@@ -12,15 +12,19 @@ import (
 type ThemeConfig struct {
 	Name   string `toml:"name"`
 	Colors struct {
-		Background          string `toml:"background"`
-		TreeNormalText      string `toml:"tree_normal_text"`
-		TreeSelectedItem    string `toml:"tree_selected_item"`
-		TreeSelectedBg      string `toml:"tree_selected_bg"`
-		TreeNewItem         string `toml:"tree_new_item"`
-		TreeLeafArrow       string `toml:"tree_leaf_arrow"`
-		TreeExpandableArrow string `toml:"tree_expandable_arrow"`
-		TreeExpandedArrow   string `toml:"tree_expanded_arrow"`
-		TreeCollapsedArrow  string `toml:"tree_collapsed_arrow"`
+		Background            string `toml:"background"`
+		TreeNormalText        string `toml:"tree_normal_text"`
+		TreeSelectedItem      string `toml:"tree_selected_item"`
+		TreeSelectedBg        string `toml:"tree_selected_bg"`
+		TreeNewItem           string `toml:"tree_new_item"`
+		TreeLeafArrow         string `toml:"tree_leaf_arrow"`
+		TreeExpandableArrow   string `toml:"tree_expandable_arrow"`
+		TreeExpandedArrow     string `toml:"tree_expanded_arrow"`
+		TreeCollapsedArrow    string `toml:"tree_collapsed_arrow"`
+		TreeVisualSelection   string `toml:"tree_visual_selection"`
+		TreeVisualSelectionBg string `toml:"tree_visual_selection_bg"`
+		TreeVisualCursor      string `toml:"tree_visual_cursor"`
+		TreeVisualCursorBg    string `toml:"tree_visual_cursor_bg"`
 		EditorText        string `toml:"editor_text"`
 		EditorCursor      string `toml:"editor_cursor"`
 		EditorCursorBg    string `toml:"editor_cursor_bg"`
@@ -135,6 +139,18 @@ func configToTheme(config ThemeConfig) *Theme {
 	}
 	if config.Colors.TreeCollapsedArrow != "" {
 		baseTheme.Colors.TreeCollapsedArrow = ParseColorString(config.Colors.TreeCollapsedArrow)
+	}
+	if config.Colors.TreeVisualSelection != "" {
+		baseTheme.Colors.TreeVisualSelection = ParseColorString(config.Colors.TreeVisualSelection)
+	}
+	if config.Colors.TreeVisualSelectionBg != "" {
+		baseTheme.Colors.TreeVisualSelectionBg = ParseColorString(config.Colors.TreeVisualSelectionBg)
+	}
+	if config.Colors.TreeVisualCursor != "" {
+		baseTheme.Colors.TreeVisualCursor = ParseColorString(config.Colors.TreeVisualCursor)
+	}
+	if config.Colors.TreeVisualCursorBg != "" {
+		baseTheme.Colors.TreeVisualCursorBg = ParseColorString(config.Colors.TreeVisualCursorBg)
 	}
 	if config.Colors.EditorText != "" {
 		baseTheme.Colors.EditorText = ParseColorString(config.Colors.EditorText)

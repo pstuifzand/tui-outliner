@@ -154,6 +154,17 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			},
 		},
 		{
+			Key:         'y',
+			Description: "Yank (copy) item",
+			Handler: func(app *App) {
+				selected := app.tree.GetSelected()
+				if selected != nil {
+					app.clipboard = selected
+					app.SetStatus("Yanked item")
+				}
+			},
+		},
+		{
 			Key:         'p',
 			Description: "Paste item below",
 			Handler: func(app *App) {
@@ -221,12 +232,112 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				app.command.Start()
 			},
 		},
+		{
+			Key:         'V',
+			Description: "Visual mode (line-wise selection)",
+			Handler: func(app *App) {
+				if app.mode == NormalMode {
+					app.mode = VisualMode
+					app.visualAnchor = app.tree.GetSelectedIndex()
+					app.SetStatus("Visual mode")
+				}
+			},
+		},
+	}
+}
+
+// InitializeVisualKeybindings sets up all the key bindings for visual mode
+func (a *App) InitializeVisualKeybindings() []KeyBinding {
+	return []KeyBinding{
+		{
+			Key:         'j',
+			Description: "Extend selection down",
+			Handler: func(app *App) {
+				app.tree.SelectNext()
+			},
+		},
+		{
+			Key:         'k',
+			Description: "Extend selection up",
+			Handler: func(app *App) {
+				app.tree.SelectPrev()
+			},
+		},
+		{
+			Key:         'h',
+			Description: "Collapse item",
+			Handler: func(app *App) {
+				app.tree.Collapse()
+			},
+		},
+		{
+			Key:         'l',
+			Description: "Expand item",
+			Handler: func(app *App) {
+				app.tree.Expand()
+			},
+		},
+		{
+			Key:         'V',
+			Description: "Exit visual mode",
+			Handler: func(app *App) {
+				app.mode = NormalMode
+				app.visualAnchor = -1
+				app.SetStatus("Exited visual mode")
+			},
+		},
+		{
+			Key:         'd',
+			Description: "Delete selected items",
+			Handler: func(app *App) {
+				app.deleteVisualSelection()
+			},
+		},
+		{
+			Key:         'x',
+			Description: "Delete selected items",
+			Handler: func(app *App) {
+				app.deleteVisualSelection()
+			},
+		},
+		{
+			Key:         'y',
+			Description: "Yank (copy) selected items",
+			Handler: func(app *App) {
+				app.yankVisualSelection()
+			},
+		},
+		{
+			Key:         '>',
+			Description: "Indent selected items",
+			Handler: func(app *App) {
+				app.indentVisualSelection()
+			},
+		},
+		{
+			Key:         '<',
+			Description: "Outdent selected items",
+			Handler: func(app *App) {
+				app.outdentVisualSelection()
+			},
+		},
 	}
 }
 
 // GetKeybindingByKey returns a keybinding for a given key
 func (a *App) GetKeybindingByKey(key rune) *KeyBinding {
 	for _, kb := range a.keybindings {
+		if kb.Key == key {
+			return &kb
+		}
+	}
+	return nil
+}
+
+// GetVisualKeybindingByKey returns a visual mode keybinding for a given key
+func (a *App) GetVisualKeybindingByKey(key rune) *KeyBinding {
+	visualKeybindings := a.InitializeVisualKeybindings()
+	for _, kb := range visualKeybindings {
 		if kb.Key == key {
 			return &kb
 		}

@@ -53,6 +53,10 @@ func (c *CommandMode) HandleKey(ev *tcell.EventKey) (command string, done bool) 
 		if c.cursorPos > 0 {
 			c.input = c.input[:c.cursorPos-1] + c.input[c.cursorPos:]
 			c.cursorPos--
+		} else if c.input == "" {
+			// Exit command mode when backspace is pressed on empty command line
+			c.Stop()
+			return "", true
 		}
 	case tcell.KeyDelete:
 		if c.cursorPos < len(c.input) {

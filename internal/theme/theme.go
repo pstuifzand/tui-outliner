@@ -10,14 +10,18 @@ type Colors struct {
 	Background tcell.Color
 
 	// Tree view colors
-	TreeNormalText      tcell.Color
-	TreeSelectedItem    tcell.Color
-	TreeSelectedBg      tcell.Color  // Background for selected items
-	TreeNewItem         tcell.Color
-	TreeLeafArrow       tcell.Color  // Dimmer arrow for leaf nodes (no children)
-	TreeExpandableArrow tcell.Color  // Brighter arrow for nodes with children
-	TreeExpandedArrow   tcell.Color
-	TreeCollapsedArrow  tcell.Color
+	TreeNormalText       tcell.Color
+	TreeSelectedItem     tcell.Color
+	TreeSelectedBg       tcell.Color  // Background for selected items
+	TreeNewItem          tcell.Color
+	TreeLeafArrow        tcell.Color  // Dimmer arrow for leaf nodes (no children)
+	TreeExpandableArrow  tcell.Color  // Brighter arrow for nodes with children
+	TreeExpandedArrow    tcell.Color
+	TreeCollapsedArrow   tcell.Color
+	TreeVisualSelection  tcell.Color  // Foreground color for items in visual selection
+	TreeVisualSelectionBg tcell.Color // Background color for items in visual selection
+	TreeVisualCursor     tcell.Color  // Foreground color for visual mode cursor
+	TreeVisualCursorBg   tcell.Color  // Background color for visual mode cursor
 
 	// Editor colors
 	EditorText        tcell.Color
@@ -76,6 +80,10 @@ func Default() *Theme {
 			TreeExpandableArrow: tcell.ColorWhite,
 			TreeExpandedArrow:   tcell.ColorWhite,
 			TreeCollapsedArrow:  tcell.ColorWhite,
+			TreeVisualSelection: tcell.ColorWhite,
+			TreeVisualSelectionBg: tcell.ColorBlue,
+			TreeVisualCursor:    tcell.ColorBlack,
+			TreeVisualCursorBg:  tcell.ColorBlue,
 			// Editor colors
 			EditorText:        tcell.ColorWhite,
 			EditorCursor:      tcell.ColorBlack,

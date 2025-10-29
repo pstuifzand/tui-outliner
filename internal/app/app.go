@@ -17,6 +17,7 @@ type Mode int
 const (
 	NormalMode Mode = iota
 	InsertMode
+	VisualMode
 )
 
 // App is the main application controller
@@ -35,8 +36,9 @@ type App struct {
 	autoSaveTime time.Time
 	quit         bool
 	debugMode    bool
-	mode         Mode // Current editor mode (NormalMode or InsertMode)
+	mode         Mode // Current editor mode (NormalMode, InsertMode, or VisualMode)
 	clipboard    *model.Item // For cut/paste operations
+	visualAnchor int  // For visual mode selection (index in filteredView, -1 when not in visual mode)
 	keybindings  []KeyBinding // All keybindings
 }
 
@@ -83,6 +85,7 @@ func NewApp(filePath string) (*App, error) {
 		autoSaveTime: time.Now(),
 		quit:         false,
 		mode:         NormalMode,
+		visualAnchor: -1,
 	}
 
 	// Initialize keybindings
@@ -184,12 +187,12 @@ func (a *App) render() {
 		if len(results) > 0 {
 			// Create a temporary tree with search results
 			tempTree := ui.NewTreeView(results)
-			tempTree.Render(a.screen, treeStartY)
+			tempTree.Render(a.screen, treeStartY, -1)
 		} else {
 			a.screen.DrawString(0, treeStartY, "No results", ui.DefaultStyle())
 		}
 	} else {
-		a.tree.Render(a.screen, treeStartY)
+		a.tree.Render(a.screen, treeStartY, a.visualAnchor)
 	}
 
 	// Render editor inline if active
@@ -235,6 +238,8 @@ func (a *App) render() {
 	// Show mode indicator
 	if a.mode == InsertMode {
 		statusLine = "-- INSERT --"
+	} else if a.mode == VisualMode {
+		statusLine = "-- VISUAL --"
 	} else {
 		statusLine = "-- NORMAL --"
 	}
@@ -339,6 +344,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 			if keyEv.Key() == tcell.KeyEscape || keyEv.Rune() == '?' {
 				a.help.Toggle()
 			}
+		}
+		return
+	}
+
+	// Handle visual mode
+	if a.mode == VisualMode {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			a.handleVisualMode(keyEv)
 		}
 		return
 	}
@@ -503,6 +516,166 @@ func (a *App) SaveAs(filename string) error {
 	a.dirty = false
 	a.autoSaveTime = time.Now()
 	return nil
+}
+
+// handleVisualMode handles input while in visual mode
+func (a *App) handleVisualMode(ev *tcell.EventKey) {
+	// Handle special keys for visual mode
+	switch ev.Key() {
+	case tcell.KeyDown:
+		a.tree.SelectNext()
+		return
+	case tcell.KeyUp:
+		a.tree.SelectPrev()
+		return
+	case tcell.KeyLeft:
+		a.tree.Collapse()
+		return
+	case tcell.KeyRight:
+		a.tree.Expand()
+		return
+	case tcell.KeyEscape:
+		// Exit visual mode
+		a.mode = NormalMode
+		a.visualAnchor = -1
+		a.SetStatus("Exited visual mode")
+		return
+	}
+
+	// Handle character keys using keybindings
+	key := ev.Rune()
+	kb := a.GetVisualKeybindingByKey(key)
+	if kb != nil {
+		kb.Handler(a)
+	}
+}
+
+// deleteVisualSelection deletes all items in the visual selection range
+func (a *App) deleteVisualSelection() {
+	start, end := a.getVisualSelectionRange()
+	if start < 0 || end < 0 {
+		a.SetStatus("No selection")
+		return
+	}
+
+	// Get all items in the selection range
+	items := a.tree.GetItemsInRange(start, end)
+	if len(items) == 0 {
+		a.SetStatus("Nothing to delete")
+		return
+	}
+
+	// Delete each item
+	for _, item := range items {
+		a.tree.DeleteItem(item)
+	}
+
+	a.mode = NormalMode
+	a.visualAnchor = -1
+	a.SetStatus(fmt.Sprintf("Deleted %d items", len(items)))
+	a.dirty = true
+}
+
+// yankVisualSelection yanks (copies) all items in the visual selection range
+func (a *App) yankVisualSelection() {
+	start, end := a.getVisualSelectionRange()
+	if start < 0 || end < 0 {
+		a.SetStatus("No selection")
+		return
+	}
+
+	// Get all items in the selection range
+	items := a.tree.GetItemsInRange(start, end)
+	if len(items) == 0 {
+		a.SetStatus("Nothing to yank")
+		return
+	}
+
+	// For now, store just the first item in clipboard
+	// TODO: Extend clipboard to support multiple items
+	if len(items) > 0 {
+		a.clipboard = items[0]
+	}
+
+	a.mode = NormalMode
+	a.visualAnchor = -1
+	a.SetStatus(fmt.Sprintf("Yanked %d items", len(items)))
+}
+
+// indentVisualSelection indents all items in the visual selection range
+func (a *App) indentVisualSelection() {
+	start, end := a.getVisualSelectionRange()
+	if start < 0 || end < 0 {
+		a.SetStatus("No selection")
+		return
+	}
+
+	// Get all items in the selection range
+	items := a.tree.GetItemsInRange(start, end)
+	if len(items) == 0 {
+		a.SetStatus("Nothing to indent")
+		return
+	}
+
+	// Indent each item
+	count := 0
+	for _, item := range items {
+		if a.tree.IndentItem(item) {
+			count++
+		}
+	}
+
+	a.mode = NormalMode
+	a.visualAnchor = -1
+	a.SetStatus(fmt.Sprintf("Indented %d items", count))
+	a.dirty = true
+}
+
+// outdentVisualSelection outdents all items in the visual selection range
+func (a *App) outdentVisualSelection() {
+	start, end := a.getVisualSelectionRange()
+	if start < 0 || end < 0 {
+		a.SetStatus("No selection")
+		return
+	}
+
+	// Get all items in the selection range
+	items := a.tree.GetItemsInRange(start, end)
+	if len(items) == 0 {
+		a.SetStatus("Nothing to outdent")
+		return
+	}
+
+	// Outdent each item
+	count := 0
+	for _, item := range items {
+		if a.tree.OutdentItem(item) {
+			count++
+		}
+	}
+
+	a.mode = NormalMode
+	a.visualAnchor = -1
+	a.SetStatus(fmt.Sprintf("Outdented %d items", count))
+	a.dirty = true
+}
+
+// getVisualSelectionRange returns the start and end indices of the visual selection
+// Returns -1, -1 if not in visual selection
+func (a *App) getVisualSelectionRange() (int, int) {
+	if a.visualAnchor < 0 {
+		return -1, -1
+	}
+
+	current := a.tree.GetSelectedIndex()
+	start := a.visualAnchor
+	end := current
+
+	if start > end {
+		start, end = end, start
+	}
+
+	return start, end
 }
 
 // SetStatus sets the status message

@@ -246,3 +246,4 @@ ls -la /home/peter/work/tui-outliner/
 - All files use UTF-8 encoding
 - JSON is the persistence format for outlines
 - The application includes auto-save (5 seconds of inactivity)
+- When adding docs, add these to the ./docs/ directory.

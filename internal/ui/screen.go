@@ -180,6 +180,16 @@ func (s *Screen) TreeExpandableArrowStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeExpandableArrow)
 }
 
+// TreeVisualSelectionStyle returns the style for items in visual selection
+func (s *Screen) TreeVisualSelectionStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.TreeVisualSelection, s.Theme.Colors.TreeVisualSelectionBg)
+}
+
+// TreeVisualCursorStyle returns the style for the cursor position in visual selection
+func (s *Screen) TreeVisualCursorStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.TreeVisualCursor, s.Theme.Colors.TreeVisualCursorBg).Bold(true)
+}
+
 // EditorStyle returns the style for editor text
 func (s *Screen) EditorStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.EditorText)

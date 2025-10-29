@@ -484,11 +484,23 @@ func (tv *TreeView) GetDisplayItems() []*displayItem {
 }
 
 // Render renders the tree to the screen
-func (tv *TreeView) Render(screen *Screen, startY int) {
+func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 	defaultStyle := screen.TreeNormalStyle()
 	selectedStyle := screen.TreeSelectedStyle()
+	visualStyle := screen.TreeVisualSelectionStyle()
+	visualCursorStyle := screen.TreeVisualCursorStyle()
 	newItemStyle := screen.TreeNewItemStyle()
 	screenWidth := screen.GetWidth()
+
+	// Determine visual selection range
+	visualStart, visualEnd := -1, -1
+	if visualAnchor >= 0 {
+		visualStart = visualAnchor
+		visualEnd = tv.selectedIdx
+		if visualStart > visualEnd {
+			visualStart, visualEnd = visualEnd, visualStart
+		}
+	}
 
 	for idx, dispItem := range tv.filteredView {
 		y := startY + idx
@@ -496,13 +508,23 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 			break
 		}
 
-		// Select style based on selection and new item status
+		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
-		if dispItem.item.IsNew && idx != tv.selectedIdx {
-			// Use new item style for new items (dim) when not selected
+		if dispItem.item.IsNew && idx != tv.selectedIdx && (visualStart < 0 || idx < visualStart || idx > visualEnd) {
+			// Use new item style for new items (dim) when not selected and not in visual range
 			style = newItemStyle
 		}
-		if idx == tv.selectedIdx {
+
+		// Check if in visual selection range
+		inVisualRange := visualStart >= 0 && idx >= visualStart && idx <= visualEnd
+
+		if inVisualRange {
+			if idx == tv.selectedIdx {
+				style = visualCursorStyle
+			} else {
+				style = visualStyle
+			}
+		} else if idx == tv.selectedIdx {
 			style = selectedStyle
 		}
 
@@ -575,4 +597,96 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 // GetItemCount returns the number of displayed items
 func (tv *TreeView) GetItemCount() int {
 	return len(tv.filteredView)
+}
+
+// GetItemsInRange returns all items in the range from start to end index (inclusive)
+func (tv *TreeView) GetItemsInRange(start, end int) []*model.Item {
+	if start < 0 || end < 0 || start >= len(tv.filteredView) || end >= len(tv.filteredView) {
+		return nil
+	}
+
+	if start > end {
+		start, end = end, start
+	}
+
+	items := make([]*model.Item, 0)
+	for i := start; i <= end; i++ {
+		if i < len(tv.filteredView) {
+			items = append(items, tv.filteredView[i].item)
+		}
+	}
+
+	return items
+}
+
+// IndentItem indents a specific item (makes it a child of previous item)
+func (tv *TreeView) IndentItem(item *model.Item) bool {
+	if item == nil {
+		return false
+	}
+
+	// Find the index of this item in filteredView
+	itemIdx := -1
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.item.ID == item.ID {
+			itemIdx = idx
+			break
+		}
+	}
+
+	if itemIdx < 1 {
+		return false // Must have a previous item to indent into
+	}
+
+	// Get previous item - it becomes the parent
+	prevItem := tv.filteredView[itemIdx-1].item
+
+	// Remove from current parent
+	if item.Parent != nil {
+		item.Parent.RemoveChild(item)
+	} else {
+		// Remove from root
+		for idx, rootItem := range tv.items {
+			if rootItem.ID == item.ID {
+				tv.items = append(tv.items[:idx], tv.items[idx+1:]...)
+				break
+			}
+		}
+	}
+
+	// Add to previous item as child
+	prevItem.AddChild(item)
+
+	// Expand previous item to show the moved item
+	prevItem.Expanded = true
+
+	tv.rebuildView()
+	return true
+}
+
+// OutdentItem outdents a specific item (decreases nesting level)
+func (tv *TreeView) OutdentItem(item *model.Item) bool {
+	if item == nil {
+		return false
+	}
+
+	if item.Parent == nil {
+		return false // Already at top level
+	}
+
+	parentParent := item.Parent.Parent
+	currentParent := item.Parent
+
+	// Remove from current parent
+	currentParent.RemoveChild(item)
+
+	// Add to parent's parent or to root
+	if parentParent != nil {
+		parentParent.AddChild(item)
+	} else {
+		tv.items = append(tv.items, item)
+	}
+
+	tv.rebuildView()
+	return true
 }
