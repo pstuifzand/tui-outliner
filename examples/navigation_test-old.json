@@ -1,0 +1,47 @@
+{
+  "title": "Navigation Test - gg and G",
+  "items": [
+    {
+      "id": "item_nav_1",
+      "text": "First Item - Press gg to return here"
+    },
+    {
+      "id": "item_20251029233403_lrjgf663",
+      "text": "Second Item",
+      "metadata": {
+        "created": "2025-10-29T23:34:03.971352301+01:00",
+        "modified": "2025-10-29T23:34:03.971352444+01:00"
+      }
+    },
+    {
+      "id": "item_nav_3",
+      "text": "Third Item"
+    },
+    {
+      "id": "item_nav_4",
+      "text": "Fourth Item with Children",
+      "children": [
+        {
+          "id": "item_nav_4_1",
+          "text": "Child Item 4.1"
+        },
+        {
+          "id": "item_nav_4_2",
+          "text": "Child Item 4.2"
+        }
+      ]
+    },
+    {
+      "id": "item_nav_5",
+      "text": "Fifth Item"
+    },
+    {
+      "id": "item_20251029233541_yxnj6d60",
+      "text": "Sixth Item",
+      "metadata": {
+        "created": "2025-10-29T23:35:41.758018166+01:00",
+        "modified": "2025-10-29T23:35:41.758018402+01:00"
+      }
+    }
+  ]
+}

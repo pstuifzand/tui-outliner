@@ -259,24 +259,38 @@ func (tv *TreeView) AddItemAfter(text string) {
 			// Find position of selected item in parent's children
 			for idx, child := range parent.Children {
 				if child.ID == selected.ID {
-					// Insert after this position
-					parent.Children = append(parent.Children[:idx+1], append([]*model.Item{newItem}, parent.Children[idx+1:]...)...)
+					// Insert after this position using safe concatenation
+					newChildren := make([]*model.Item, 0, len(parent.Children)+1)
+					newChildren = append(newChildren, parent.Children[:idx+1]...)
 					newItem.Parent = parent
+					newChildren = append(newChildren, newItem)
+					newChildren = append(newChildren, parent.Children[idx+1:]...)
+					parent.Children = newChildren
 					break
 				}
 			}
 		} else {
-			// Insert at root level
+			// Insert at root level using safe concatenation
 			for idx, item := range tv.items {
 				if item.ID == selected.ID {
-					tv.items = append(tv.items[:idx+1], append([]*model.Item{newItem}, tv.items[idx+1:]...)...)
+					newItems := make([]*model.Item, 0, len(tv.items)+1)
+					newItems = append(newItems, tv.items[:idx+1]...)
+					newItems = append(newItems, newItem)
+					newItems = append(newItems, tv.items[idx+1:]...)
+					tv.items = newItems
 					break
 				}
 			}
 		}
 	}
 	tv.rebuildView()
-	tv.SelectNext()
+	// Find and select the new item in the filtered view
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.Item.ID == newItem.ID {
+			tv.selectedIdx = idx
+			return
+		}
+	}
 }
 
 // AddItemAsChild adds a new item as a child of the selected item
@@ -304,24 +318,38 @@ func (tv *TreeView) AddItemBefore(text string) {
 			// Find position of selected item in parent's children
 			for idx, child := range parent.Children {
 				if child.ID == selected.ID {
-					// Insert before this position
-					parent.Children = append(parent.Children[:idx], append([]*model.Item{newItem}, parent.Children[idx:]...)...)
+					// Insert before this position using safe concatenation
+					newChildren := make([]*model.Item, 0, len(parent.Children)+1)
+					newChildren = append(newChildren, parent.Children[:idx]...)
 					newItem.Parent = parent
+					newChildren = append(newChildren, newItem)
+					newChildren = append(newChildren, parent.Children[idx:]...)
+					parent.Children = newChildren
 					break
 				}
 			}
 		} else {
-			// Insert at root level
+			// Insert at root level using safe concatenation
 			for idx, item := range tv.items {
 				if item.ID == selected.ID {
-					tv.items = append(tv.items[:idx], append([]*model.Item{newItem}, tv.items[idx:]...)...)
+					newItems := make([]*model.Item, 0, len(tv.items)+1)
+					newItems = append(newItems, tv.items[:idx]...)
+					newItems = append(newItems, newItem)
+					newItems = append(newItems, tv.items[idx:]...)
+					tv.items = newItems
 					break
 				}
 			}
 		}
 	}
 	tv.rebuildView()
-	tv.selectedIdx = tv.selectedIdx // Selection stays on the new item (which is now at the same index)
+	// Find and select the new item in the filtered view
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.Item.ID == newItem.ID {
+			tv.selectedIdx = idx
+			return
+		}
+	}
 }
 
 // DeleteSelected removes the selected item
@@ -696,4 +724,21 @@ func (tv *TreeView) OutdentItem(item *model.Item) bool {
 
 	tv.rebuildView()
 	return true
+}
+
+// SelectFirst moves selection to the first item
+func (tv *TreeView) SelectFirst() {
+	tv.selectedIdx = 0
+}
+
+// SelectLast moves selection to the last item
+func (tv *TreeView) SelectLast() {
+	if len(tv.filteredView) > 0 {
+		tv.selectedIdx = len(tv.filteredView) - 1
+	}
+}
+
+// GetItems returns the root-level items (for saving back to outline)
+func (tv *TreeView) GetItems() []*model.Item {
+	return tv.items
 }

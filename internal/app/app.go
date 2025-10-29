@@ -22,24 +22,26 @@ const (
 
 // App is the main application controller
 type App struct {
-	screen       *ui.Screen
-	outline      *model.Outline
-	store        *storage.JSONStore
-	tree         *ui.TreeView
-	editor       *ui.Editor
-	search       *ui.Search
-	help         *ui.HelpScreen
-	command      *ui.CommandMode
-	statusMsg    string
-	statusTime   time.Time
-	dirty        bool
-	autoSaveTime time.Time
-	quit         bool
-	debugMode    bool
-	mode         Mode // Current editor mode (NormalMode, InsertMode, or VisualMode)
-	clipboard    *model.Item // For cut/paste operations
-	visualAnchor int  // For visual mode selection (index in filteredView, -1 when not in visual mode)
-	keybindings  []KeyBinding // All keybindings
+	screen             *ui.Screen
+	outline            *model.Outline
+	store              *storage.JSONStore
+	tree               *ui.TreeView
+	editor             *ui.Editor
+	search             *ui.Search
+	help               *ui.HelpScreen
+	command            *ui.CommandMode
+	statusMsg          string
+	statusTime         time.Time
+	dirty              bool
+	autoSaveTime       time.Time
+	quit               bool
+	debugMode          bool
+	mode               Mode // Current editor mode (NormalMode, InsertMode, or VisualMode)
+	clipboard          *model.Item // For cut/paste operations
+	visualAnchor       int  // For visual mode selection (index in filteredView, -1 when not in visual mode)
+	keybindings        []KeyBinding // All keybindings
+	pendingKeybindings []PendingKeyBinding // Pending key definitions (g, z, etc)
+	pendingKeySeq      rune        // Current pending key waiting for second character
 }
 
 // NewApp creates a new App instance
@@ -74,30 +76,36 @@ func NewApp(filePath string) (*App, error) {
 	command := ui.NewCommandMode()
 
 	app := &App{
-		screen:       screen,
-		outline:      outline,
-		store:        store,
-		tree:         tree,
-		editor:       nil,
-		search:       ui.NewSearch(outline.GetAllItems()),
-		help:         help,
-		command:      command,
-		statusMsg:    "Ready",
-		statusTime:   time.Now(),
-		dirty:        false,
-		autoSaveTime: time.Now(),
-		quit:         false,
-		mode:         NormalMode,
-		visualAnchor: -1,
+		screen:             screen,
+		outline:            outline,
+		store:              store,
+		tree:               tree,
+		editor:             nil,
+		search:             ui.NewSearch(outline.GetAllItems()),
+		help:               help,
+		command:            command,
+		statusMsg:          "Ready",
+		statusTime:         time.Now(),
+		dirty:              false,
+		autoSaveTime:       time.Now(),
+		quit:               false,
+		mode:               NormalMode,
+		visualAnchor:       -1,
+		pendingKeySeq:      0,
 	}
 
 	// Initialize keybindings
 	app.keybindings = app.InitializeKeybindings()
+	app.pendingKeybindings = app.InitializePendingKeybindings()
 
 	// Convert keybindings to KeyBindingInfo for help screen
 	var helpKeybindings []ui.KeyBindingInfo
 	for i := range app.keybindings {
 		helpKeybindings = append(helpKeybindings, &app.keybindings[i])
+	}
+	// Add pending keybindings to help
+	for i := range app.pendingKeybindings {
+		helpKeybindings = append(helpKeybindings, &app.pendingKeybindings[i])
 	}
 	app.help.SetKeybindings(helpKeybindings)
 
@@ -312,9 +320,10 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if !a.editor.HandleKey(keyEv) {
-				// Check if Enter or Escape was pressed
+				// Check if Enter, Escape, or Backspace on empty was pressed
 				enterPressed := a.editor.WasEnterPressed()
 				escapePressed := a.editor.WasEscapePressed()
+				backspaceOnEmpty := a.editor.WasBackspaceOnEmpty()
 				editedItem := a.editor.GetItem()
 
 				// Exit edit mode
@@ -329,6 +338,23 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					a.tree.DeleteItem(editedItem)
 					a.SetStatus("Deleted empty item")
 					a.dirty = true
+				} else if backspaceOnEmpty {
+					// Backspace pressed on empty item - merge with previous item
+					prevIdx := a.tree.GetSelectedIndex() - 1
+					if prevIdx >= 0 {
+						a.tree.DeleteItem(editedItem)
+						a.tree.SelectItem(prevIdx)
+						a.SetStatus("Merged with previous item")
+						a.dirty = true
+
+						// Enter insert mode on previous item with cursor at end
+						prevItem := a.tree.GetSelected()
+						if prevItem != nil {
+							a.editor = ui.NewEditor(prevItem)
+							a.editor.Start()
+							a.mode = InsertMode
+						}
+					}
 				} else if enterPressed {
 					// If Enter was pressed, create new node below and enter insert mode
 					a.tree.AddItemAfter("")
@@ -388,27 +414,33 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 	switch ev.Key() {
 	case tcell.KeyDown:
 		a.tree.SelectNext()
+		a.pendingKeySeq = 0 // Clear pending sequence on other keys
 		return
 	case tcell.KeyUp:
 		a.tree.SelectPrev()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyLeft:
 		a.tree.Collapse()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyRight:
 		a.tree.Expand()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlI:
 		if a.tree.Indent() {
 			a.SetStatus("Indented")
 			a.dirty = true
 		}
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlU:
 		if a.tree.Outdent() {
 			a.SetStatus("Outdented")
 			a.dirty = true
 		}
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlS:
 		if err := a.Save(); err != nil {
@@ -417,16 +449,39 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 			a.SetStatus("Saved")
 			a.dirty = false
 		}
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyEscape:
 		// Can be used for various purposes (just ignore for now)
+		a.pendingKeySeq = 0
 		return
 	}
 
 	// Handle rune (character) keys using keybinding map
 	r := ev.Rune()
 
-	// Check for keybinding (also handle . and , as alternates for > and <)
+	// Check if we're waiting for a second key of a pending key sequence
+	if a.pendingKeySeq != 0 {
+		pendingKey := a.GetPendingKeyBindingByPrefix(a.pendingKeySeq)
+		if pendingKey != nil {
+			if seqBinding, ok := pendingKey.Sequences[r]; ok {
+				// Execute the pending key sequence
+				seqBinding.Handler(a)
+				a.pendingKeySeq = 0
+				return
+			}
+		}
+		// Clear pending sequence if second key didn't match
+		a.pendingKeySeq = 0
+	}
+
+	// Check if this is a pending key prefix
+	if a.IsPendingKeyPrefix(r) {
+		a.pendingKeySeq = r
+		return
+	}
+
+	// Check for regular keybinding (also handle . and , as alternates for > and <)
 	kb := a.GetKeybindingByKey(r)
 	if kb != nil {
 		kb.Handler(a)
@@ -504,6 +559,9 @@ func (a *App) handleCommand(cmd string) {
 
 // Save saves the outline to disk
 func (a *App) Save() error {
+	// Sync tree items back to outline before saving
+	a.outline.Items = a.tree.GetItems()
+
 	if err := a.store.Save(a.outline); err != nil {
 		return err
 	}
@@ -519,6 +577,9 @@ func (a *App) SaveAs(filename string) error {
 	if filename == "" {
 		return a.Save()
 	}
+
+	// Sync tree items back to outline before saving
+	a.outline.Items = a.tree.GetItems()
 
 	// Save to the specified filename
 	if err := a.store.SaveToFile(a.outline, filename); err != nil {
@@ -539,26 +600,54 @@ func (a *App) handleVisualMode(ev *tcell.EventKey) {
 	switch ev.Key() {
 	case tcell.KeyDown:
 		a.tree.SelectNext()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyUp:
 		a.tree.SelectPrev()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyLeft:
 		a.tree.Collapse()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyRight:
 		a.tree.Expand()
+		a.pendingKeySeq = 0
 		return
 	case tcell.KeyEscape:
 		// Exit visual mode
 		a.mode = NormalMode
 		a.visualAnchor = -1
+		a.pendingKeySeq = 0
 		a.SetStatus("Exited visual mode")
 		return
 	}
 
-	// Handle character keys using keybindings
+	// Handle character keys
 	key := ev.Rune()
+
+	// Check if we're waiting for a second key of a pending key sequence
+	if a.pendingKeySeq != 0 {
+		pendingKey := a.GetPendingKeyBindingByPrefix(a.pendingKeySeq)
+		if pendingKey != nil {
+			if seqBinding, ok := pendingKey.Sequences[key]; ok {
+				// Execute the pending key sequence
+				seqBinding.Handler(a)
+				a.pendingKeySeq = 0
+				return
+			}
+		}
+		// Clear pending sequence if second key didn't match
+		a.pendingKeySeq = 0
+	}
+
+	// Check if this is a pending key prefix
+	if a.IsPendingKeyPrefix(key) {
+		a.pendingKeySeq = key
+		return
+	}
+
+	// Handle visual keybindings
 	kb := a.GetVisualKeybindingByKey(key)
 	if kb != nil {
 		kb.Handler(a)

@@ -8,6 +8,13 @@ type KeyBindingInfo interface {
 	GetDescription() string
 }
 
+// PendingKeyBindingInfo represents a pending keybinding for display
+type PendingKeyBindingInfo interface {
+	GetKey() rune
+	GetDescription() string
+	GetSequences() map[rune]string // Returns map of second key to description
+}
+
 // HelpScreen manages the help display
 type HelpScreen struct {
 	visible      bool
@@ -45,8 +52,22 @@ func (h *HelpScreen) GetKeybindings() []string {
 	result = append(result, "")
 
 	for _, kb := range h.keybindings {
-		line := fmt.Sprintf("  %c  - %s", kb.GetKey(), kb.GetDescription())
-		result = append(result, line)
+		// Check if this is a PendingKeyBinding by trying to cast it
+		if pkb, ok := kb.(PendingKeyBindingInfo); ok {
+			// Display the pending key with its sequences
+			line := fmt.Sprintf("  %c  - %s", pkb.GetKey(), pkb.GetDescription())
+			result = append(result, line)
+
+			// Show the sub-sequences
+			sequences := pkb.GetSequences()
+			for seqKey, seqDesc := range sequences {
+				line := fmt.Sprintf("    %c%c  - %s", pkb.GetKey(), seqKey, seqDesc)
+				result = append(result, line)
+			}
+		} else {
+			line := fmt.Sprintf("  %c  - %s", kb.GetKey(), kb.GetDescription())
+			result = append(result, line)
+		}
 	}
 
 	result = append(result, "")

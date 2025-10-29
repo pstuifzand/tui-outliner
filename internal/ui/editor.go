@@ -7,12 +7,13 @@ import (
 
 // Editor manages inline text editing of outline items
 type Editor struct {
-	item          *model.Item
-	text          string
-	cursorPos     int
-	active        bool
-	enterPressed  bool // Track if Enter was pressed to create new node
-	escapePressed bool // Track if Escape was pressed
+	item               *model.Item
+	text               string
+	cursorPos          int
+	active             bool
+	enterPressed       bool // Track if Enter was pressed to create new node
+	escapePressed      bool // Track if Escape was pressed
+	backspaceOnEmpty   bool // Track if Backspace was pressed on an empty item
 }
 
 // NewEditor creates a new Editor
@@ -70,6 +71,10 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		if e.cursorPos > 0 {
 			e.text = e.text[:e.cursorPos-1] + e.text[e.cursorPos:]
 			e.cursorPos--
+		} else if e.cursorPos == 0 && e.text == "" {
+			// Backspace pressed on empty item - signal to merge with previous item
+			e.backspaceOnEmpty = true
+			return false // Signal to exit edit mode
 		}
 	case tcell.KeyDelete:
 		if e.cursorPos < len(e.text) {
@@ -198,6 +203,13 @@ func (e *Editor) WasEscapePressed() bool {
 	return pressed
 }
 
+// WasBackspaceOnEmpty returns whether Backspace was pressed on an empty item and resets the flag
+func (e *Editor) WasBackspaceOnEmpty() bool {
+	pressed := e.backspaceOnEmpty
+	e.backspaceOnEmpty = false
+	return pressed
+}
+
 // GetItem returns the item being edited
 func (e *Editor) GetItem() *model.Item {
 	return e.item
@@ -213,4 +225,9 @@ func (e *Editor) SetCursorFromScreenX(relativeX int) {
 		relativeX = len(e.text)
 	}
 	e.cursorPos = relativeX
+}
+
+// SetCursorToStart positions the cursor at the beginning of the text
+func (e *Editor) SetCursorToStart() {
+	e.cursorPos = 0
 }

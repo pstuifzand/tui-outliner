@@ -21,6 +21,32 @@ func (kb *KeyBinding) GetDescription() string {
 	return kb.Description
 }
 
+// PendingKeyBinding represents a pending key (like 'g' or 'z') that waits for a second key
+type PendingKeyBinding struct {
+	Prefix      rune                          // The first key (e.g., 'g' or 'z')
+	Description string                        // Description of what the pending key does
+	Sequences   map[rune]KeyBinding           // Map of second key to keybinding
+}
+
+// GetKey returns the prefix key
+func (pkb *PendingKeyBinding) GetKey() rune {
+	return pkb.Prefix
+}
+
+// GetDescription returns the description
+func (pkb *PendingKeyBinding) GetDescription() string {
+	return pkb.Description
+}
+
+// GetSequences returns a map of second key to description for display in help
+func (pkb *PendingKeyBinding) GetSequences() map[rune]string {
+	result := make(map[rune]string)
+	for key, binding := range pkb.Sequences {
+		result[key] = binding.Description
+	}
+	return result
+}
+
 // InitializeKeybindings sets up all the key bindings
 func (a *App) InitializeKeybindings() []KeyBinding {
 	return []KeyBinding{
@@ -74,12 +100,13 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 		},
 		{
 			Key:         'i',
-			Description: "Edit item",
+			Description: "Edit item (cursor at start)",
 			Handler: func(app *App) {
 				selected := app.tree.GetSelected()
 				if selected != nil {
 					app.editor = ui.NewEditor(selected)
 					app.editor.Start()
+					app.editor.SetCursorToStart()
 					app.mode = InsertMode
 				}
 			},
@@ -243,6 +270,37 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				}
 			},
 		},
+		{
+			Key:         'G',
+			Description: "Go to last node",
+			Handler: func(app *App) {
+				app.tree.SelectLast()
+			},
+		},
+	}
+}
+
+// InitializePendingKeybindings sets up pending key bindings (keys that wait for a second key)
+func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
+	return []PendingKeyBinding{
+		{
+			Prefix:      'g',
+			Description: "Go to... (g + key)",
+			Sequences: map[rune]KeyBinding{
+				'g': {
+					Key:         'g',
+					Description: "Go to first node",
+					Handler: func(app *App) {
+						app.tree.SelectFirst()
+					},
+				},
+			},
+		},
+		{
+			Prefix:      'z',
+			Description: "Fold... (z + key)",
+			Sequences:   map[rune]KeyBinding{}, // Placeholder for future fold operations
+		},
 	}
 }
 
@@ -321,6 +379,13 @@ func (a *App) InitializeVisualKeybindings() []KeyBinding {
 				app.outdentVisualSelection()
 			},
 		},
+		{
+			Key:         'G',
+			Description: "Extend selection to last node",
+			Handler: func(app *App) {
+				app.tree.SelectLast()
+			},
+		},
 	}
 }
 
@@ -343,4 +408,19 @@ func (a *App) GetVisualKeybindingByKey(key rune) *KeyBinding {
 		}
 	}
 	return nil
+}
+
+// GetPendingKeyBindingByPrefix returns a pending keybinding for a prefix key
+func (a *App) GetPendingKeyBindingByPrefix(prefix rune) *PendingKeyBinding {
+	for i := range a.pendingKeybindings {
+		if a.pendingKeybindings[i].Prefix == prefix {
+			return &a.pendingKeybindings[i]
+		}
+	}
+	return nil
+}
+
+// IsPendingKeyPrefix checks if a key is a pending key prefix
+func (a *App) IsPendingKeyPrefix(key rune) bool {
+	return a.GetPendingKeyBindingByPrefix(key) != nil
 }

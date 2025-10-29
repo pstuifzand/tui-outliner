@@ -9,6 +9,9 @@
 | `k` / `↑` | Move up |
 | `h` / `←` | Collapse item |
 | `l` / `→` | Expand item |
+| `gg` | Go to first node |
+| `G` | Go to last node |
+| `z...` | Reserved for future fold/zoom commands |
 
 ### Item Operations
 | Key | Action |
@@ -56,6 +59,9 @@ Enter with `V` in normal mode.
 | `k` / `↑` | Extend selection up |
 | `h` / `←` | Collapse item |
 | `l` / `→` | Expand item |
+| `gg` | Extend selection to first node |
+| `G` | Extend selection to last node |
+| `z...` | Reserved for future fold/zoom commands |
 
 ### Operations
 | Key | Action |

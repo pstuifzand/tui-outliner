@@ -12,7 +12,9 @@ Location: `internal/app/keybindings.go` - `InitializeKeybindings()`
 These are the default keybindings active when not in Insert or Visual mode.
 
 **Key bindings include:**
-- Navigation: `j`, `k`, `h`, `l` (and arrow keys)
+- Navigation: `j`, `k`, `h`, `l` (and arrow keys), `G` (go to last node)
+- Pending keys: `g...` (go to commands), `z...` (fold/zoom commands - reserved)
+  - `gg` (go to first node)
 - Node operations: `J`, `K` (move up/down), `i`, `c`, `A` (edit), `o`, `O` (create)
 - Deletion: `d` (delete current)
 - Paste: `p`, `P` (paste below/above)
@@ -27,7 +29,9 @@ Location: `internal/app/keybindings.go` - `InitializeVisualKeybindings()`
 These keybindings are active when in visual mode (multi-item selection).
 
 **Key bindings include:**
-- Navigation: `j`, `k`, `h`, `l` (extend selection / expand collapse)
+- Navigation: `j`, `k`, `h`, `l` (extend selection / expand collapse), `G` (extend to last node)
+- Pending keys: `g...` (go to commands), `z...` (fold/zoom commands - reserved)
+  - `gg` (extend selection to first node)
 - Operations: `d`, `x` (delete), `y` (yank), `>`, `<` (indent/outdent)
 - Exit: `V` (exit visual mode)
 
@@ -111,6 +115,55 @@ Example:
 2. Add a new KeyBinding struct to the `InitializeVisualKeybindings()` function
 3. Implement the handler function
 4. Rebuild the application
+
+## Pending Keys
+
+The keybindings system supports "pending keys" - keys that wait for a second character to complete the command (like Vim's `g`, `z`, etc).
+
+### How It Works
+
+Pending keys are defined in `InitializePendingKeybindings()` as a `PendingKeyBinding` structure:
+
+```go
+type PendingKeyBinding struct {
+    Prefix      rune                // The first key (e.g., 'g' or 'z')
+    Description string              // Description for help screen
+    Sequences   map[rune]KeyBinding // Map of second key to keybinding
+}
+```
+
+### Event Flow
+
+1. When a pending key prefix is pressed (e.g., 'g'), it's stored in `pendingKeySeq`
+2. On the next keypress, the system checks if it matches a registered sequence
+3. If it matches, the handler executes and `pendingKeySeq` is cleared
+4. If no match, `pendingKeySeq` is cleared and the key is processed normally
+
+### Adding New Pending Key Sequences
+
+To add a new `g_` or `z_` command, edit `InitializePendingKeybindings()`:
+
+```go
+{
+    Prefix:      'g',
+    Description: "Go to... (g + key)",
+    Sequences: map[rune]KeyBinding{
+        'g': {
+            Key:         'g',
+            Description: "Go to first node",
+            Handler: func(app *App) {
+                app.tree.SelectFirst()
+            },
+        },
+        // Add more sequences here (ga, gb, etc.)
+    },
+},
+```
+
+### Currently Implemented Sequences
+
+- `gg` - Go to first node (Normal mode and Visual mode)
+- `z...` - Reserved prefix for future fold/zoom operations
 
 ## Special Key Handling
 
