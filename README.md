@@ -1,6 +1,8 @@
-# TUI Outliner
+# tuo - TUI Outliner
 
 A powerful, keyboard-driven outliner application for the terminal, built in Go. Organize your thoughts, projects, and tasks in a hierarchical tree structure with rich metadata support.
+
+**tuo** is the command-line application name for the TUI Outliner.
 
 ## Features
 
@@ -21,29 +23,32 @@ A powerful, keyboard-driven outliner application for the terminal, built in Go. 
 
 ```bash
 cd tui-outliner
-go build -o tui-outliner
+go build -o tuo
 ```
 
 ### Run
 
 ```bash
-./tui-outliner <outline_file.json>
+./tuo [outline_file.json]
 ```
 
-If the file doesn't exist, it will be created when you save.
+- If a filename is provided, it loads that file (or creates it on save)
+- If no filename is provided, tuo starts with an empty outline in memory
+- Use `:w <filename>` to save the outline to a file
 
 ## Quick Start
 
-1. Create or open an outline file:
+1. Start tuo with a file or start with an empty outline:
 ```bash
-./tui-outliner my_outline.json
+./tuo my_outline.json    # Open specific file
+./tuo                     # Start with empty outline in memory
 ```
 
 2. Start editing with these basic commands:
 - `j/k` or `↓/↑` - Navigate items
 - `i` - Edit selected item text
 - `o` - Insert new item after selected
-- `a` - Insert new child item
+- `A` - Append text (edit at end of current item)
 - `d` - Delete selected item
 - `l/h` or `→/←` - Expand/collapse items
 - `>/<` or `Ctrl+I/Ctrl+U` - Indent/outdent items
@@ -67,9 +72,11 @@ If the file doesn't exist, it will be created when you save.
 
 | Key | Action |
 |-----|--------|
-| `i` | Edit selected item |
+| `i` | Edit selected item (cursor at start) |
+| `A` | Append text (edit at end of item) |
+| `c` | Change (replace all item text) |
 | `o` | Insert new item after |
-| `a` | Insert new child item |
+| `O` | Insert new item before |
 | `d` | Delete selected item |
 
 ### Tree Manipulation
@@ -95,7 +102,8 @@ Press `:` to enter command mode, then type a command and press Enter:
 
 | Command | Alias | Action |
 |---------|-------|--------|
-| `:w` | `:write` | Save the outline |
+| `:w` | `:write` | Save the outline to current file |
+| `:w <file>` | `:write <file>` | Save the outline to a specific file |
 | `:q` | `:quit` | Quit (warns if unsaved) |
 | `:q!` | `:quit!` | Force quit without saving |
 | `:wq` | | Save and quit |
@@ -104,11 +112,12 @@ Press `:` to enter command mode, then type a command and press Enter:
 
 Examples:
 ```
-:w           # Save
-:q           # Quit (if saved)
-:wq          # Save and quit
-:q!          # Force quit
-:help        # Show keybindings
+:w                    # Save to current file
+:w backup.json        # Save to a new file
+:q                    # Quit (if saved)
+:wq                   # Save and quit
+:q!                   # Force quit
+:help                 # Show keybindings
 ```
 
 ## File Format
@@ -152,7 +161,7 @@ Outlines are stored as JSON files with the following structure:
 Check the `examples/` directory for sample outline files:
 
 ```bash
-./tui-outliner examples/sample.json
+./tuo examples/sample.json
 ```
 
 ## Project Structure
@@ -181,12 +190,12 @@ tui-outliner/
 
 ### Edit Mode
 
-When you press `i` to edit an item's text:
+When you press `i`, `A`, `c`, `o`, or `O` to edit an item's text:
 
 | Key | Action |
 |-----|--------|
-| `Enter` | Save changes and exit edit mode |
-| `Escape` | Cancel and exit edit mode |
+| `Enter` | Save changes and create new item below |
+| `Escape` | Cancel edit (deletes empty items, preserves non-empty) |
 | `Ctrl+A` | Move to beginning of line |
 | `Ctrl+E` | Move to end of line |
 | `Ctrl+U` | Delete from start to cursor |
@@ -225,7 +234,7 @@ If keybindings don't respond:
 
 1. **Run with debug mode** to see what keys are being detected:
    ```bash
-   ./tui-outliner -debug examples/sample.json
+   ./tuo -debug examples/sample.json
    ```
    Every keypress will show in the status line with its key code and rune.
 
@@ -260,7 +269,19 @@ See `DEBUG.md` for more detailed troubleshooting steps.
 ### Building
 
 ```bash
-go build -o tui-outliner
+go build -o tuo
+```
+
+To install the binary to your system:
+
+```bash
+go build -o tuo && mv tuo /usr/local/bin/
+```
+
+Then you can run `tuo` from anywhere:
+
+```bash
+tuo my_outline.json
 ```
 
 ### Running Tests

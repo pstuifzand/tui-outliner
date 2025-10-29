@@ -441,10 +441,18 @@ func (a *App) handleCommand(cmd string) {
 	case "q!", "quit!":
 		a.quit = true
 	case "w", "write":
-		if err := a.Save(); err != nil {
+		var filename string
+		if len(parts) > 1 {
+			filename = parts[1]
+		}
+		if err := a.SaveAs(filename); err != nil {
 			a.SetStatus("Failed to save: " + err.Error())
 		} else {
-			a.SetStatus("Saved")
+			if filename != "" {
+				a.SetStatus("Saved to " + filename)
+			} else {
+				a.SetStatus("Saved")
+			}
 		}
 	case "wq":
 		if err := a.Save(); err != nil {
@@ -471,6 +479,27 @@ func (a *App) Save() error {
 	if err := a.store.Save(a.outline); err != nil {
 		return err
 	}
+	a.dirty = false
+	a.autoSaveTime = time.Now()
+	return nil
+}
+
+// SaveAs saves the outline to a specified file path
+// If filename is empty, uses the current store's file path
+// If successful, updates the store's FilePath to the new location
+func (a *App) SaveAs(filename string) error {
+	if filename == "" {
+		return a.Save()
+	}
+
+	// Save to the specified filename
+	if err := a.store.SaveToFile(a.outline, filename); err != nil {
+		return err
+	}
+
+	// Update the store's file path for future saves
+	a.store.FilePath = filename
+
 	a.dirty = false
 	a.autoSaveTime = time.Now()
 	return nil

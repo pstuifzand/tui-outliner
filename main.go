@@ -13,14 +13,12 @@ func main() {
 	flag.Parse()
 
 	args := flag.Args()
-	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "Usage: tui-outliner [options] <file>\n")
-		fmt.Fprintf(os.Stderr, "Options:\n")
-		fmt.Fprintf(os.Stderr, "  -debug    Enable debug mode to show key events\n")
-		os.Exit(1)
-	}
+	var filePath string
 
-	filePath := args[0]
+	if len(args) > 0 {
+		filePath = args[0]
+	}
+	// filePath will be empty if no argument provided, which is allowed
 
 	application, err := app.NewApp(filePath)
 	if err != nil {

@@ -23,6 +23,11 @@ func NewJSONStore(filePath string) *JSONStore {
 
 // Load loads an outline from a JSON file
 func (s *JSONStore) Load() (*model.Outline, error) {
+	// If no file path specified, return a new empty outline
+	if s.FilePath == "" {
+		return model.NewOutline("Untitled"), nil
+	}
+
 	data, err := os.ReadFile(s.FilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -45,8 +50,16 @@ func (s *JSONStore) Load() (*model.Outline, error) {
 
 // Save saves an outline to a JSON file
 func (s *JSONStore) Save(outline *model.Outline) error {
+	if s.FilePath == "" {
+		return fmt.Errorf("no file path specified. Use :w <filename> to save")
+	}
+	return s.SaveToFile(outline, s.FilePath)
+}
+
+// SaveToFile saves an outline to a specified file path
+func (s *JSONStore) SaveToFile(outline *model.Outline, filePath string) error {
 	// Ensure directory exists
-	dir := filepath.Dir(s.FilePath)
+	dir := filepath.Dir(filePath)
 	if dir != "." && dir != "" {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
@@ -58,7 +71,7 @@ func (s *JSONStore) Save(outline *model.Outline) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	if err := os.WriteFile(s.FilePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
