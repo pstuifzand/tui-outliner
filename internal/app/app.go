@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
@@ -577,6 +578,34 @@ func (a *App) handleCommand(cmd string) {
 			a.SetStatus("Debug mode ON")
 		} else {
 			a.SetStatus("Debug mode OFF")
+		}
+	case "export":
+		if len(parts) < 3 {
+			a.SetStatus("Usage: :export markdown <filename>")
+			return
+		}
+		if parts[1] != "markdown" {
+			a.SetStatus("Unknown export format: " + parts[1])
+			return
+		}
+		filename := parts[2]
+		// Sync tree items back to outline before exporting
+		a.outline.Items = a.tree.GetItems()
+		if err := export.ExportToMarkdown(a.outline, filename); err != nil {
+			a.SetStatus("Failed to export: " + err.Error())
+		} else {
+			a.SetStatus("Exported to " + filename)
+		}
+	case "title":
+		if len(parts) < 2 {
+			// Show current title
+			a.SetStatus("Title: " + a.outline.Title)
+		} else {
+			// Set new title (everything after "title")
+			newTitle := strings.Join(parts[1:], " ")
+			a.outline.Title = newTitle
+			a.dirty = true
+			a.SetStatus("Title set to: " + newTitle)
 		}
 	default:
 		a.SetStatus("Unknown command: " + parts[0])

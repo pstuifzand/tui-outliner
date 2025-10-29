@@ -104,6 +104,9 @@ Press `:` to enter command mode, then type a command and press Enter:
 |---------|-------|--------|
 | `:w` | `:write` | Save the outline to current file |
 | `:w <file>` | `:write <file>` | Save the outline to a specific file |
+| `:title <text>` | | Set the outline title |
+| `:title` | | Show current outline title |
+| `:export markdown <file>` | | Export outline as markdown (unordered list format) |
 | `:q` | `:quit` | Quit (warns if unsaved) |
 | `:q!` | `:quit!` | Force quit without saving |
 | `:wq` | | Save and quit |
@@ -114,6 +117,9 @@ Examples:
 ```
 :w                    # Save to current file
 :w backup.json        # Save to a new file
+:title My Projects    # Set outline title to "My Projects"
+:title                # Show current title
+:export markdown notes.md  # Export as markdown
 :q                    # Quit (if saved)
 :wq                   # Save and quit
 :q!                   # Force quit

@@ -94,6 +94,8 @@ tui-outliner/
 │   │   └── help.go                  # Help screen
 │   ├── storage/
 │   │   └── json.go                  # File I/O
+│   ├── export/
+│   │   └── markdown.go              # Markdown export functionality
 │   ├── theme/
 │   │   └── ...
 │   └── config/
@@ -143,6 +145,21 @@ Key methods in `internal/ui/tree.go`:
 - `AddItemBefore(text)` - Insert before current (added recently)
 - `DeleteItem(item)` - Delete specific item by reference
 - `SelectNext()`, `SelectPrev()` - Navigation
+
+### Export Functionality
+
+Export functions are in `internal/export/markdown.go`:
+
+- `ExportToMarkdown(outline *model.Outline, filePath string)` - Exports outline to markdown format with unordered list structure
+  - Uses `-` for bullets with proper indentation (2 spaces per nesting level)
+  - Exports only text content (no metadata)
+  - Skips empty items while preserving structure
+  - Includes outline title as a top-level header if present
+
+Commands in `app.go`:
+- `:export markdown <filename>` - Export current outline to markdown file
+- `:title <text>` - Set outline title
+- `:title` - Show current outline title (marks as dirty if changed)
 
 ## Common Development Tasks
 
@@ -239,6 +256,16 @@ ls -la /home/peter/work/tui-outliner/
 3. **Save with Filename**: Use `:w <filename>` to save the buffer to disk and set that as the working file
 4. **SaveAs Functionality**: After saving with `:w filename`, subsequent `:w` commands save to the same file
 5. **Empty Buffer Saves**: Attempting `:w` without a filename on a new buffer shows error message directing to use `:w <filename>`
+6. **Markdown Export**: Added `:export markdown <filename>` command to export outlines as markdown with unordered list format
+   - Exports hierarchy as nested bullet lists using `-` characters
+   - 2 spaces per indentation level for clean formatting
+   - Exports text content only (no metadata)
+   - Includes outline title as a top-level markdown header
+7. **Title Command**: Added `:title <text>` command to set the outline title
+   - `:title` with no argument shows the current title
+   - `:title My Title` sets the outline title to "My Title"
+   - Supports multi-word titles
+   - Marks outline as dirty when title is changed
 
 ## Notes
 
@@ -247,3 +274,4 @@ ls -la /home/peter/work/tui-outliner/
 - JSON is the persistence format for outlines
 - The application includes auto-save (5 seconds of inactivity)
 - When adding docs, add these to the ./docs/ directory.
+- always create test outlines in examples/ directory
