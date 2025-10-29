@@ -49,6 +49,9 @@ func NewApp(filePath string) (*App, error) {
 		return nil, fmt.Errorf("failed to create screen: %w", err)
 	}
 
+	// Enable mouse support if available
+	screen.EnableMouse()
+
 	store := storage.NewJSONStore(filePath)
 	outline, err := store.Load()
 	if err != nil {
@@ -299,8 +302,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 		return
 	}
 
-	// Handle editor input
+	// Handle editor input (keyboard and mouse)
 	if a.editor != nil && a.editor.IsActive() {
+		// Handle mouse clicks to position cursor
+		if mouseEv, ok := ev.(*tcell.EventMouse); ok {
+			a.handleEditorMouseClick(mouseEv)
+			return
+		}
+
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if !a.editor.HandleKey(keyEv) {
 				// Check if Enter or Escape was pressed
@@ -356,9 +365,15 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 		return
 	}
 
-	// Handle normal input
+	// Handle normal mode (keyboard and mouse)
 	if keyEv, ok := ev.(*tcell.EventKey); ok {
 		a.handleKeypress(keyEv)
+		return
+	}
+
+	// Handle mouse clicks in normal mode
+	if mouseEv, ok := ev.(*tcell.EventMouse); ok {
+		a.handleTreeMouseClick(mouseEv)
 	}
 }
 
@@ -676,6 +691,98 @@ func (a *App) getVisualSelectionRange() (int, int) {
 	}
 
 	return start, end
+}
+
+// handleTreeMouseClick handles mouse clicks in the tree view
+func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
+	// Only handle left mouse button
+	if mouseEv.Buttons()&tcell.Button1 == 0 {
+		return
+	}
+
+	x, y := mouseEv.Position()
+
+	// Tree starts at Y = 1
+	treeStartY := 1
+
+	// Check if click is within tree area
+	if y < treeStartY {
+		return
+	}
+
+	// Calculate which tree item was clicked
+	itemIdx := y - treeStartY
+
+	// Check if we're in search mode
+	if a.search.IsActive() {
+		// For search results, just select the item
+		results := a.search.GetResults()
+		if itemIdx >= 0 && itemIdx < len(results) {
+			a.tree = ui.NewTreeView(results)
+			if itemIdx < len(a.tree.GetDisplayItems()) {
+				for i := 0; i < itemIdx; i++ {
+					a.tree.SelectNext()
+				}
+			}
+		}
+		return
+	}
+
+	displayItems := a.tree.GetDisplayItems()
+	if itemIdx < 0 || itemIdx >= len(displayItems) {
+		return
+	}
+
+	// Check if click was on the arrow (expand/collapse)
+	dispItem := displayItems[itemIdx]
+	arrowX := dispItem.Depth * 2
+
+	// Arrow is at position arrowX, click is on it if within those bounds
+	if x >= arrowX && x < arrowX+1 && len(dispItem.Item.Children) > 0 {
+		// Click was on the arrow
+		a.tree.SelectItem(itemIdx)
+		if dispItem.Item.Expanded {
+			a.tree.Collapse()
+		} else {
+			a.tree.Expand()
+		}
+		return
+	}
+
+	// Otherwise, just select the item
+	a.tree.SelectItem(itemIdx)
+}
+
+// handleEditorMouseClick handles mouse clicks while editing
+func (a *App) handleEditorMouseClick(mouseEv *tcell.EventMouse) {
+	// Only handle left mouse button
+	if mouseEv.Buttons()&tcell.Button1 == 0 {
+		return
+	}
+
+	x, _ := mouseEv.Position()
+
+	// Get editor position info from the last render
+	selectedIdx := a.tree.GetSelectedIndex()
+	if selectedIdx < 0 {
+		return
+	}
+
+	// Get editor details from the app's last render state
+	// We need to calculate the editor's screen position
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		return
+	}
+
+	depth := a.tree.GetSelectedDepth()
+	editorX := depth*2 + 2 // indentation + arrow + space
+
+	// Calculate cursor position from click
+	if x >= editorX {
+		relativeX := x - editorX
+		a.editor.SetCursorFromScreenX(relativeX)
+	}
 }
 
 // SetStatus sets the status message

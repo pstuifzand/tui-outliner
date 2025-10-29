@@ -13,8 +13,8 @@ type TreeView struct {
 }
 
 type displayItem struct {
-	item  *model.Item
-	depth int
+	Item  *model.Item
+	Depth int
 }
 
 // NewTreeView creates a new TreeView
@@ -40,7 +40,7 @@ func (tv *TreeView) buildDisplayItems(items []*model.Item, depth int) []*display
 	for _, item := range items {
 		// Only show if expanded or at top level
 		if depth == 0 || (item.Parent != nil && item.Parent.Expanded) {
-			result = append(result, &displayItem{item: item, depth: depth})
+			result = append(result, &displayItem{Item: item, Depth: depth})
 			if item.Expanded && len(item.Children) > 0 {
 				result = append(result, tv.buildDisplayItems(item.Children, depth+1)...)
 			}
@@ -66,7 +66,7 @@ func (tv *TreeView) SelectPrev() {
 // Expand expands the selected item
 func (tv *TreeView) Expand() {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		item := tv.filteredView[tv.selectedIdx].item
+		item := tv.filteredView[tv.selectedIdx].Item
 		if !item.Expanded && len(item.Children) > 0 {
 			item.Expanded = true
 			tv.rebuildView()
@@ -77,7 +77,7 @@ func (tv *TreeView) Expand() {
 // Collapse collapses the selected item
 func (tv *TreeView) Collapse() {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		item := tv.filteredView[tv.selectedIdx].item
+		item := tv.filteredView[tv.selectedIdx].Item
 		if item.Expanded {
 			item.Expanded = false
 			tv.rebuildView()
@@ -91,10 +91,10 @@ func (tv *TreeView) Indent() bool {
 		return false
 	}
 
-	current := tv.filteredView[tv.selectedIdx].item
+	current := tv.filteredView[tv.selectedIdx].Item
 
 	// Get previous item - it becomes the parent
-	prevItem := tv.filteredView[tv.selectedIdx-1].item
+	prevItem := tv.filteredView[tv.selectedIdx-1].Item
 
 	// Remove from current parent
 	if current.Parent != nil {
@@ -125,7 +125,7 @@ func (tv *TreeView) Outdent() bool {
 		return false
 	}
 
-	current := tv.filteredView[tv.selectedIdx].item
+	current := tv.filteredView[tv.selectedIdx].Item
 	if current.Parent == nil {
 		return false // Already at top level
 	}
@@ -155,11 +155,11 @@ func (tv *TreeView) MoveItemDown() bool {
 		return false
 	}
 
-	current := tv.filteredView[tv.selectedIdx].item
-	next := tv.filteredView[tv.selectedIdx+1].item
+	current := tv.filteredView[tv.selectedIdx].Item
+	next := tv.filteredView[tv.selectedIdx+1].Item
 
 	// Only swap if they have the same parent and depth
-	if tv.filteredView[tv.selectedIdx].depth != tv.filteredView[tv.selectedIdx+1].depth {
+	if tv.filteredView[tv.selectedIdx].Depth != tv.filteredView[tv.selectedIdx+1].Depth {
 		return false
 	}
 
@@ -204,11 +204,11 @@ func (tv *TreeView) MoveItemUp() bool {
 		return false
 	}
 
-	current := tv.filteredView[tv.selectedIdx].item
-	prev := tv.filteredView[tv.selectedIdx-1].item
+	current := tv.filteredView[tv.selectedIdx].Item
+	prev := tv.filteredView[tv.selectedIdx-1].Item
 
 	// Only swap if they have the same parent and depth
-	if tv.filteredView[tv.selectedIdx].depth != tv.filteredView[tv.selectedIdx-1].depth {
+	if tv.filteredView[tv.selectedIdx].Depth != tv.filteredView[tv.selectedIdx-1].Depth {
 		return false
 	}
 
@@ -253,7 +253,7 @@ func (tv *TreeView) AddItemAfter(text string) {
 	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
 		tv.items = append(tv.items, newItem)
 	} else {
-		selected := tv.filteredView[tv.selectedIdx].item
+		selected := tv.filteredView[tv.selectedIdx].Item
 		parent := selected.Parent
 		if parent != nil {
 			// Find position of selected item in parent's children
@@ -283,7 +283,7 @@ func (tv *TreeView) AddItemAfter(text string) {
 func (tv *TreeView) AddItemAsChild(text string) {
 	newItem := model.NewItem(text)
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		selected := tv.filteredView[tv.selectedIdx].item
+		selected := tv.filteredView[tv.selectedIdx].Item
 		selected.AddChild(newItem)
 		selected.Expanded = true
 	} else {
@@ -298,7 +298,7 @@ func (tv *TreeView) AddItemBefore(text string) {
 	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
 		tv.items = append(tv.items, newItem)
 	} else {
-		selected := tv.filteredView[tv.selectedIdx].item
+		selected := tv.filteredView[tv.selectedIdx].Item
 		parent := selected.Parent
 		if parent != nil {
 			// Find position of selected item in parent's children
@@ -330,7 +330,7 @@ func (tv *TreeView) DeleteSelected() bool {
 		return false
 	}
 
-	item := tv.filteredView[tv.selectedIdx].item
+	item := tv.filteredView[tv.selectedIdx].Item
 	if item.Parent != nil {
 		item.Parent.RemoveChild(item)
 	} else {
@@ -379,7 +379,7 @@ func (tv *TreeView) PasteAfter(item *model.Item) bool {
 		return false
 	}
 
-	selected := tv.filteredView[tv.selectedIdx].item
+	selected := tv.filteredView[tv.selectedIdx].Item
 	parent := selected.Parent
 
 	if parent != nil {
@@ -421,7 +421,7 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 		return false
 	}
 
-	selected := tv.filteredView[tv.selectedIdx].item
+	selected := tv.filteredView[tv.selectedIdx].Item
 	parent := selected.Parent
 
 	if parent != nil {
@@ -460,7 +460,7 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 // GetSelected returns the currently selected item
 func (tv *TreeView) GetSelected() *model.Item {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		return tv.filteredView[tv.selectedIdx].item
+		return tv.filteredView[tv.selectedIdx].Item
 	}
 	return nil
 }
@@ -470,10 +470,17 @@ func (tv *TreeView) GetSelectedIndex() int {
 	return tv.selectedIdx
 }
 
+// SelectItem selects an item by index
+func (tv *TreeView) SelectItem(idx int) {
+	if idx >= 0 && idx < len(tv.filteredView) {
+		tv.selectedIdx = idx
+	}
+}
+
 // GetSelectedDepth returns the depth (nesting level) of the currently selected item
 func (tv *TreeView) GetSelectedDepth() int {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		return tv.filteredView[tv.selectedIdx].depth
+		return tv.filteredView[tv.selectedIdx].Depth
 	}
 	return 0
 }
@@ -510,7 +517,7 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
-		if dispItem.item.IsNew && idx != tv.selectedIdx && (visualStart < 0 || idx < visualStart || idx > visualEnd) {
+		if dispItem.Item.IsNew && idx != tv.selectedIdx && (visualStart < 0 || idx < visualStart || idx > visualEnd) {
 			// Use new item style for new items (dim) when not selected and not in visual range
 			style = newItemStyle
 		}
@@ -532,19 +539,19 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 		prefix := ""
 
 		// Add indentation for parent levels (2 spaces per level)
-		for i := 0; i < dispItem.depth; i++ {
+		for i := 0; i < dispItem.Depth; i++ {
 			prefix += "  "  // 2 spaces per nesting level
 		}
 
 		// Draw indentation
-		if dispItem.depth > 0 {
+		if dispItem.Depth > 0 {
 			screen.DrawString(0, y, prefix, style)
 		}
 
 		// Always draw an arrow
 		// Use different colors for leaf vs expandable nodes
 		arrowStyle := screen.TreeLeafArrowStyle()  // Default to leaf (dimmer)
-		if len(dispItem.item.Children) > 0 {
+		if len(dispItem.Item.Children) > 0 {
 			// For nodes with children, use brighter expandable arrow style
 			arrowStyle = screen.TreeExpandableArrowStyle()
 		}
@@ -553,11 +560,11 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 		}
 
 		arrow := "▶"
-		if len(dispItem.item.Children) > 0 && dispItem.item.Expanded {
+		if len(dispItem.Item.Children) > 0 && dispItem.Item.Expanded {
 			arrow = "▼"
 		}
 
-		prefixX := dispItem.depth * 2
+		prefixX := dispItem.Depth * 2
 		screen.DrawString(prefixX, y, arrow, arrowStyle)
 
 		// Build the full line
@@ -567,7 +574,7 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 			maxWidth = 0
 		}
 
-		text := dispItem.item.Text
+		text := dispItem.Item.Text
 		if len(text) > maxWidth {
 			text = text[:maxWidth]
 		}
@@ -612,7 +619,7 @@ func (tv *TreeView) GetItemsInRange(start, end int) []*model.Item {
 	items := make([]*model.Item, 0)
 	for i := start; i <= end; i++ {
 		if i < len(tv.filteredView) {
-			items = append(items, tv.filteredView[i].item)
+			items = append(items, tv.filteredView[i].Item)
 		}
 	}
 
@@ -628,7 +635,7 @@ func (tv *TreeView) IndentItem(item *model.Item) bool {
 	// Find the index of this item in filteredView
 	itemIdx := -1
 	for idx, dispItem := range tv.filteredView {
-		if dispItem.item.ID == item.ID {
+		if dispItem.Item.ID == item.ID {
 			itemIdx = idx
 			break
 		}
@@ -639,7 +646,7 @@ func (tv *TreeView) IndentItem(item *model.Item) bool {
 	}
 
 	// Get previous item - it becomes the parent
-	prevItem := tv.filteredView[itemIdx-1].item
+	prevItem := tv.filteredView[itemIdx-1].Item
 
 	// Remove from current parent
 	if item.Parent != nil {

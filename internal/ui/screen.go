@@ -133,6 +133,11 @@ func (s *Screen) HasMouse() bool {
 	return s.tcellScreen.HasMouse()
 }
 
+// EnableMouse enables mouse support on the screen
+func (s *Screen) EnableMouse() {
+	s.tcellScreen.EnableMouse()
+}
+
 // DefaultStyle returns the default terminal style
 func DefaultStyle() tcell.Style {
 	return tcell.StyleDefault

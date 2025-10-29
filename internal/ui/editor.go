@@ -202,3 +202,15 @@ func (e *Editor) WasEscapePressed() bool {
 func (e *Editor) GetItem() *model.Item {
 	return e.item
 }
+
+// SetCursorFromScreenX sets the cursor position based on a screen X coordinate
+// relativeX is the X coordinate relative to the start of the text (after indentation, arrow, etc.)
+func (e *Editor) SetCursorFromScreenX(relativeX int) {
+	if relativeX < 0 {
+		relativeX = 0
+	}
+	if relativeX > len(e.text) {
+		relativeX = len(e.text)
+	}
+	e.cursorPos = relativeX
+}
