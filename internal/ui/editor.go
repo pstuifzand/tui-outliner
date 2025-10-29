@@ -14,6 +14,8 @@ type Editor struct {
 	enterPressed       bool // Track if Enter was pressed to create new node
 	escapePressed      bool // Track if Escape was pressed
 	backspaceOnEmpty   bool // Track if Backspace was pressed on an empty item
+	indentPressed      bool // Track if Tab was pressed to indent
+	outdentPressed     bool // Track if Shift+Tab was pressed to outdent
 }
 
 // NewEditor creates a new Editor
@@ -67,6 +69,14 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 	case tcell.KeyEnter:
 		e.enterPressed = true
 		return false // Signal to exit edit mode and create new node
+	case tcell.KeyTab:
+		// Tab pressed - indent the current item
+		e.indentPressed = true
+		return false // Signal to exit edit mode and perform indent
+	case tcell.KeyBacktab:
+		// Shift+Tab pressed (sent as KeyBacktab) - outdent the current item
+		e.outdentPressed = true
+		return false // Signal to exit edit mode and perform outdent
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if e.cursorPos > 0 {
 			e.text = e.text[:e.cursorPos-1] + e.text[e.cursorPos:]
@@ -207,6 +217,20 @@ func (e *Editor) WasEscapePressed() bool {
 func (e *Editor) WasBackspaceOnEmpty() bool {
 	pressed := e.backspaceOnEmpty
 	e.backspaceOnEmpty = false
+	return pressed
+}
+
+// WasIndentPressed returns whether Tab was pressed to indent and resets the flag
+func (e *Editor) WasIndentPressed() bool {
+	pressed := e.indentPressed
+	e.indentPressed = false
+	return pressed
+}
+
+// WasOutdentPressed returns whether Shift+Tab was pressed to outdent and resets the flag
+func (e *Editor) WasOutdentPressed() bool {
+	pressed := e.outdentPressed
+	e.outdentPressed = false
 	return pressed
 }
 

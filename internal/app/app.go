@@ -320,13 +320,15 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if !a.editor.HandleKey(keyEv) {
-				// Check if Enter, Escape, or Backspace on empty was pressed
+				// Check if Enter, Escape, Backspace on empty, or indent/outdent was pressed
 				enterPressed := a.editor.WasEnterPressed()
 				escapePressed := a.editor.WasEscapePressed()
 				backspaceOnEmpty := a.editor.WasBackspaceOnEmpty()
+				indentPressed := a.editor.WasIndentPressed()
+				outdentPressed := a.editor.WasOutdentPressed()
 				editedItem := a.editor.GetItem()
 
-				// Exit edit mode
+				// Exit edit mode (except for indent/outdent which continue in insert mode)
 				a.editor.Stop()
 				a.editor = nil
 				a.dirty = true
@@ -355,6 +357,30 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 							a.mode = InsertMode
 						}
 					}
+				} else if indentPressed {
+					// Tab pressed - indent the current item
+					if a.tree.Indent() {
+						a.SetStatus("Indented")
+						a.dirty = true
+					} else {
+						a.SetStatus("Cannot indent (no previous item)")
+					}
+					// Re-enter insert mode on the same item
+					a.editor = ui.NewEditor(editedItem)
+					a.editor.Start()
+					a.mode = InsertMode
+				} else if outdentPressed {
+					// Shift+Tab pressed - outdent the current item
+					if a.tree.Outdent() {
+						a.SetStatus("Outdented")
+						a.dirty = true
+					} else {
+						a.SetStatus("Cannot outdent (already at root level)")
+					}
+					// Re-enter insert mode on the same item
+					a.editor = ui.NewEditor(editedItem)
+					a.editor.Start()
+					a.mode = InsertMode
 				} else if enterPressed {
 					// If Enter was pressed, create new node below and enter insert mode
 					a.tree.AddItemAfter("")
