@@ -111,8 +111,8 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 
 // Render renders the editor on the screen
 func (e *Editor) Render(screen *Screen, x, y int, maxWidth int) {
-	style := DefaultStyle()
-	cursorStyle := StyleReverse()
+	textStyle := screen.EditorStyle()
+	cursorStyle := screen.EditorCursorStyle()
 
 	// Determine which portion of text to display
 	displayText := e.text
@@ -134,7 +134,7 @@ func (e *Editor) Render(screen *Screen, x, y int, maxWidth int) {
 
 	// Draw the text
 	for i, r := range displayText {
-		screen.SetCell(x+i, y, r, style)
+		screen.SetCell(x+i, y, r, textStyle)
 	}
 
 	// Clear remainder (except cursor position if it's at the end)
@@ -145,7 +145,7 @@ func (e *Editor) Render(screen *Screen, x, y int, maxWidth int) {
 			if i == cursorScreenX && e.cursorPos == len(e.text) {
 				screen.SetCell(x+i, y, ' ', cursorStyle)
 			} else {
-				screen.SetCell(x+i, y, ' ', style)
+				screen.SetCell(x+i, y, ' ', textStyle)
 			}
 		}
 	}

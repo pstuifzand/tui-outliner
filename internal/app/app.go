@@ -80,6 +80,13 @@ func NewApp(filePath string) (*App, error) {
 	// Initialize keybindings
 	app.keybindings = app.InitializeKeybindings()
 
+	// Convert keybindings to KeyBindingInfo for help screen
+	var helpKeybindings []ui.KeyBindingInfo
+	for i := range app.keybindings {
+		helpKeybindings = append(helpKeybindings, &app.keybindings[i])
+	}
+	app.help.SetKeybindings(helpKeybindings)
+
 	return app, nil
 }
 
@@ -144,7 +151,7 @@ func (a *App) render() {
 	height := a.screen.GetHeight()
 
 	// Draw header (title)
-	headerStyle := ui.StyleBold()
+	headerStyle := a.screen.HeaderStyle()
 	header := fmt.Sprintf(" %s ", a.outline.Title)
 	a.screen.DrawString(0, 0, header, headerStyle)
 
@@ -202,7 +209,12 @@ func (a *App) render() {
 	}
 
 	// Draw status line with mode indicator
+	modeStyle := a.screen.StatusModeStyle()
+	messageStyle := a.screen.StatusMessageStyle()
+	modifiedStyle := a.screen.StatusModifiedStyle()
+
 	statusLine := ""
+	lineX := 0
 
 	// Show mode indicator
 	if a.mode == "INSERT" {
@@ -210,20 +222,30 @@ func (a *App) render() {
 	} else {
 		statusLine = "-- NORMAL --"
 	}
+	a.screen.DrawString(lineX, height-1, statusLine, modeStyle)
+	lineX += len(statusLine)
 
 	// Append status message if not the default "Ready"
 	if a.statusMsg != "Ready" {
 		if time.Since(a.statusTime) <= 3*time.Second {
-			statusLine += " " + a.statusMsg
+			msg := " " + a.statusMsg
+			a.screen.DrawString(lineX, height-1, msg, messageStyle)
+			lineX += len(msg)
 		}
 	}
 
 	// Append modified indicator
 	if a.dirty {
-		statusLine += " (modified)"
+		modified := " (modified)"
+		a.screen.DrawString(lineX, height-1, modified, modifiedStyle)
+		lineX += len(modified)
 	}
 
-	a.screen.DrawString(0, height-1, statusLine, ui.DefaultStyle())
+	// Clear remainder of status line
+	for lineX < width {
+		a.screen.SetCell(lineX, height-1, ' ', modeStyle)
+		lineX++
+	}
 
 	// Draw help overlay if visible
 	a.help.Render(a.screen)

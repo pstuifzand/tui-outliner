@@ -11,6 +11,16 @@ type KeyBinding struct {
 	Handler     func(*App)
 }
 
+// GetKey returns the key of this keybinding
+func (kb *KeyBinding) GetKey() rune {
+	return kb.Key
+}
+
+// GetDescription returns the description of this keybinding
+func (kb *KeyBinding) GetDescription() string {
+	return kb.Description
+}
+
 // InitializeKeybindings sets up all the key bindings
 func (a *App) InitializeKeybindings() []KeyBinding {
 	return []KeyBinding{
@@ -40,6 +50,26 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Expand item",
 			Handler: func(app *App) {
 				app.tree.Expand()
+			},
+		},
+		{
+			Key:         'J',
+			Description: "Move node down",
+			Handler: func(app *App) {
+				if app.tree.MoveItemDown() {
+					app.SetStatus("Moved item down")
+					app.dirty = true
+				}
+			},
+		},
+		{
+			Key:         'K',
+			Description: "Move node up",
+			Handler: func(app *App) {
+				if app.tree.MoveItemUp() {
+					app.SetStatus("Moved item up")
+					app.dirty = true
+				}
 			},
 		},
 		{

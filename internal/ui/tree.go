@@ -149,6 +149,104 @@ func (tv *TreeView) Outdent() bool {
 	return true
 }
 
+// MoveItemDown moves the selected item down in linear order (swaps with next sibling)
+func (tv *TreeView) MoveItemDown() bool {
+	if tv.selectedIdx >= len(tv.filteredView)-1 || tv.selectedIdx < 0 {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].item
+	next := tv.filteredView[tv.selectedIdx+1].item
+
+	// Only swap if they have the same parent and depth
+	if tv.filteredView[tv.selectedIdx].depth != tv.filteredView[tv.selectedIdx+1].depth {
+		return false
+	}
+
+	// Get the parent (could be nil for root items)
+	parent := current.Parent
+
+	// Find indices in the parent's children array
+	var currentIdx, nextIdx int
+	var children []*model.Item
+
+	if parent != nil {
+		children = parent.Children
+	} else {
+		children = tv.items
+	}
+
+	for idx, child := range children {
+		if child.ID == current.ID {
+			currentIdx = idx
+		}
+		if child.ID == next.ID {
+			nextIdx = idx
+		}
+	}
+
+	// Swap only if they are adjacent
+	if nextIdx != currentIdx+1 {
+		return false
+	}
+
+	// Swap items in the slice
+	children[currentIdx], children[nextIdx] = children[nextIdx], children[currentIdx]
+
+	tv.rebuildView()
+	tv.selectedIdx++ // Move selection to follow the item
+	return true
+}
+
+// MoveItemUp moves the selected item up in linear order (swaps with previous sibling)
+func (tv *TreeView) MoveItemUp() bool {
+	if tv.selectedIdx <= 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].item
+	prev := tv.filteredView[tv.selectedIdx-1].item
+
+	// Only swap if they have the same parent and depth
+	if tv.filteredView[tv.selectedIdx].depth != tv.filteredView[tv.selectedIdx-1].depth {
+		return false
+	}
+
+	// Get the parent (could be nil for root items)
+	parent := current.Parent
+
+	// Find indices in the parent's children array
+	var currentIdx, prevIdx int
+	var children []*model.Item
+
+	if parent != nil {
+		children = parent.Children
+	} else {
+		children = tv.items
+	}
+
+	for idx, child := range children {
+		if child.ID == current.ID {
+			currentIdx = idx
+		}
+		if child.ID == prev.ID {
+			prevIdx = idx
+		}
+	}
+
+	// Swap only if they are adjacent
+	if prevIdx != currentIdx-1 {
+		return false
+	}
+
+	// Swap items in the slice
+	children[currentIdx], children[prevIdx] = children[prevIdx], children[currentIdx]
+
+	tv.rebuildView()
+	tv.selectedIdx-- // Move selection to follow the item
+	return true
+}
+
 // AddItemAfter adds a new item after the selected item
 func (tv *TreeView) AddItemAfter(text string) {
 	newItem := model.NewItem(text)
@@ -329,8 +427,9 @@ func (tv *TreeView) GetDisplayItems() []*displayItem {
 
 // Render renders the tree to the screen
 func (tv *TreeView) Render(screen *Screen, startY int) {
-	defaultStyle := DefaultStyle()
-	selectedStyle := StyleReverse()
+	defaultStyle := screen.TreeNormalStyle()
+	selectedStyle := screen.TreeSelectedStyle()
+	newItemStyle := screen.TreeNewItemStyle()
 	screenWidth := screen.GetWidth()
 
 	for idx, dispItem := range tv.filteredView {
@@ -342,8 +441,8 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 		// Select style based on selection and new item status
 		style := defaultStyle
 		if dispItem.item.IsNew && idx != tv.selectedIdx {
-			// Use dim style for new items (light gray) when not selected
-			style = StyleDim()
+			// Use new item style for new items (dim) when not selected
+			style = newItemStyle
 		}
 		if idx == tv.selectedIdx {
 			style = selectedStyle
@@ -363,9 +462,10 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 		}
 
 		// Always draw an arrow
-		arrowStyle := StyleDim()  // Light gray for leaf nodes
-		if len(dispItem.item.Children) > 0 {
-			arrowStyle = style  // White (normal style) for nodes with children
+		arrowStyle := screen.TreeArrowStyle()  // Default arrow color
+		if len(dispItem.item.Children) == 0 {
+			// For leaf nodes, use the arrow style from theme
+			arrowStyle = screen.TreeArrowStyle()
 		}
 		if idx == tv.selectedIdx {
 			arrowStyle = selectedStyle  // Use selected style if item is selected

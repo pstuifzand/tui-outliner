@@ -121,11 +121,13 @@ func (s *Search) SetAllItems(items []*model.Item) {
 
 // Render renders the search bar on the screen
 func (s *Search) Render(screen *Screen, y int) {
-	style := DefaultStyle()
-	cursorStyle := StyleReverse()
+	labelStyle := screen.SearchLabelStyle()
+	textStyle := screen.SearchTextStyle()
+	cursorStyle := screen.SearchCursorStyle()
+	resultStyle := screen.SearchResultCountStyle()
 
 	// Draw label
-	screen.DrawString(0, y, "Search: ", style)
+	screen.DrawString(0, y, "Search: ", labelStyle)
 
 	// Draw query
 	x := 8
@@ -136,7 +138,7 @@ func (s *Search) Render(screen *Screen, y int) {
 	}
 
 	for i, r := range displayQuery {
-		charStyle := style
+		charStyle := textStyle
 		if i == s.cursorPos {
 			charStyle = cursorStyle
 		}
@@ -151,7 +153,7 @@ func (s *Search) Render(screen *Screen, y int) {
 	// Clear remainder
 	for i := len(displayQuery); i < maxWidth; i++ {
 		if x+i < screen.GetWidth() {
-			screen.SetCell(x+i, y, ' ', style)
+			screen.SetCell(x+i, y, ' ', textStyle)
 		}
 	}
 
@@ -160,5 +162,5 @@ func (s *Search) Render(screen *Screen, y int) {
 	if len(s.results) > 9 {
 		resultText = " (" + string(rune(len(s.results))) + " matches)"
 	}
-	screen.DrawString(screen.GetWidth()-len(resultText), y, resultText, style)
+	screen.DrawString(screen.GetWidth()-len(resultText), y, resultText, resultStyle)
 }

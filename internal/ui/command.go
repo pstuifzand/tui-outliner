@@ -97,19 +97,20 @@ func (c *CommandMode) Render(screen *Screen, y int) {
 		return
 	}
 
-	style := DefaultStyle()
-	cursorStyle := StyleReverse()
+	promptStyle := screen.CommandPromptStyle()
+	textStyle := screen.CommandTextStyle()
+	cursorStyle := screen.CommandCursorStyle()
 	screenWidth := screen.GetWidth()
 
 	// Draw colon and input
 	prefix := ":"
 	x := 0
-	screen.DrawString(x, y, prefix, style)
+	screen.DrawString(x, y, prefix, promptStyle)
 	x += len(prefix)
 
 	// Draw input with cursor
 	for i, r := range c.input {
-		charStyle := style
+		charStyle := textStyle
 		if i == c.cursorPos {
 			charStyle = cursorStyle
 		}
@@ -127,7 +128,7 @@ func (c *CommandMode) Render(screen *Screen, y int) {
 
 	// Clear remainder of line
 	for x < screenWidth {
-		screen.SetCell(x, y, ' ', style)
+		screen.SetCell(x, y, ' ', textStyle)
 		x++
 	}
 }

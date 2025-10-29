@@ -2,16 +2,29 @@ package ui
 
 import "fmt"
 
+// KeyBindingInfo represents a keybinding for display
+type KeyBindingInfo interface {
+	GetKey() rune
+	GetDescription() string
+}
+
 // HelpScreen manages the help display
 type HelpScreen struct {
-	visible bool
+	visible      bool
+	keybindings  []KeyBindingInfo
 }
 
 // NewHelpScreen creates a new HelpScreen
 func NewHelpScreen() *HelpScreen {
 	return &HelpScreen{
-		visible: false,
+		visible:     false,
+		keybindings: []KeyBindingInfo{},
 	}
+}
+
+// SetKeybindings sets the keybindings to display
+func (h *HelpScreen) SetKeybindings(keybindings []KeyBindingInfo) {
+	h.keybindings = keybindings
 }
 
 // Toggle toggles the help screen visibility
@@ -24,32 +37,26 @@ func (h *HelpScreen) IsVisible() bool {
 	return h.visible
 }
 
-// GetKeybindings returns a list of keybindings
+// GetKeybindings returns a formatted list of keybindings
 func (h *HelpScreen) GetKeybindings() []string {
-	return []string{
-		"Navigation:",
-		"  j/Down      - Move down",
-		"  k/Up        - Move up",
-		"  h/Left      - Collapse item",
-		"  l/Right     - Expand item",
-		"  >/Ctrl+I    - Indent item",
-		"  </Ctrl+U    - Outdent item",
-		"",
-		"Editing:",
-		"  i           - Edit selected item",
-		"  o           - Insert new item after",
-		"  O           - Insert new item before",
-		"  a           - Append new child item",
-		"  d           - Delete selected item",
-		"  /           - Search/filter",
-		"  m           - Edit metadata",
-		"",
-		"Other:",
-		"  ?           - Toggle help",
-		"  :w          - Save",
-		"  :q          - Quit",
-		"  Escape      - Close dialogs/exit edit mode",
+	var result []string
+
+	result = append(result, "Keybindings:")
+	result = append(result, "")
+
+	for _, kb := range h.keybindings {
+		line := fmt.Sprintf("  %c  - %s", kb.GetKey(), kb.GetDescription())
+		result = append(result, line)
 	}
+
+	result = append(result, "")
+	result = append(result, "Special Keys:")
+	result = append(result, "  Ctrl+S      - Save")
+	result = append(result, "  Escape      - Exit edit mode")
+	result = append(result, "  Enter       - Confirm/Exit edit mode")
+	result = append(result, "  Arrow Keys  - Navigate (alternative to hjkl)")
+
+	return result
 }
 
 // Render renders the help screen
@@ -58,44 +65,68 @@ func (h *HelpScreen) Render(screen *Screen) {
 		return
 	}
 
-	style := DefaultStyle()
-	titleStyle := StyleBold()
+	contentStyle := screen.HelpStyle()
+	borderStyle := screen.HelpBorderStyle()
+	titleStyle := screen.HelpTitleStyle()
 
 	// Draw background (semi-transparent with reverse)
 	for y := 0; y < screen.GetHeight(); y++ {
 		for x := 0; x < screen.GetWidth(); x++ {
-			screen.SetCell(x, y, ' ', StyleDim())
+			screen.SetCell(x, y, ' ', contentStyle)
 		}
 	}
 
 	// Draw help box
 	startY := 2
 	startX := 5
-	width := screen.GetWidth() - 10
+	boxWidth := screen.GetWidth() - 10
 	height := screen.GetHeight() - 4
 
 	keybindings := h.GetKeybindings()
 
-	// Draw title
-	title := " Keybindings (? to close) "
-	screen.DrawString(startX, startY, fmt.Sprintf("┌─%s─┐", repeatString("─", len(title))), style)
-	screen.DrawString(startX+2, startY+1, title, titleStyle)
-	screen.DrawString(startX, startY+2, "├─" + repeatString("─", width-2) + "┤", style)
+	// Draw top border
+	screen.SetCell(startX, startY, '┌', borderStyle)
+	for i := 1; i < boxWidth-1; i++ {
+		screen.SetCell(startX+i, startY, '─', borderStyle)
+	}
+	screen.SetCell(startX+boxWidth-1, startY, '┐', borderStyle)
 
-	// Draw keybindings
+	// Draw title with side borders
+	title := " Keybindings (? to close) "
+	screen.SetCell(startX, startY+1, '│', borderStyle)
+	screen.DrawString(startX+2, startY+1, title, titleStyle)
+	screen.SetCell(startX+boxWidth-1, startY+1, '│', borderStyle)
+
+	// Draw middle border
+	screen.SetCell(startX, startY+2, '├', borderStyle)
+	for i := 1; i < boxWidth-1; i++ {
+		screen.SetCell(startX+i, startY+2, '─', borderStyle)
+	}
+	screen.SetCell(startX+boxWidth-1, startY+2, '┤', borderStyle)
+
+	// Draw keybindings with side borders
 	y := startY + 3
 	for i, binding := range keybindings {
 		if y >= startY+height-1 {
 			break
 		}
 		if i < len(keybindings) {
-			screen.DrawString(startX+2, y, binding, style)
+			// Draw left border
+			screen.SetCell(startX, y, '│', borderStyle)
+			// Draw content
+			screen.DrawString(startX+2, y, binding, contentStyle)
+			// Draw right border
+			screen.SetCell(startX+boxWidth-1, y, '│', borderStyle)
 			y++
 		}
 	}
 
 	// Draw bottom border
-	screen.DrawString(startX, y, "└"+repeatString("─", width)+"┘", style)
+	screen.SetCell(startX, y, '└', borderStyle)
+	for i := 1; i < boxWidth-1; i++ {
+		screen.SetCell(startX+i, y, '─', borderStyle)
+	}
+	screen.SetCell(startX+boxWidth-1, y, '┘', borderStyle)
 }
 
 func repeatString(s string, count int) string {

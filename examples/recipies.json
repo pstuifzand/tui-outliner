@@ -7,7 +7,7 @@
       "children": [
         {
           "id": "item_20251029211657_3bt9q5l4",
-          "text": "Stoofvlees",
+          "text": "Runderstoof met pompoen",
           "children": [
             {
               "id": "item_20251029211725_bwpiawpf",
@@ -15,26 +15,42 @@
               "children": [
                 {
                   "id": "item_20251029211727_76gwdo3k",
-                  "text": "Stoofvlees",
+                  "text": "500g runderlappen",
                   "metadata": {
                     "created": "2025-10-29T21:17:27.585285447+01:00",
                     "modified": "2025-10-29T21:17:27.585285603+01:00"
                   }
                 },
                 {
-                  "id": "item_20251029212543_5kwsuron",
-                  "text": "test this",
+                  "id": "item_20251029213754_5avwwxwx",
+                  "text": "125g spekblokjes",
                   "metadata": {
-                    "created": "2025-10-29T21:25:43.306798962+01:00",
-                    "modified": "2025-10-29T21:25:43.306799068+01:00"
+                    "created": "2025-10-29T21:37:54.439641132+01:00",
+                    "modified": "2025-10-29T21:37:54.439641266+01:00"
                   }
                 },
                 {
-                  "id": "item_20251029212310_o0nj3vj9",
-                  "text": "helloword1",
+                  "id": "item_20251029213804_ahxzyyxx",
+                  "text": "50g boter",
                   "metadata": {
-                    "created": "2025-10-29T21:23:10.963832935+01:00",
-                    "modified": "2025-10-29T21:23:10.963833143+01:00"
+                    "created": "2025-10-29T21:38:04.31342753+01:00",
+                    "modified": "2025-10-29T21:38:04.313427703+01:00"
+                  }
+                },
+                {
+                  "id": "item_20251029215135_3ziyre5q",
+                  "text": "hello world",
+                  "metadata": {
+                    "created": "2025-10-29T21:51:35.837712139+01:00",
+                    "modified": "2025-10-29T21:51:35.83771236+01:00"
+                  }
+                },
+                {
+                  "id": "item_20251029213706_dzewk1q4",
+                  "text": "50g uien",
+                  "metadata": {
+                    "created": "2025-10-29T21:37:06.788575993+01:00",
+                    "modified": "2025-10-29T21:37:06.788576143+01:00"
                   }
                 }
               ],

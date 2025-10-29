@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/pstuifzand/tui-outliner/internal/theme"
 )
 
 // Screen manages the tcell screen and rendering
@@ -12,10 +13,16 @@ type Screen struct {
 	tcellScreen tcell.Screen
 	width       int
 	height      int
+	Theme       *theme.Theme
 }
 
 // NewScreen creates a new Screen instance
 func NewScreen() (*Screen, error) {
+	return NewScreenWithTheme(theme.TokyoNight())
+}
+
+// NewScreenWithTheme creates a new Screen instance with a specific theme
+func NewScreenWithTheme(t *theme.Theme) (*Screen, error) {
 	tcellScreen, err := tcell.NewScreen()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create screen: %w", err)
@@ -30,6 +37,7 @@ func NewScreen() (*Screen, error) {
 		tcellScreen: tcellScreen,
 		width:       width,
 		height:      height,
+		Theme:       t,
 	}, nil
 }
 
@@ -132,4 +140,106 @@ func StyleReverse() tcell.Style {
 // StyleDim returns a dim style
 func StyleDim() tcell.Style {
 	return tcell.StyleDefault.Dim(true)
+}
+
+// Theme-aware style methods
+
+// TreeNormalStyle returns the style for normal tree items
+func (s *Screen) TreeNormalStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeNormalText)
+}
+
+// TreeSelectedStyle returns the style for selected tree items
+func (s *Screen) TreeSelectedStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeSelectedItem).Bold(true)
+}
+
+// TreeNewItemStyle returns the style for new/placeholder tree items
+func (s *Screen) TreeNewItemStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeNewItem).Dim(true)
+}
+
+// TreeArrowStyle returns the style for tree navigation arrows
+func (s *Screen) TreeArrowStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeLeafArrow)
+}
+
+// EditorStyle returns the style for editor text
+func (s *Screen) EditorStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.EditorText)
+}
+
+// EditorCursorStyle returns the style for editor cursor
+func (s *Screen) EditorCursorStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.EditorCursor).Bold(true)
+}
+
+// SearchLabelStyle returns the style for search label
+func (s *Screen) SearchLabelStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.SearchLabel)
+}
+
+// SearchTextStyle returns the style for search text
+func (s *Screen) SearchTextStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.SearchText)
+}
+
+// SearchCursorStyle returns the style for search cursor
+func (s *Screen) SearchCursorStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.SearchCursor).Bold(true)
+}
+
+// SearchResultCountStyle returns the style for search result count
+func (s *Screen) SearchResultCountStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.SearchResultCount)
+}
+
+// CommandPromptStyle returns the style for command prompt
+func (s *Screen) CommandPromptStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.CommandPrompt)
+}
+
+// CommandTextStyle returns the style for command text
+func (s *Screen) CommandTextStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.CommandText)
+}
+
+// CommandCursorStyle returns the style for command cursor
+func (s *Screen) CommandCursorStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.CommandCursor).Bold(true)
+}
+
+// HelpStyle returns the style for help background
+func (s *Screen) HelpStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.HelpContent, s.Theme.Colors.HelpBackground)
+}
+
+// HelpBorderStyle returns the style for help borders
+func (s *Screen) HelpBorderStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.HelpBorder)
+}
+
+// HelpTitleStyle returns the style for help title
+func (s *Screen) HelpTitleStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.HelpTitle).Bold(true)
+}
+
+// StatusModeStyle returns the style for mode indicator
+func (s *Screen) StatusModeStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.StatusMode).Bold(true)
+}
+
+// StatusMessageStyle returns the style for status messages
+func (s *Screen) StatusMessageStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.StatusMessage)
+}
+
+// StatusModifiedStyle returns the style for modified indicator
+func (s *Screen) StatusModifiedStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.StatusModified)
+}
+
+// HeaderStyle returns the style for header title
+func (s *Screen) HeaderStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.HeaderTitle).Bold(true)
 }
