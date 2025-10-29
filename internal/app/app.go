@@ -29,6 +29,7 @@ type App struct {
 	debugMode    bool
 	mode         string // "NORMAL" or "INSERT"
 	clipboard    *model.Item // For cut/paste operations
+	keybindings  []KeyBinding // All keybindings
 }
 
 // NewApp creates a new App instance
@@ -59,7 +60,7 @@ func NewApp(filePath string) (*App, error) {
 	help := ui.NewHelpScreen()
 	command := ui.NewCommandMode()
 
-	return &App{
+	app := &App{
 		screen:       screen,
 		outline:      outline,
 		store:        store,
@@ -74,7 +75,12 @@ func NewApp(filePath string) (*App, error) {
 		autoSaveTime: time.Now(),
 		quit:         false,
 		mode:         "NORMAL",
-	}, nil
+	}
+
+	// Initialize keybindings
+	app.keybindings = app.InitializeKeybindings()
+
+	return app, nil
 }
 
 // Run starts the main event loop
@@ -283,8 +289,6 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 
 // handleKeypress handles a single keypress in normal mode
 func (a *App) handleKeypress(ev *tcell.EventKey) {
-	selected := a.tree.GetSelected()
-
 	// Debug mode: show key information
 	if a.debugMode {
 		a.SetStatus(fmt.Sprintf("Key: %v | Rune: %q | Modifiers: %v", ev.Key(), ev.Rune(), ev.Modifiers()))
@@ -329,79 +333,27 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 		return
 	}
 
-	// Handle rune (character) keys
+	// Handle rune (character) keys using keybinding map
 	r := ev.Rune()
+
+	// Check for keybinding (also handle . and , as alternates for > and <)
+	kb := a.GetKeybindingByKey(r)
+	if kb != nil {
+		kb.Handler(a)
+		return
+	}
+
+	// Handle alternate keybindings for indent/outdent
 	switch r {
-	case 'j':
-		a.tree.SelectNext()
-	case 'k':
-		a.tree.SelectPrev()
-	case 'h':
-		a.tree.Collapse()
-	case 'l':
-		a.tree.Expand()
-	case 'i':
-		if selected != nil {
-			a.editor = ui.NewEditor(selected)
-			a.editor.Start()
-			a.mode = "INSERT"
-		}
-	case 'c':
-		if selected != nil {
-			a.editor = ui.NewEditor(selected)
-			a.editor.SetText("")  // Clear the text
-			a.editor.Start()
-			a.mode = "INSERT"
-		}
-	case 'o':
-		a.tree.AddItemAfter("Type here...")
-		a.SetStatus("Created new item after")
-		a.dirty = true
-	case 'a':
-		a.tree.AddItemAsChild("Type here...")
-		a.SetStatus("Created new child item")
-		a.dirty = true
-	case 'd':
-		// Store the item in clipboard before deleting
-		a.clipboard = selected
-		if a.tree.DeleteSelected() {
-			a.SetStatus("Deleted item")
-			a.dirty = true
-		}
-	case '>', '.':  // '>' (shift+period) or '.' (period) for indent
+	case '.':  // . as alternate for indent
 		if a.tree.Indent() {
 			a.SetStatus("Indented")
 			a.dirty = true
 		}
-	case '<', ',':  // '<' (shift+comma) or ',' (comma) for outdent
+	case ',':  // , as alternate for outdent
 		if a.tree.Outdent() {
 			a.SetStatus("Outdented")
 			a.dirty = true
-		}
-	case '/':
-		a.search.Start()
-		a.search.SetAllItems(a.outline.GetAllItems())
-	case '?':
-		a.help.Toggle()
-	case ':':
-		a.command.Start()
-	case 'p':
-		// Paste below current node
-		if a.clipboard != nil {
-			if a.tree.PasteAfter(a.clipboard) {
-				a.SetStatus("Pasted item")
-				a.dirty = true
-				a.clipboard = nil  // Clear clipboard after paste
-			}
-		}
-	case 'P':
-		// Paste above current node
-		if a.clipboard != nil {
-			if a.tree.PasteBefore(a.clipboard) {
-				a.SetStatus("Pasted item")
-				a.dirty = true
-				a.clipboard = nil  // Clear clipboard after paste
-			}
 		}
 	}
 }
