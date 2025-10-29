@@ -28,6 +28,7 @@ type App struct {
 	quit         bool
 	debugMode    bool
 	mode         string // "NORMAL" or "INSERT"
+	clipboard    *model.Item // For cut/paste operations
 }
 
 // NewApp creates a new App instance
@@ -133,6 +134,7 @@ func (a *App) Close() error {
 func (a *App) render() {
 	a.screen.Clear()
 
+	width := a.screen.GetWidth()
 	height := a.screen.GetHeight()
 
 	// Draw header (title)
@@ -159,6 +161,28 @@ func (a *App) render() {
 		}
 	} else {
 		a.tree.Render(a.screen, treeStartY)
+	}
+
+	// Render editor inline if active
+	if a.editor != nil && a.editor.IsActive() {
+		selectedIdx := a.tree.GetSelectedIndex()
+		if selectedIdx >= 0 {
+			// Calculate the Y position of the selected item on screen
+			itemY := treeStartY + selectedIdx
+			if itemY < treeEndY {
+				// Calculate X position after the tree prefix (indentation + arrow + space)
+				selected := a.tree.GetSelected()
+				if selected != nil {
+					// Get depth from tree view (need to find it)
+					depth := a.tree.GetSelectedDepth()
+					editorX := depth*2 + 2  // indentation + arrow + space
+					maxWidth := width - editorX
+					if maxWidth > 0 {
+						a.editor.Render(a.screen, editorX, itemY, maxWidth)
+					}
+				}
+			}
+		}
 	}
 
 	// Draw search bar if active
@@ -322,6 +346,13 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 			a.editor.Start()
 			a.mode = "INSERT"
 		}
+	case 'c':
+		if selected != nil {
+			a.editor = ui.NewEditor(selected)
+			a.editor.SetText("")  // Clear the text
+			a.editor.Start()
+			a.mode = "INSERT"
+		}
 	case 'o':
 		a.tree.AddItemAfter("Type here...")
 		a.SetStatus("Created new item after")
@@ -331,6 +362,8 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 		a.SetStatus("Created new child item")
 		a.dirty = true
 	case 'd':
+		// Store the item in clipboard before deleting
+		a.clipboard = selected
 		if a.tree.DeleteSelected() {
 			a.SetStatus("Deleted item")
 			a.dirty = true
@@ -352,6 +385,24 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 		a.help.Toggle()
 	case ':':
 		a.command.Start()
+	case 'p':
+		// Paste below current node
+		if a.clipboard != nil {
+			if a.tree.PasteAfter(a.clipboard) {
+				a.SetStatus("Pasted item")
+				a.dirty = true
+				a.clipboard = nil  // Clear clipboard after paste
+			}
+		}
+	case 'P':
+		// Paste above current node
+		if a.clipboard != nil {
+			if a.tree.PasteBefore(a.clipboard) {
+				a.SetStatus("Pasted item")
+				a.dirty = true
+				a.clipboard = nil  // Clear clipboard after paste
+			}
+		}
 	}
 }
 

@@ -114,41 +114,47 @@ func (e *Editor) Render(screen *Screen, x, y int, maxWidth int) {
 	style := DefaultStyle()
 	cursorStyle := StyleReverse()
 
-	// Draw the text
+	// Determine which portion of text to display
 	displayText := e.text
+	startIdx := 0
 	if len(displayText) > maxWidth {
 		// Show portion around cursor
-		start := e.cursorPos - maxWidth/2
-		if start < 0 {
-			start = 0
+		startIdx = e.cursorPos - maxWidth/2
+		if startIdx < 0 {
+			startIdx = 0
 		}
-		if start+maxWidth > len(displayText) {
-			start = len(displayText) - maxWidth
+		if startIdx+maxWidth > len(displayText) {
+			startIdx = len(displayText) - maxWidth
 		}
-		if start < 0 {
-			start = 0
+		if startIdx < 0 {
+			startIdx = 0
 		}
-		displayText = displayText[start:]
+		displayText = displayText[startIdx:]
 	}
 
+	// Draw the text
 	for i, r := range displayText {
-		charStyle := style
-		if i == e.cursorPos {
-			charStyle = cursorStyle
-		}
-		screen.SetCell(x+i, y, r, charStyle)
+		screen.SetCell(x+i, y, r, style)
 	}
 
-	// Draw cursor at end if needed
-	if e.cursorPos >= len(displayText) && e.cursorPos < maxWidth+x {
-		screen.SetCell(x+e.cursorPos, y, ' ', cursorStyle)
-	}
-
-	// Clear remainder
+	// Clear remainder (except cursor position if it's at the end)
+	cursorScreenX := e.cursorPos - startIdx
 	for i := len(displayText); i < maxWidth; i++ {
 		if x+i < screen.GetWidth() {
-			screen.SetCell(x+i, y, ' ', style)
+			// Show cursor as a block at the end
+			if i == cursorScreenX && e.cursorPos == len(e.text) {
+				screen.SetCell(x+i, y, ' ', cursorStyle)
+			} else {
+				screen.SetCell(x+i, y, ' ', style)
+			}
 		}
+	}
+
+	// Draw cursor on character if it's within the displayed text
+	if cursorScreenX >= 0 && cursorScreenX < len(displayText) {
+		// Cursor is on a character - highlight it in reverse
+		r := rune(displayText[cursorScreenX])
+		screen.SetCell(x+cursorScreenX, y, r, cursorStyle)
 	}
 }
 

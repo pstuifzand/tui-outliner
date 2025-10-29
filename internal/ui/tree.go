@@ -217,6 +217,90 @@ func (tv *TreeView) DeleteSelected() bool {
 	return true
 }
 
+// PasteAfter pastes an item after the selected item
+func (tv *TreeView) PasteAfter(item *model.Item) bool {
+	if item == nil || len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	selected := tv.filteredView[tv.selectedIdx].item
+	parent := selected.Parent
+
+	if parent != nil {
+		// Find position of selected item in parent's children
+		for idx, child := range parent.Children {
+			if child.ID == selected.ID {
+				// Insert after this position
+				newChildren := make([]*model.Item, 0, len(parent.Children)+1)
+				newChildren = append(newChildren, parent.Children[:idx+1]...)
+				item.Parent = parent
+				newChildren = append(newChildren, item)
+				newChildren = append(newChildren, parent.Children[idx+1:]...)
+				parent.Children = newChildren
+				tv.rebuildView()
+				return true
+			}
+		}
+	} else {
+		// Selected item is at root level
+		for idx, rootItem := range tv.items {
+			if rootItem.ID == selected.ID {
+				newItems := make([]*model.Item, 0, len(tv.items)+1)
+				newItems = append(newItems, tv.items[:idx+1]...)
+				item.Parent = nil
+				newItems = append(newItems, item)
+				newItems = append(newItems, tv.items[idx+1:]...)
+				tv.items = newItems
+				tv.rebuildView()
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// PasteBefore pastes an item before the selected item
+func (tv *TreeView) PasteBefore(item *model.Item) bool {
+	if item == nil || len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	selected := tv.filteredView[tv.selectedIdx].item
+	parent := selected.Parent
+
+	if parent != nil {
+		// Find position of selected item in parent's children
+		for idx, child := range parent.Children {
+			if child.ID == selected.ID {
+				// Insert before this position
+				newChildren := make([]*model.Item, 0, len(parent.Children)+1)
+				newChildren = append(newChildren, parent.Children[:idx]...)
+				item.Parent = parent
+				newChildren = append(newChildren, item)
+				newChildren = append(newChildren, parent.Children[idx:]...)
+				parent.Children = newChildren
+				tv.rebuildView()
+				return true
+			}
+		}
+	} else {
+		// Selected item is at root level
+		for idx, rootItem := range tv.items {
+			if rootItem.ID == selected.ID {
+				newItems := make([]*model.Item, 0, len(tv.items)+1)
+				newItems = append(newItems, tv.items[:idx]...)
+				item.Parent = nil
+				newItems = append(newItems, item)
+				newItems = append(newItems, tv.items[idx:]...)
+				tv.items = newItems
+				tv.rebuildView()
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // GetSelected returns the currently selected item
 func (tv *TreeView) GetSelected() *model.Item {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
@@ -228,6 +312,14 @@ func (tv *TreeView) GetSelected() *model.Item {
 // GetSelectedIndex returns the currently selected index
 func (tv *TreeView) GetSelectedIndex() int {
 	return tv.selectedIdx
+}
+
+// GetSelectedDepth returns the depth (nesting level) of the currently selected item
+func (tv *TreeView) GetSelectedDepth() int {
+	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
+		return tv.filteredView[tv.selectedIdx].depth
+	}
+	return 0
 }
 
 // GetDisplayItems returns the current display items
@@ -265,19 +357,31 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 			prefix += "  "  // 2 spaces per nesting level
 		}
 
-		// Add tree character for current item
-		if len(dispItem.item.Children) > 0 {
-			if dispItem.item.Expanded {
-				prefix += "▼"  // Arrow only, no space after
-			} else {
-				prefix += "▶"  // Arrow only, no space after
-			}
-		} else {
-			prefix += " "  // 1 space for leaf nodes (to align with parent's arrow)
+		// Draw indentation
+		if dispItem.depth > 0 {
+			screen.DrawString(0, y, prefix, style)
 		}
 
+		// Always draw an arrow
+		arrowStyle := StyleDim()  // Light gray for leaf nodes
+		if len(dispItem.item.Children) > 0 {
+			arrowStyle = style  // White (normal style) for nodes with children
+		}
+		if idx == tv.selectedIdx {
+			arrowStyle = selectedStyle  // Use selected style if item is selected
+		}
+
+		arrow := "▶"
+		if len(dispItem.item.Children) > 0 && dispItem.item.Expanded {
+			arrow = "▼"
+		}
+
+		prefixX := dispItem.depth * 2
+		screen.DrawString(prefixX, y, arrow, arrowStyle)
+
 		// Build the full line
-		maxWidth := screenWidth - len(prefix)
+		arrowAndIndent := prefix + arrow
+		maxWidth := screenWidth - len(arrowAndIndent)
 		if maxWidth < 0 {
 			maxWidth = 0
 		}
@@ -287,15 +391,16 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 			text = text[:maxWidth]
 		}
 
-		fullLine := prefix + text
+		// Draw the text
+		textX := prefixX + 2  // Position after the arrow and space
+		screen.SetCell(prefixX+1, y, ' ', style)  // Space after arrow
+		screen.DrawString(textX, y, text, style)
 
 		// Pad to screen width
-		for len(fullLine) < screenWidth {
-			fullLine += " "
+		totalLen := textX + len(text)
+		for x := totalLen; x < screenWidth; x++ {
+			screen.SetCell(x, y, ' ', style)
 		}
-
-		// Draw the full line with consistent style
-		screen.DrawString(0, y, fullLine, style)
 	}
 
 	// Clear remaining lines

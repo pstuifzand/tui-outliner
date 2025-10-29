@@ -24,6 +24,24 @@
         {
           "id": "item_20251029210630_45iyfq5h",
           "text": "New itemdfdfdfdf",
+          "children": [
+            {
+              "id": "item_20251029211218_rrdap6k1",
+              "text": "This is another child node",
+              "metadata": {
+                "created": "2025-10-29T21:12:18.226826395+01:00",
+                "modified": "2025-10-29T21:12:18.226826551+01:00"
+              }
+            },
+            {
+              "id": "item_20251029211410_jtqkebof",
+              "text": "hell oworld",
+              "metadata": {
+                "created": "2025-10-29T21:14:10.144215828+01:00",
+                "modified": "2025-10-29T21:14:10.144215972+01:00"
+              }
+            }
+          ],
           "metadata": {
             "created": "2025-10-29T21:06:30.177089914+01:00",
             "modified": "2025-10-29T21:06:30.17709007+01:00"
