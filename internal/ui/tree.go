@@ -292,6 +292,38 @@ func (tv *TreeView) AddItemAsChild(text string) {
 	tv.rebuildView()
 }
 
+// AddItemBefore adds a new item before the selected item
+func (tv *TreeView) AddItemBefore(text string) {
+	newItem := model.NewItem(text)
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		tv.items = append(tv.items, newItem)
+	} else {
+		selected := tv.filteredView[tv.selectedIdx].item
+		parent := selected.Parent
+		if parent != nil {
+			// Find position of selected item in parent's children
+			for idx, child := range parent.Children {
+				if child.ID == selected.ID {
+					// Insert before this position
+					parent.Children = append(parent.Children[:idx], append([]*model.Item{newItem}, parent.Children[idx:]...)...)
+					newItem.Parent = parent
+					break
+				}
+			}
+		} else {
+			// Insert at root level
+			for idx, item := range tv.items {
+				if item.ID == selected.ID {
+					tv.items = append(tv.items[:idx], append([]*model.Item{newItem}, tv.items[idx:]...)...)
+					break
+				}
+			}
+		}
+	}
+	tv.rebuildView()
+	tv.selectedIdx = tv.selectedIdx // Selection stays on the new item (which is now at the same index)
+}
+
 // DeleteSelected removes the selected item
 func (tv *TreeView) DeleteSelected() bool {
 	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
@@ -312,6 +344,32 @@ func (tv *TreeView) DeleteSelected() bool {
 	}
 
 	tv.rebuildView()
+	return true
+}
+
+// DeleteItem removes a specific item by reference
+func (tv *TreeView) DeleteItem(item *model.Item) bool {
+	if item == nil {
+		return false
+	}
+
+	if item.Parent != nil {
+		item.Parent.RemoveChild(item)
+	} else {
+		// Remove from root
+		for idx, rootItem := range tv.items {
+			if rootItem.ID == item.ID {
+				tv.items = append(tv.items[:idx], tv.items[idx+1:]...)
+				break
+			}
+		}
+	}
+
+	tv.rebuildView()
+	// Move selection back if needed
+	if tv.selectedIdx >= len(tv.filteredView) && len(tv.filteredView) > 0 {
+		tv.selectedIdx = len(tv.filteredView) - 1
+	}
 	return true
 }
 
@@ -462,10 +520,11 @@ func (tv *TreeView) Render(screen *Screen, startY int) {
 		}
 
 		// Always draw an arrow
-		arrowStyle := screen.TreeArrowStyle()  // Default arrow color
-		if len(dispItem.item.Children) == 0 {
-			// For leaf nodes, use the arrow style from theme
-			arrowStyle = screen.TreeArrowStyle()
+		// Use different colors for leaf vs expandable nodes
+		arrowStyle := screen.TreeLeafArrowStyle()  // Default to leaf (dimmer)
+		if len(dispItem.item.Children) > 0 {
+			// For nodes with children, use brighter expandable arrow style
+			arrowStyle = screen.TreeExpandableArrowStyle()
 		}
 		if idx == tv.selectedIdx {
 			arrowStyle = selectedStyle  // Use selected style if item is selected

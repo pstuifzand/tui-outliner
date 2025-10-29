@@ -6,6 +6,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/theme"
+	"github.com/pstuifzand/tui-outliner/internal/config"
 )
 
 // Screen manages the tcell screen and rendering
@@ -16,9 +17,19 @@ type Screen struct {
 	Theme       *theme.Theme
 }
 
-// NewScreen creates a new Screen instance
+// NewScreen creates a new Screen instance with the configured theme
 func NewScreen() (*Screen, error) {
-	return NewScreenWithTheme(theme.TokyoNight())
+	// Load config to get the theme name
+	cfg, err := config.Load()
+	if err != nil {
+		// If config fails to load, use Default as fallback
+		return NewScreenWithTheme(theme.Default())
+	}
+
+	// Load the theme based on config
+	// Try to load from TOML files first, fall back to built-in Default
+	t := theme.LoadThemeOrDefault(cfg.Theme)
+	return NewScreenWithTheme(t)
 }
 
 // NewScreenWithTheme creates a new Screen instance with a specific theme
@@ -151,7 +162,7 @@ func (s *Screen) TreeNormalStyle() tcell.Style {
 
 // TreeSelectedStyle returns the style for selected tree items
 func (s *Screen) TreeSelectedStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.TreeSelectedItem).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.TreeSelectedItem, s.Theme.Colors.TreeSelectedBg).Bold(true)
 }
 
 // TreeNewItemStyle returns the style for new/placeholder tree items
@@ -159,9 +170,14 @@ func (s *Screen) TreeNewItemStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeNewItem).Dim(true)
 }
 
-// TreeArrowStyle returns the style for tree navigation arrows
-func (s *Screen) TreeArrowStyle() tcell.Style {
+// TreeLeafArrowStyle returns the style for leaf node arrows (dimmer)
+func (s *Screen) TreeLeafArrowStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeLeafArrow)
+}
+
+// TreeExpandableArrowStyle returns the style for expandable node arrows (brighter)
+func (s *Screen) TreeExpandableArrowStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeExpandableArrow)
 }
 
 // EditorStyle returns the style for editor text
@@ -171,7 +187,7 @@ func (s *Screen) EditorStyle() tcell.Style {
 
 // EditorCursorStyle returns the style for editor cursor
 func (s *Screen) EditorCursorStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.EditorCursor).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.EditorCursor, s.Theme.Colors.EditorCursorBg)
 }
 
 // SearchLabelStyle returns the style for search label
@@ -186,7 +202,7 @@ func (s *Screen) SearchTextStyle() tcell.Style {
 
 // SearchCursorStyle returns the style for search cursor
 func (s *Screen) SearchCursorStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.SearchCursor).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.SearchCursor, s.Theme.Colors.SearchCursorBg)
 }
 
 // SearchResultCountStyle returns the style for search result count
@@ -206,7 +222,7 @@ func (s *Screen) CommandTextStyle() tcell.Style {
 
 // CommandCursorStyle returns the style for command cursor
 func (s *Screen) CommandCursorStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.CommandCursor).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.CommandCursor, s.Theme.Colors.CommandCursorBg)
 }
 
 // HelpStyle returns the style for help background
@@ -226,7 +242,7 @@ func (s *Screen) HelpTitleStyle() tcell.Style {
 
 // StatusModeStyle returns the style for mode indicator
 func (s *Screen) StatusModeStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.StatusMode).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.StatusMode, s.Theme.Colors.StatusModeBg).Bold(true)
 }
 
 // StatusMessageStyle returns the style for status messages
@@ -241,5 +257,10 @@ func (s *Screen) StatusModifiedStyle() tcell.Style {
 
 // HeaderStyle returns the style for header title
 func (s *Screen) HeaderStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.HeaderTitle).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.HeaderTitle, s.Theme.Colors.HeaderBg).Bold(true)
+}
+
+// BackgroundStyle returns the default background style for the application
+func (s *Screen) BackgroundStyle() tcell.Style {
+	return tcell.StyleDefault.Background(s.Theme.Colors.Background)
 }

@@ -7,10 +7,12 @@ import (
 
 // Editor manages inline text editing of outline items
 type Editor struct {
-	item      *model.Item
-	text      string
-	cursorPos int
-	active    bool
+	item          *model.Item
+	text          string
+	cursorPos     int
+	active        bool
+	enterPressed  bool // Track if Enter was pressed to create new node
+	escapePressed bool // Track if Escape was pressed
 }
 
 // NewEditor creates a new Editor
@@ -33,6 +35,10 @@ func (e *Editor) Start() {
 func (e *Editor) Stop() string {
 	e.active = false
 	e.item.Text = e.text
+	// Mark item as no longer new if it has content
+	if e.item.IsNew && e.text != "" && e.text != "Type here..." {
+		e.item.IsNew = false
+	}
 	return e.text
 }
 
@@ -55,9 +61,11 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 
 	switch ev.Key() {
 	case tcell.KeyEscape:
+		e.escapePressed = true
 		return false // Signal to exit edit mode
 	case tcell.KeyEnter:
-		return false // Signal to exit edit mode
+		e.enterPressed = true
+		return false // Signal to exit edit mode and create new node
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if e.cursorPos > 0 {
 			e.text = e.text[:e.cursorPos-1] + e.text[e.cursorPos:]
@@ -174,4 +182,23 @@ func (e *Editor) SetText(text string) {
 // GetCursorPos returns the cursor position
 func (e *Editor) GetCursorPos() int {
 	return e.cursorPos
+}
+
+// WasEnterPressed returns whether Enter was pressed and resets the flag
+func (e *Editor) WasEnterPressed() bool {
+	pressed := e.enterPressed
+	e.enterPressed = false
+	return pressed
+}
+
+// WasEscapePressed returns whether Escape was pressed and resets the flag
+func (e *Editor) WasEscapePressed() bool {
+	pressed := e.escapePressed
+	e.escapePressed = false
+	return pressed
+}
+
+// GetItem returns the item being edited
+func (e *Editor) GetItem() *model.Item {
+	return e.item
 }

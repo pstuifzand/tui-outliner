@@ -11,6 +11,14 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
+// Mode represents the current editor mode
+type Mode int
+
+const (
+	NormalMode Mode = iota
+	InsertMode
+)
+
 // App is the main application controller
 type App struct {
 	screen       *ui.Screen
@@ -27,7 +35,7 @@ type App struct {
 	autoSaveTime time.Time
 	quit         bool
 	debugMode    bool
-	mode         string // "NORMAL" or "INSERT"
+	mode         Mode // Current editor mode (NormalMode or InsertMode)
 	clipboard    *model.Item // For cut/paste operations
 	keybindings  []KeyBinding // All keybindings
 }
@@ -74,7 +82,7 @@ func NewApp(filePath string) (*App, error) {
 		dirty:        false,
 		autoSaveTime: time.Now(),
 		quit:         false,
-		mode:         "NORMAL",
+		mode:         NormalMode,
 	}
 
 	// Initialize keybindings
@@ -150,6 +158,14 @@ func (a *App) render() {
 	width := a.screen.GetWidth()
 	height := a.screen.GetHeight()
 
+	// Fill background for entire screen
+	bgStyle := a.screen.BackgroundStyle()
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			a.screen.SetCell(x, y, ' ', bgStyle)
+		}
+	}
+
 	// Draw header (title)
 	headerStyle := a.screen.HeaderStyle()
 	header := fmt.Sprintf(" %s ", a.outline.Title)
@@ -217,7 +233,7 @@ func (a *App) render() {
 	lineX := 0
 
 	// Show mode indicator
-	if a.mode == "INSERT" {
+	if a.mode == InsertMode {
 		statusLine = "-- INSERT --"
 	} else {
 		statusLine = "-- NORMAL --"
@@ -282,12 +298,36 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 	if a.editor != nil && a.editor.IsActive() {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if !a.editor.HandleKey(keyEv) {
+				// Check if Enter or Escape was pressed
+				enterPressed := a.editor.WasEnterPressed()
+				escapePressed := a.editor.WasEscapePressed()
+				editedItem := a.editor.GetItem()
+
 				// Exit edit mode
 				a.editor.Stop()
 				a.editor = nil
 				a.dirty = true
-				a.mode = "NORMAL"
+				a.mode = NormalMode
 				a.SetStatus("Modified")
+
+				// If Escape was pressed and item is empty, delete it
+				if escapePressed && editedItem.Text == "" {
+					a.tree.DeleteItem(editedItem)
+					a.SetStatus("Deleted empty item")
+					a.dirty = true
+				} else if enterPressed {
+					// If Enter was pressed, create new node below and enter insert mode
+					a.tree.AddItemAfter("")
+					a.SetStatus("Created new item below")
+					a.dirty = true
+					// Enter insert mode for the new item
+					selected := a.tree.GetSelected()
+					if selected != nil {
+						a.editor = ui.NewEditor(selected)
+						a.editor.Start()
+						a.mode = InsertMode
+					}
+				}
 			}
 		}
 		return

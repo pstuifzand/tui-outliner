@@ -80,7 +80,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				if selected != nil {
 					app.editor = ui.NewEditor(selected)
 					app.editor.Start()
-					app.mode = "INSERT"
+					app.mode = InsertMode
 				}
 			},
 		},
@@ -93,7 +93,35 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 					app.editor = ui.NewEditor(selected)
 					app.editor.SetText("")
 					app.editor.Start()
-					app.mode = "INSERT"
+					app.mode = InsertMode
+				}
+			},
+		},
+		{
+			Key:         'A',
+			Description: "Append (edit at end of text)",
+			Handler: func(app *App) {
+				selected := app.tree.GetSelected()
+				if selected != nil {
+					app.editor = ui.NewEditor(selected)
+					app.editor.Start()
+					app.mode = InsertMode
+				}
+			},
+		},
+		{
+			Key:         'O',
+			Description: "Insert new item before",
+			Handler: func(app *App) {
+				app.tree.AddItemBefore("")
+				app.SetStatus("Created new item before")
+				app.dirty = true
+				// Enter insert mode for the new item
+				selected := app.tree.GetSelected()
+				if selected != nil {
+					app.editor = ui.NewEditor(selected)
+					app.editor.Start()
+					app.mode = InsertMode
 				}
 			},
 		},
@@ -101,18 +129,16 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'o',
 			Description: "Insert new item after",
 			Handler: func(app *App) {
-				app.tree.AddItemAfter("Type here...")
+				app.tree.AddItemAfter("")
 				app.SetStatus("Created new item after")
 				app.dirty = true
-			},
-		},
-		{
-			Key:         'a',
-			Description: "Insert new item as child",
-			Handler: func(app *App) {
-				app.tree.AddItemAsChild("Type here...")
-				app.SetStatus("Created new child item")
-				app.dirty = true
+				// Enter insert mode for the new item
+				selected := app.tree.GetSelected()
+				if selected != nil {
+					app.editor = ui.NewEditor(selected)
+					app.editor.Start()
+					app.mode = InsertMode
+				}
 			},
 		},
 		{
