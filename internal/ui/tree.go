@@ -527,6 +527,13 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 	newItemStyle := screen.TreeNewItemStyle()
 	screenWidth := screen.GetWidth()
 
+	// Get background color for adding to text styles
+	bgColor := screen.Theme.Colors.Background
+
+	// Add background to non-selected styles
+	defaultStyle = defaultStyle.Background(bgColor)
+	newItemStyle = newItemStyle.Background(bgColor)
+
 	// Determine visual selection range
 	visualStart, visualEnd := -1, -1
 	if visualAnchor >= 0 {
@@ -563,6 +570,10 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 			style = selectedStyle
 		}
 
+		// Prepare arrow style with background color
+		leafArrowStyle := screen.TreeLeafArrowStyle().Background(bgColor)
+		expandableArrowStyle := screen.TreeExpandableArrowStyle().Background(bgColor)
+
 		// Build the prefix: 2 spaces per nesting level
 		prefix := ""
 
@@ -578,10 +589,10 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 
 		// Always draw an arrow
 		// Use different colors for leaf vs expandable nodes
-		arrowStyle := screen.TreeLeafArrowStyle()  // Default to leaf (dimmer)
+		arrowStyle := leafArrowStyle  // Default to leaf (dimmer)
 		if len(dispItem.Item.Children) > 0 {
 			// For nodes with children, use brighter expandable arrow style
-			arrowStyle = screen.TreeExpandableArrowStyle()
+			arrowStyle = expandableArrowStyle
 		}
 		if idx == tv.selectedIdx {
 			arrowStyle = selectedStyle  // Use selected style if item is selected
@@ -612,20 +623,22 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 		screen.SetCell(prefixX+1, y, ' ', style)  // Space after arrow
 		screen.DrawString(textX, y, text, style)
 
-		// Pad to screen width
+		// Pad to screen width with background color
 		totalLen := textX + len(text)
+		bgStyle := screen.BackgroundStyle()
 		for x := totalLen; x < screenWidth; x++ {
-			screen.SetCell(x, y, ' ', style)
+			screen.SetCell(x, y, ' ', bgStyle)
 		}
 	}
 
-	// Clear remaining lines
+	// Clear remaining lines with background color
+	bgStyle := screen.BackgroundStyle()
 	for y := startY + len(tv.filteredView); y < screen.GetHeight()-1; y++ {
 		clearLine := ""
 		for i := 0; i < screenWidth; i++ {
 			clearLine += " "
 		}
-		screen.DrawString(0, y, clearLine, defaultStyle)
+		screen.DrawString(0, y, clearLine, bgStyle)
 	}
 }
 
