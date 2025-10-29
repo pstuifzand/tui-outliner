@@ -1,0 +1,26 @@
+# Binaries
+tui-outliner
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Test binaries
+*.test
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Outline files (optional - uncomment to ignore local outlines)
+# *.json

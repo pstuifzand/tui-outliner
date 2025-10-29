@@ -1,0 +1,39 @@
+{
+  "title": "Untitled",
+  "items": [
+    {
+      "id": "item_20251029210338_ufb7630w",
+      "text": "Welcome to tui-outliner",
+      "children": [
+        {
+          "id": "item_20251029210538_d3qj92wf",
+          "text": "New item",
+          "metadata": {
+            "created": "2025-10-29T21:05:38.397499702+01:00",
+            "modified": "2025-10-29T21:05:38.397499911+01:00"
+          }
+        },
+        {
+          "id": "item_20251029210341_ui5um9wk",
+          "text": "New item",
+          "metadata": {
+            "created": "2025-10-29T21:03:41.412467281+01:00",
+            "modified": "2025-10-29T21:03:41.412467402+01:00"
+          }
+        },
+        {
+          "id": "item_20251029210630_45iyfq5h",
+          "text": "New itemdfdfdfdf",
+          "metadata": {
+            "created": "2025-10-29T21:06:30.177089914+01:00",
+            "modified": "2025-10-29T21:06:30.17709007+01:00"
+          }
+        }
+      ],
+      "metadata": {
+        "created": "2025-10-29T21:03:38.254886812+01:00",
+        "modified": "2025-10-29T21:03:38.254886909+01:00"
+      }
+    }
+  ]
+}

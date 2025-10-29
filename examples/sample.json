@@ -1,0 +1,247 @@
+{
+  "title": "Project Planning",
+  "items": [
+    {
+      "id": "item_001",
+      "text": "Phase 1: Design",
+      "children": [
+        {
+          "id": "item_002",
+          "text": "Create wireframes",
+          "metadata": {
+            "tags": [
+              "design"
+            ],
+            "priority": "high",
+            "created": "2025-10-29T00:00:00Z",
+            "modified": "2025-10-29T00:00:00Z"
+          }
+        },
+        {
+          "id": "item_003",
+          "text": "Define color scheme",
+          "children": [
+            {
+              "id": "item_004",
+              "text": "Phase 2: Development",
+              "children": [
+                {
+                  "id": "item_005",
+                  "text": "Setup development environment",
+                  "metadata": {
+                    "tags": [
+                      "dev",
+                      "setup"
+                    ],
+                    "priority": "high",
+                    "created": "2025-10-29T00:00:00Z",
+                    "modified": "2025-10-29T00:00:00Z"
+                  }
+                },
+                {
+                  "id": "item_006",
+                  "text": "Implement core features",
+                  "children": [
+                    {
+                      "id": "item_007",
+                      "text": "User authentication",
+                      "metadata": {
+                        "tags": [
+                          "feature",
+                          "security"
+                        ],
+                        "priority": "high",
+                        "created": "2025-10-29T00:00:00Z",
+                        "modified": "2025-10-29T00:00:00Z"
+                      }
+                    },
+                    {
+                      "id": "item_008",
+                      "text": "Database integration",
+                      "metadata": {
+                        "tags": [
+                          "feature",
+                          "backend"
+                        ],
+                        "priority": "high",
+                        "created": "2025-10-29T00:00:00Z",
+                        "modified": "2025-10-29T00:00:00Z"
+                      }
+                    }
+                  ],
+                  "metadata": {
+                    "tags": [
+                      "dev"
+                    ],
+                    "priority": "high",
+                    "created": "2025-10-29T00:00:00Z",
+                    "modified": "2025-10-29T00:00:00Z"
+                  }
+                }
+              ],
+              "metadata": {
+                "tags": [
+                  "phase"
+                ],
+                "priority": "high",
+                "created": "2025-10-29T00:00:00Z",
+                "modified": "2025-10-29T00:00:00Z"
+              }
+            }
+          ],
+          "metadata": {
+            "tags": [
+              "design",
+              "ui"
+            ],
+            "priority": "high",
+            "created": "2025-10-29T00:00:00Z",
+            "modified": "2025-10-29T00:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "tags": [
+          "phase"
+        ],
+        "priority": "high",
+        "created": "2025-10-29T00:00:00Z",
+        "modified": "2025-10-29T00:00:00Z"
+      }
+    },
+    {
+      "id": "item_004",
+      "text": "Phase 2: Development",
+      "children": [
+        {
+          "id": "item_005",
+          "text": "Setup development environment",
+          "metadata": {
+            "tags": [
+              "dev",
+              "setup"
+            ],
+            "priority": "high",
+            "created": "2025-10-29T00:00:00Z",
+            "modified": "2025-10-29T00:00:00Z"
+          }
+        },
+        {
+          "id": "item_006",
+          "text": "Implement core features",
+          "children": [
+            {
+              "id": "item_007",
+              "text": "User authentication",
+              "metadata": {
+                "tags": [
+                  "feature",
+                  "security"
+                ],
+                "priority": "high",
+                "created": "2025-10-29T00:00:00Z",
+                "modified": "2025-10-29T00:00:00Z"
+              }
+            },
+            {
+              "id": "item_008",
+              "text": "Database integration",
+              "metadata": {
+                "tags": [
+                  "feature",
+                  "backend"
+                ],
+                "priority": "high",
+                "created": "2025-10-29T00:00:00Z",
+                "modified": "2025-10-29T00:00:00Z"
+              }
+            }
+          ],
+          "metadata": {
+            "tags": [
+              "dev"
+            ],
+            "priority": "high",
+            "created": "2025-10-29T00:00:00Z",
+            "modified": "2025-10-29T00:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "tags": [
+          "phase"
+        ],
+        "priority": "high",
+        "created": "2025-10-29T00:00:00Z",
+        "modified": "2025-10-29T00:00:00Z"
+      }
+    },
+    {
+      "id": "item_004",
+      "text": "Phase 2: Development",
+      "children": [
+        {
+          "id": "item_005",
+          "text": "Setup development environment",
+          "metadata": {
+            "tags": [
+              "dev",
+              "setup"
+            ],
+            "priority": "high",
+            "created": "2025-10-29T00:00:00Z",
+            "modified": "2025-10-29T00:00:00Z"
+          }
+        },
+        {
+          "id": "item_006",
+          "text": "Implement core features",
+          "children": [
+            {
+              "id": "item_007",
+              "text": "User authentication",
+              "metadata": {
+                "tags": [
+                  "feature",
+                  "security"
+                ],
+                "priority": "high",
+                "created": "2025-10-29T00:00:00Z",
+                "modified": "2025-10-29T00:00:00Z"
+              }
+            },
+            {
+              "id": "item_008",
+              "text": "Database integration",
+              "metadata": {
+                "tags": [
+                  "feature",
+                  "backend"
+                ],
+                "priority": "high",
+                "created": "2025-10-29T00:00:00Z",
+                "modified": "2025-10-29T00:00:00Z"
+              }
+            }
+          ],
+          "metadata": {
+            "tags": [
+              "dev"
+            ],
+            "priority": "high",
+            "created": "2025-10-29T00:00:00Z",
+            "modified": "2025-10-29T00:00:00Z"
+          }
+        }
+      ],
+      "metadata": {
+        "tags": [
+          "phase"
+        ],
+        "priority": "high",
+        "created": "2025-10-29T00:00:00Z",
+        "modified": "2025-10-29T00:00:00Z"
+      }
+    }
+  ]
+}
