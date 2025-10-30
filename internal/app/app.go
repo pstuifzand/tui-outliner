@@ -250,7 +250,7 @@ func (a *App) render() {
 				if selected != nil {
 					// Get depth from tree view (need to find it)
 					depth := a.tree.GetSelectedDepth()
-					editorX := depth*2 + 3 // indentation + arrow + attribute + space
+					editorX := depth*3 + 3 // indentation + arrow + attribute + space
 					maxWidth := width - editorX
 					if maxWidth > 0 {
 						a.editor.Render(a.screen, editorX, itemY, maxWidth)
@@ -1139,7 +1139,7 @@ func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
 
 	// Check if click was on the arrow (expand/collapse)
 	dispItem := displayItems[itemIdx]
-	arrowX := dispItem.Depth * 2
+	arrowX := dispItem.Depth * 3
 
 	// Arrow is at position arrowX, click is on it if within those bounds
 	if x >= arrowX && x < arrowX+1 && len(dispItem.Item.Children) > 0 {
@@ -1180,7 +1180,7 @@ func (a *App) handleEditorMouseClick(mouseEv *tcell.EventMouse) {
 	}
 
 	depth := a.tree.GetSelectedDepth()
-	editorX := depth*2 + 2 // indentation + arrow + space
+	editorX := depth*3 + 3 // indentation + arrow + space
 
 	// Calculate cursor position from click
 	if x >= editorX {

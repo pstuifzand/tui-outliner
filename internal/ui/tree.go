@@ -26,8 +26,8 @@ type TreeView struct {
 	viewportOffset int // Index of first visible item in the viewport
 
 	// Hoisting state
-	hoistedItem    *model.Item   // Current hoisted node (nil if not hoisted)
-	originalItems  []*model.Item // Saved root items before hoisting
+	hoistedItem   *model.Item   // Current hoisted node (nil if not hoisted)
+	originalItems []*model.Item // Saved root items before hoisting
 }
 
 type displayItem struct {
@@ -740,11 +740,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 	defaultStyle = defaultStyle.Background(bgColor)
 	newItemStyle = newItemStyle.Background(bgColor)
 
-	// Calculate available viewport height
-	viewportHeight := screenHeight - startY - 1  // Reserve 1 line for status bar
-	if viewportHeight < 1 {
-		viewportHeight = 1
-	}
+	// Calculate available viewport height Reserve 1 line for status bar
+	viewportHeight := max(screenHeight-startY-1, 1)
 
 	// Ensure viewport offset keeps selected item visible
 	if tv.selectedIdx < tv.viewportOffset {
@@ -754,10 +751,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 	}
 
 	// Clamp viewport offset
-	maxOffset := len(tv.filteredView) - viewportHeight
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
+	maxOffset := max(len(tv.filteredView)-viewportHeight, 0)
 	if tv.viewportOffset > maxOffset {
 		tv.viewportOffset = maxOffset
 	}
@@ -779,7 +773,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 	screenY := startY
 	for i := tv.viewportOffset; i < len(tv.filteredView) && screenY < screenHeight-1; i++ {
 		dispItem := tv.filteredView[i]
-		idx := i  // Keep track of actual index in filteredView for selection/visual comparisons
+		idx := i // Keep track of actual index in filteredView for selection/visual comparisons
 		y := screenY
 
 		// Select style based on selection, visual selection, and new item status
@@ -811,7 +805,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 
 		// Add indentation for parent levels (2 spaces per level)
 		for i := 0; i < dispItem.Depth; i++ {
-			prefix += "  "  // 2 spaces per nesting level
+			prefix += "  " // 2 spaces per nesting level
 		}
 
 		// Draw indentation
@@ -821,13 +815,13 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 
 		// Always draw an arrow
 		// Use different colors for leaf vs expandable nodes
-		arrowStyle := leafArrowStyle  // Default to leaf (dimmer)
+		arrowStyle := leafArrowStyle // Default to leaf (dimmer)
 		if len(dispItem.Item.Children) > 0 {
 			// For nodes with children, use brighter expandable arrow style
 			arrowStyle = expandableArrowStyle
 		}
 		if idx == tv.selectedIdx {
-			arrowStyle = selectedStyle  // Use selected style if item is selected
+			arrowStyle = selectedStyle // Use selected style if item is selected
 		}
 
 		arrow := "▶"
@@ -835,20 +829,20 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 			arrow = "▼"
 		}
 
-		prefixX := dispItem.Depth * 2
+		prefixX := dispItem.Depth * 3
 		screen.DrawString(prefixX, y, arrow, arrowStyle)
 
 		// Draw attribute indicator or space to maintain alignment
 		indicatorStyle := screen.TreeAttributeIndicatorStyle()
 		if idx == tv.selectedIdx {
-			indicatorStyle = selectedStyle  // Use selected style if item is selected
+			indicatorStyle = selectedStyle // Use selected style if item is selected
 		}
 
 		hasAttributes := dispItem.Item.Metadata != nil && len(dispItem.Item.Metadata.Attributes) > 0
 		if hasAttributes {
-			screen.SetCell(prefixX+1, y, '●', indicatorStyle)  // Filled circle for items with attributes
+			screen.SetCell(prefixX+1, y, '●', indicatorStyle) // Filled circle for items with attributes
 		} else {
-			screen.SetCell(prefixX+1, y, ' ', style)  // Space for items without attributes
+			screen.SetCell(prefixX+1, y, ' ', style) // Space for items without attributes
 		}
 
 		// Build the full line
@@ -864,8 +858,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 		}
 
 		// Draw the text
-		textX := prefixX + 3  // Position after the arrow, indicator, and space
-		screen.SetCell(prefixX+2, y, ' ', style)  // Space after indicator
+		textX := prefixX + 3                     // Position after the arrow, indicator, and space
+		screen.SetCell(prefixX+2, y, ' ', style) // Space after indicator
 
 		// Highlight search matches in the text only if this is the current match
 		if searchQuery != "" && currentMatchItem != nil && dispItem.Item == currentMatchItem {
@@ -881,7 +875,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 			screen.SetCell(x, y, ' ', bgStyle)
 		}
 
-		screenY++  // Move to next screen line
+		screenY++ // Move to next screen line
 	}
 
 	// Clear remaining lines with background color
