@@ -2,6 +2,8 @@ package app
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -32,6 +34,7 @@ type App struct {
 	help               *ui.HelpScreen
 	splash             *ui.SplashScreen
 	command            *ui.CommandMode
+	attributeEditor    *ui.AttributeEditor // Attribute editing modal
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -78,6 +81,7 @@ func NewApp(filePath string) (*App, error) {
 	help := ui.NewHelpScreen()
 	splash := ui.NewSplashScreen()
 	command := ui.NewCommandMode()
+	attributeEditor := ui.NewAttributeEditor()
 
 	// Show splash screen if no file was provided
 	hasFile := filePath != ""
@@ -86,25 +90,31 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	app := &App{
-		screen:        screen,
-		outline:       outline,
-		store:         store,
-		tree:          tree,
-		editor:        nil,
-		search:        ui.NewSearch(outline.GetAllItems()),
-		help:          help,
-		splash:        splash,
-		command:       command,
-		statusMsg:     "Ready",
-		statusTime:    time.Now(),
-		dirty:         false,
-		autoSaveTime:  time.Now(),
-		quit:          false,
-		mode:          NormalMode,
-		visualAnchor:  -1,
-		pendingKeySeq: 0,
-		hasFile:       hasFile,
+		screen:          screen,
+		outline:         outline,
+		store:           store,
+		tree:            tree,
+		editor:          nil,
+		search:          ui.NewSearch(outline.GetAllItems()),
+		help:            help,
+		splash:          splash,
+		command:         command,
+		attributeEditor: attributeEditor,
+		statusMsg:       "Ready",
+		statusTime:      time.Now(),
+		dirty:           false,
+		autoSaveTime:    time.Now(),
+		quit:            false,
+		mode:            NormalMode,
+		visualAnchor:    -1,
+		pendingKeySeq:   0,
+		hasFile:         hasFile,
 	}
+
+	// Set callback for attribute editor modifications
+	attributeEditor.SetOnModified(func() {
+		app.dirty = true
+	})
 
 	// Initialize keybindings
 	app.keybindings = app.InitializeKeybindings()
@@ -309,6 +319,9 @@ func (a *App) render() {
 	// Draw help overlay if visible
 	a.help.Render(a.screen)
 
+	// Draw attribute editor if visible
+	a.attributeEditor.Render(a.screen)
+
 	a.screen.Show()
 }
 
@@ -339,6 +352,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 			if done {
 				a.handleCommand(cmd)
 			}
+		}
+		return
+	}
+
+	// Handle attribute editor input
+	if a.attributeEditor.IsVisible() {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			a.attributeEditor.HandleKeyEvent(keyEv)
 		}
 		return
 	}
@@ -621,13 +642,75 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 	}
 }
 
+// parseCommand parses a command string into parts, respecting quoted strings
+// Handles both single and double quotes, and allows escaping quotes with backslash
+func parseCommand(cmd string) []string {
+	var parts []string
+	var current strings.Builder
+	inQuote := false
+	quoteChar := rune(0)
+	wasQuoted := false
+	i := 0
+
+	for i < len(cmd) {
+		r := rune(cmd[i])
+
+		// Handle escape sequences
+		if r == '\\' && i+1 < len(cmd) {
+			nextR := rune(cmd[i+1])
+			// Escape quote or backslash
+			if nextR == '"' || nextR == '\'' || nextR == '\\' {
+				current.WriteRune(nextR)
+				i += 2
+				continue
+			}
+		}
+
+		// Handle quotes
+		if (r == '"' || r == '\'') && (quoteChar == 0 || quoteChar == r) {
+			if inQuote {
+				inQuote = false
+				quoteChar = 0
+			} else {
+				inQuote = true
+				quoteChar = r
+				wasQuoted = true
+			}
+			i++
+			continue
+		}
+
+		// Handle whitespace (outside quotes)
+		if !inQuote && (r == ' ' || r == '\t') {
+			if current.Len() > 0 || wasQuoted {
+				parts = append(parts, current.String())
+				current.Reset()
+				wasQuoted = false
+			}
+			i++
+			continue
+		}
+
+		// Regular character
+		current.WriteRune(r)
+		i++
+	}
+
+	// Add final part
+	if current.Len() > 0 || wasQuoted {
+		parts = append(parts, current.String())
+	}
+
+	return parts
+}
+
 // handleCommand processes a command from command mode
 func (a *App) handleCommand(cmd string) {
 	if cmd == "" {
 		return
 	}
 
-	parts := strings.Fields(cmd)
+	parts := parseCommand(cmd)
 	if len(parts) == 0 {
 		return
 	}
@@ -737,6 +820,19 @@ func (a *App) handleCommand(cmd string) {
 			// Clear the IsNew flag since this item has meaningful content (date)
 			if foundItem != nil {
 				foundItem.IsNew = false
+				// Add type and date attributes to the daily note
+				if foundItem.Metadata == nil {
+					foundItem.Metadata = &model.Metadata{
+						Attributes: make(map[string]string),
+						Created:    time.Now(),
+						Modified:   time.Now(),
+					}
+				}
+				if foundItem.Metadata.Attributes == nil {
+					foundItem.Metadata.Attributes = make(map[string]string)
+				}
+				foundItem.Metadata.Attributes["type"] = "day"
+				foundItem.Metadata.Attributes["date"] = today
 			}
 			a.dirty = true
 			a.SetStatus("Created daily note for " + today)
@@ -750,6 +846,8 @@ func (a *App) handleCommand(cmd string) {
 			}
 			a.SetStatus("Navigated to daily note for " + today)
 		}
+	case "attr":
+		a.handleAttrCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -1106,4 +1204,120 @@ func (a *App) Quit() {
 // SetDebugMode enables or disables debug mode
 func (a *App) SetDebugMode(debug bool) {
 	a.debugMode = debug
+}
+
+// handleAttrCommand processes attribute-related commands
+func (a *App) handleAttrCommand(parts []string) {
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Ensure metadata exists
+	if selected.Metadata == nil {
+		selected.Metadata = &model.Metadata{
+			Attributes: make(map[string]string),
+			Created:    time.Now(),
+			Modified:   time.Now(),
+		}
+	}
+
+	// Ensure attributes map exists
+	if selected.Metadata.Attributes == nil {
+		selected.Metadata.Attributes = make(map[string]string)
+	}
+
+	if len(parts) < 2 {
+		// Show all attributes
+		a.showAttributes(selected)
+		return
+	}
+
+	switch parts[1] {
+	case "add", "set":
+		if len(parts) < 4 {
+			a.SetStatus("Usage: :attr add <key> <value>")
+			return
+		}
+		key := parts[2]
+		value := strings.Join(parts[3:], " ")
+		selected.Metadata.Attributes[key] = value
+		selected.Metadata.Modified = time.Now()
+		a.dirty = true
+		a.SetStatus(fmt.Sprintf("Attribute '%s' set to '%s'", key, value))
+
+	case "del", "delete", "remove":
+		if len(parts) < 3 {
+			a.SetStatus("Usage: :attr del <key>")
+			return
+		}
+		key := parts[2]
+		if _, exists := selected.Metadata.Attributes[key]; !exists {
+			a.SetStatus(fmt.Sprintf("Attribute '%s' not found", key))
+			return
+		}
+		delete(selected.Metadata.Attributes, key)
+		selected.Metadata.Modified = time.Now()
+		a.dirty = true
+		a.SetStatus(fmt.Sprintf("Attribute '%s' deleted", key))
+
+	case "list", "show", "view":
+		a.showAttributes(selected)
+
+	default:
+		a.SetStatus("Unknown attr command: " + parts[1])
+	}
+}
+
+// showAttributes displays all attributes for an item
+func (a *App) showAttributes(item *model.Item) {
+	if item.Metadata == nil || len(item.Metadata.Attributes) == 0 {
+		a.SetStatus("No attributes for this item")
+		return
+	}
+
+	// Build a formatted string of all attributes
+	var lines []string
+	for key, value := range item.Metadata.Attributes {
+		lines = append(lines, fmt.Sprintf("%s: %s", key, value))
+	}
+
+	// Show all attributes in status bar (limit to first line for now)
+	if len(lines) > 0 {
+		a.SetStatus("Attributes: " + lines[0])
+	}
+}
+
+// handleGoCommand opens a URL from the 'url' attribute using xdg-open
+func (a *App) handleGoCommand() {
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Check if item has attributes
+	if selected.Metadata == nil || selected.Metadata.Attributes == nil {
+		a.SetStatus("Item has no attributes")
+		return
+	}
+
+	// Look for 'url' attribute
+	url, exists := selected.Metadata.Attributes["url"]
+	if !exists || url == "" {
+		a.SetStatus("No 'url' attribute found for this item")
+		return
+	}
+
+	// Try to open the URL with xdg-open
+	cmd := exec.Command("xdg-open", url)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		a.SetStatus(fmt.Sprintf("Failed to open URL: %v", err))
+	} else {
+		a.SetStatus(fmt.Sprintf("Opening URL: %s", url))
+	}
 }

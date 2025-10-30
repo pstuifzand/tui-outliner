@@ -287,6 +287,19 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			},
 		},
 		{
+			Key:         '@',
+			Description: "Edit attributes",
+			Handler: func(app *App) {
+				selected := app.tree.GetSelected()
+				if selected != nil {
+					app.attributeEditor.Show(selected)
+					app.SetStatus("Editing attributes (q to quit)")
+				} else {
+					app.SetStatus("No item selected")
+				}
+			},
+		},
+		{
 			Key:         'V',
 			Description: "Visual mode (line-wise selection)",
 			Handler: func(app *App) {
@@ -321,13 +334,20 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 	return []PendingKeyBinding{
 		{
 			Prefix:      'g',
-			Description: "Go to... (g + key)",
+			Description: "Go to... or go (URL)... (g + key)",
 			Sequences: map[rune]KeyBinding{
 				'g': {
 					Key:         'g',
 					Description: "Go to first node",
 					Handler: func(app *App) {
 						app.tree.SelectFirst()
+					},
+				},
+				'o': {
+					Key:         'o',
+					Description: "Open URL from 'url' attribute (xdg-open)",
+					Handler: func(app *App) {
+						app.handleGoCommand()
 					},
 				},
 			},
@@ -509,6 +529,49 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 							app.SetStatus("No items this year found")
 						} else {
 							app.SetStatus("Found item this year")
+						}
+					},
+				},
+			},
+		},
+		{
+			Prefix:      'a',
+			Description: "Attribute... (a + key)",
+			Sequences: map[rune]KeyBinding{
+				'a': {
+					Key:         'a',
+					Description: "Add attribute (prompt for key and value)",
+					Handler: func(app *App) {
+						app.SetStatus("Use :attr add <key> <value> to add attributes")
+					},
+				},
+				'd': {
+					Key:         'd',
+					Description: "Delete attribute (prompt for key)",
+					Handler: func(app *App) {
+						app.SetStatus("Use :attr del <key> to delete attributes")
+					},
+				},
+				'c': {
+					Key:         'c',
+					Description: "Change/edit attribute value (prompt for key)",
+					Handler: func(app *App) {
+						app.SetStatus("Use :attr add <key> <value> to change attributes")
+					},
+				},
+				'v': {
+					Key:         'v',
+					Description: "View all attributes for this item",
+					Handler: func(app *App) {
+						selected := app.tree.GetSelected()
+						if selected != nil && selected.Metadata != nil && len(selected.Metadata.Attributes) > 0 {
+							var attrs []string
+							for k, v := range selected.Metadata.Attributes {
+								attrs = append(attrs, k+": "+v)
+							}
+							app.SetStatus("Attributes: " + attrs[0])
+						} else {
+							app.SetStatus("No attributes for this item")
 						}
 					},
 				},

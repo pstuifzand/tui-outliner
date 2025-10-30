@@ -7,7 +7,7 @@ A powerful, keyboard-driven outliner application for the terminal, built in Go. 
 ## Features
 
 - **Hierarchical Tree Structure**: Organize items in a nested, expandable/collapsible tree
-- **Rich Metadata**: Add tags, priorities, due dates, and notes to each item
+- **Flexible Attributes**: Add custom key-value attributes to items for rich metadata (tags, URLs, statuses, etc.)
 - **File Persistence**: Save and load outlines from JSON files with auto-save support
 - **Search & Filter**: Quickly find items by text search
 - **Keyboard-Driven**: Vim-style keybindings for efficient navigation and editing
@@ -120,6 +120,9 @@ Press `:` to enter command mode, then type a command and press Enter:
 | `:wq` | | Save and quit |
 | `:help` | | Show help screen |
 | `:debug` | | Toggle debug mode |
+| `:attr add <key> <value>` | | Add or update an attribute on selected item |
+| `:attr del <key>` | | Delete an attribute from selected item |
+| `:attr list` (or `:attr`) | | Show all attributes for selected item |
 
 Examples:
 ```
@@ -128,11 +131,80 @@ Examples:
 :title My Projects    # Set outline title to "My Projects"
 :title                # Show current title
 :export markdown notes.md  # Export as markdown
+:attr add type task   # Add a 'type' attribute with value 'task'
+:attr add url https://example.com  # Add a URL attribute
+:attr del type        # Remove the 'type' attribute
+:attr                 # Show all attributes for current item
 :q                    # Quit (if saved)
 :wq                   # Save and quit
 :q!                   # Force quit
 :help                 # Show keybindings
 ```
+
+## Attributes
+
+Items can have custom key-value attributes for rich metadata. Attributes are useful for:
+- Adding custom properties to items (e.g., status, assignee, effort)
+- Storing URLs and other links
+- Tagging items with domain-specific metadata
+- Creating daily notes with date information
+
+### Managing Attributes
+
+**Via Commands:**
+- `:attr add <key> <value>` - Add or update an attribute
+- `:attr del <key>` - Delete an attribute
+- `:attr` or `:attr list` - View all attributes for the current item
+
+**Via Keybindings:**
+- `av` - View all attributes (shortcut for `:attr`)
+- `go` - Open URL from `url` attribute with `xdg-open` (g then o)
+
+### Examples
+
+```json
+{
+  "text": "Important Link",
+  "metadata": {
+    "attributes": {
+      "url": "https://example.com",
+      "type": "reference"
+    }
+  }
+}
+```
+
+```json
+{
+  "text": "2025-10-30",
+  "metadata": {
+    "attributes": {
+      "type": "day",
+      "date": "2025-10-30"
+    }
+  }
+}
+```
+
+```json
+{
+  "text": "Project Task",
+  "metadata": {
+    "attributes": {
+      "status": "in-progress",
+      "priority": "high",
+      "assignee": "Alice",
+      "effort": "3-days"
+    }
+  }
+}
+```
+
+### Special Attributes
+
+- **date**: Items with a date attribute (in YYYY-MM-DD format) can be navigated with date-based commands ([d, ]d, etc.)
+- **type**: Custom item type indicators (e.g., "day" for daily notes)
+- **url**: URLs that can be opened with the `go` command (uses xdg-open)
 
 ## File Format
 
@@ -151,9 +223,12 @@ Outlines are stored as JSON files with the following structure:
           "text": "Child item",
           "metadata": {
             "tags": ["tag1", "tag2"],
-            "priority": "high",
-            "due_date": "2025-12-31T00:00:00Z",
             "notes": "Additional notes",
+            "attributes": {
+              "url": "https://example.com",
+              "type": "reference",
+              "priority": "high"
+            },
             "created": "2025-10-29T00:00:00Z",
             "modified": "2025-10-29T00:00:00Z"
           }
@@ -161,7 +236,6 @@ Outlines are stored as JSON files with the following structure:
       ],
       "metadata": {
         "tags": ["tag"],
-        "priority": "high",
         "created": "2025-10-29T00:00:00Z",
         "modified": "2025-10-29T00:00:00Z"
       }
@@ -237,8 +311,8 @@ When you press `/` to search:
 ## Limitations
 
 - Currently supports single outline files (no multi-document tabs yet)
-- No metadata editing UI yet (metadata can be added via JSON editing)
 - Search is case-insensitive and matches full text
+- Attribute display in tree view not yet implemented (view via status bar with `:attr`)
 
 ## Troubleshooting
 
@@ -269,13 +343,14 @@ See `DEBUG.md` for more detailed troubleshooting steps.
 
 ## Future Enhancements
 
-- [ ] Metadata editing UI for tags, priorities, due dates
+- [ ] Attribute display in tree view (inline rendering)
+- [ ] Modal UI for attribute editing (instead of command mode)
 - [ ] Multiple documents with tabs
 - [ ] Export to Markdown/OPML formats
 - [ ] Undo/redo functionality
 - [ ] Custom keybinding configuration
 - [ ] Themes and color customization
-- [ ] Quick filters (by priority, tags, due date)
+- [ ] Quick filters by attributes
 - [ ] Vi command line mode (:w, :q, :wq)
 
 ## Development

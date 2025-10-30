@@ -271,6 +271,57 @@ ls -la /home/peter/work/tui-outliner/
    - Page size adapts to terminal height
    - Ctrl+U previously outdented items; now use `<` or `,` for outdenting instead
    - Smart viewport management keeps selection within visible area
+9. **Generic Key-Value Attributes System**: Added flexible attributes support to items
+   - Extended Metadata struct with `Attributes map[string]string` field
+   - Fully persisted to JSON with `json:"attributes,omitempty"`
+   - Attributes are initialized for all new items
+10. **Attribute Management Commands**:
+   - `:attr add <key> <value>` - Add or update an attribute
+   - `:attr del <key>` - Delete an attribute
+   - `:attr` or `:attr list` - View all attributes for current item
+11. **Attribute Keybindings** (with `a` prefix):
+   - `aa` - Add attribute (maps to `:attr add` command instruction)
+   - `ad` - Delete attribute (maps to `:attr del` command instruction)
+   - `ac` - Change attribute (maps to `:attr add` command instruction)
+   - `av` - View all attributes for current item
+12. **URL Opening Feature**:
+   - `go` keybinding (g then o) opens URL from `url` attribute
+   - Uses `xdg-open` to launch URL in default application
+   - Checks for `url` attribute, provides error message if not found
+13. **Daily Notes Integration with Attributes**:
+   - `:dailynote` command now automatically adds `type="day"` and `date="YYYY-MM-DD"` attributes
+   - Allows navigation between daily notes based on date
+14. **Date Navigation Enhancements**:
+   - Date navigation functions (`[d`, `]d`, `[w`, `]w`, etc.) now recognize date attributes
+   - Supports items with `date` attribute in YYYY-MM-DD format
+   - Maintains backward compatibility with DueDate field
+15. **Example Outline**:
+   - Created `examples/attributes_demo.json` demonstrating all attribute features
+   - Examples include daily notes, URLs, custom task attributes, and navigation
+
+## Implementation Details
+
+### Data Model Changes (internal/model/outline.go)
+- Added `Attributes map[string]string` field to Metadata struct
+- Initialized attributes map in NewItem() to prevent nil pointer errors
+- JSON serialization with `omitempty` tag for clean JSON output
+
+### Command Handling (internal/app/app.go)
+- `handleAttrCommand(parts []string)` processes `:attr` commands
+- `showAttributes(item *model.Item)` displays attributes in status bar
+- `handleGoCommand()` opens URLs with xdg-open
+- Modified `:dailynote` to auto-create `type` and `date` attributes
+
+### Keybindings (internal/app/keybindings.go)
+- Added `'a'` as pending key prefix for attribute operations
+- Added `'o'` to `'g'` prefix for `go` command (URL opening)
+- Keybindings provide status messages directing users to command mode
+
+### Navigation Functions (internal/ui/tree.go)
+- `FindNextDateItem()` now checks both DueDate and date attribute
+- `FindPrevDateItem()` now checks both DueDate and date attribute
+- `FindNextItemWithDateInterval()` parses date attributes in YYYY-MM-DD format
+- `FindPrevItemWithDateInterval()` parses date attributes in YYYY-MM-DD format
 
 ## Notes
 

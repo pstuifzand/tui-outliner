@@ -9,6 +9,85 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
+func TestParseCommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "simple command",
+			input:    "save",
+			expected: []string{"save"},
+		},
+		{
+			name:     "command with arguments",
+			input:    "open file.txt",
+			expected: []string{"open", "file.txt"},
+		},
+		{
+			name:     "double quoted string",
+			input:    `export markdown "my file.md"`,
+			expected: []string{"export", "markdown", "my file.md"},
+		},
+		{
+			name:     "single quoted string",
+			input:    "export markdown 'my file.md'",
+			expected: []string{"export", "markdown", "my file.md"},
+		},
+		{
+			name:     "mixed quotes",
+			input:    `title "Hello World" and more`,
+			expected: []string{"title", "Hello World", "and", "more"},
+		},
+		{
+			name:     "escaped quotes",
+			input:    `attr add key "value with \"quotes\""`,
+			expected: []string{"attr", "add", "key", `value with "quotes"`},
+		},
+		{
+			name:     "escaped backslash",
+			input:    `path "C:\\Users\\test"`,
+			expected: []string{"path", `C:\Users\test`},
+		},
+		{
+			name:     "multiple spaces",
+			input:    "command    with    spaces",
+			expected: []string{"command", "with", "spaces"},
+		},
+		{
+			name:     "tabs and spaces",
+			input:    "command\twith\t  mixed",
+			expected: []string{"command", "with", "mixed"},
+		},
+		{
+			name:     "empty quoted string",
+			input:    `command ""`,
+			expected: []string{"command", ""},
+		},
+		{
+			name:     "quoted string with special characters",
+			input:    `attr add url "https://example.com/path?query=value&other=123"`,
+			expected: []string{"attr", "add", "url", "https://example.com/path?query=value&other=123"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseCommand(tt.input)
+			if len(result) != len(tt.expected) {
+				t.Errorf("Expected %d parts, got %d. Input: %q", len(tt.expected), len(result), tt.input)
+				return
+			}
+			for i, part := range result {
+				if part != tt.expected[i] {
+					t.Errorf("Part %d: expected %q, got %q. Input: %q", i, tt.expected[i], part, tt.input)
+				}
+			}
+		})
+	}
+}
+
 func TestSaveSyncesTreeItemsWithOutline(t *testing.T) {
 	// Create a temporary file for testing
 	tmpfile, err := os.CreateTemp("", "test-outline-*.json")

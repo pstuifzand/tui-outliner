@@ -15,12 +15,11 @@ type Item struct {
 
 // Metadata holds rich information about an item
 type Metadata struct {
-	Tags     []string   `json:"tags,omitempty"`
-	Priority string     `json:"priority,omitempty"` // low, medium, high
-	DueDate  *time.Time `json:"due_date,omitempty"`
-	Notes    string     `json:"notes,omitempty"`
-	Created  time.Time  `json:"created"`
-	Modified time.Time  `json:"modified"`
+	Tags       []string          `json:"tags,omitempty"`
+	Notes      string            `json:"notes,omitempty"`
+	Attributes map[string]string `json:"attributes,omitempty"` // Generic key-value attributes
+	Created    time.Time         `json:"created"`
+	Modified   time.Time         `json:"modified"`
 }
 
 // Outline represents the entire outline document
@@ -36,8 +35,9 @@ func NewItem(text string) *Item {
 		Text:     text,
 		Children: make([]*Item, 0),
 		Metadata: &Metadata{
-			Created:  time.Now(),
-			Modified: time.Now(),
+			Attributes: make(map[string]string),
+			Created:    time.Now(),
+			Modified:   time.Now(),
 		},
 		Expanded: true,
 		IsNew:    true,

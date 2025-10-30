@@ -1085,7 +1085,7 @@ func (tv *TreeView) SelectPrevSibling() bool {
 	return false
 }
 
-// FindNextDateItem finds the next item with a DueDate set, starting after current selection
+// FindNextDateItem finds the next item with a date attribute, starting after current selection
 func (tv *TreeView) FindNextDateItem() bool {
 	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
 		return false
@@ -1094,15 +1094,18 @@ func (tv *TreeView) FindNextDateItem() bool {
 	// Search forward from current position
 	for i := tv.selectedIdx + 1; i < len(tv.filteredView); i++ {
 		item := tv.filteredView[i].Item
-		if item.Metadata != nil && item.Metadata.DueDate != nil {
-			tv.selectedIdx = i
-			return true
+		if item.Metadata != nil {
+			// Check for date attribute
+			if _, hasDate := item.Metadata.Attributes["date"]; hasDate {
+				tv.selectedIdx = i
+				return true
+			}
 		}
 	}
 	return false
 }
 
-// FindPrevDateItem finds the previous item with a DueDate set, starting before current selection
+// FindPrevDateItem finds the previous item with a date attribute, starting before current selection
 func (tv *TreeView) FindPrevDateItem() bool {
 	if len(tv.filteredView) == 0 || tv.selectedIdx == 0 || tv.selectedIdx >= len(tv.filteredView) {
 		return false
@@ -1111,9 +1114,12 @@ func (tv *TreeView) FindPrevDateItem() bool {
 	// Search backward from current position
 	for i := tv.selectedIdx - 1; i >= 0; i-- {
 		item := tv.filteredView[i].Item
-		if item.Metadata != nil && item.Metadata.DueDate != nil {
-			tv.selectedIdx = i
-			return true
+		if item.Metadata != nil {
+			// Check for date attribute
+			if _, hasDate := item.Metadata.Attributes["date"]; hasDate {
+				tv.selectedIdx = i
+				return true
+			}
 		}
 	}
 	return false
@@ -1155,10 +1161,17 @@ func (tv *TreeView) FindNextItemWithDateInterval(interval string) bool {
 	// Search forward from current position
 	for i := tv.selectedIdx + 1; i < len(tv.filteredView); i++ {
 		item := tv.filteredView[i].Item
-		if item.Metadata != nil && item.Metadata.DueDate != nil {
-			if item.Metadata.DueDate.After(targetStart) && item.Metadata.DueDate.Before(targetEnd) {
-				tv.selectedIdx = i
-				return true
+		if item.Metadata != nil {
+			// Check for date attribute (in YYYY-MM-DD format)
+			if dateStr, hasDate := item.Metadata.Attributes["date"]; hasDate {
+				if dateTime, err := time.Parse("2006-01-02", dateStr); err == nil {
+					// Normalize to midnight for comparison
+					dateTime = time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 0, 0, 0, 0, dateTime.Location())
+					if dateTime.After(targetStart) && dateTime.Before(targetEnd) {
+						tv.selectedIdx = i
+						return true
+					}
+				}
 			}
 		}
 	}
@@ -1200,10 +1213,17 @@ func (tv *TreeView) FindPrevItemWithDateInterval(interval string) bool {
 	// Search backward from current position
 	for i := tv.selectedIdx - 1; i >= 0; i-- {
 		item := tv.filteredView[i].Item
-		if item.Metadata != nil && item.Metadata.DueDate != nil {
-			if item.Metadata.DueDate.After(targetStart) && item.Metadata.DueDate.Before(targetEnd) {
-				tv.selectedIdx = i
-				return true
+		if item.Metadata != nil {
+			// Check for date attribute (in YYYY-MM-DD format)
+			if dateStr, hasDate := item.Metadata.Attributes["date"]; hasDate {
+				if dateTime, err := time.Parse("2006-01-02", dateStr); err == nil {
+					// Normalize to midnight for comparison
+					dateTime = time.Date(dateTime.Year(), dateTime.Month(), dateTime.Day(), 0, 0, 0, 0, dateTime.Location())
+					if dateTime.After(targetStart) && dateTime.Before(targetEnd) {
+						tv.selectedIdx = i
+						return true
+					}
+				}
 			}
 		}
 	}
