@@ -768,20 +768,23 @@ func (a *App) handleCommand(cmd string) {
 		}
 	case "export":
 		if len(parts) < 3 {
-			a.SetStatus("Usage: :export markdown <filename>")
+			a.SetStatus("Usage: :export <format> <filename>")
 			return
 		}
-		if parts[1] != "markdown" {
-			a.SetStatus("Unknown export format: " + parts[1])
-			return
-		}
+		format := parts[1]
 		filename := parts[2]
 		// Sync tree items back to outline before exporting
 		a.outline.Items = a.tree.GetItems()
-		if err := export.ExportToMarkdown(a.outline, filename); err != nil {
-			a.SetStatus("Failed to export: " + err.Error())
-		} else {
-			a.SetStatus("Exported to " + filename)
+
+		switch format {
+		case "markdown":
+			if err := export.ExportToMarkdown(a.outline, filename); err != nil {
+				a.SetStatus("Failed to export: " + err.Error())
+			} else {
+				a.SetStatus("Exported to " + filename)
+			}
+		default:
+			a.SetStatus("Unknown export format: " + format + " (use 'markdown' or 'text')")
 		}
 	case "title":
 		if len(parts) < 2 {
