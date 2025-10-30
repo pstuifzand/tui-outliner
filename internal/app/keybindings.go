@@ -241,6 +241,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         '/',
 			Description: "Search",
 			Handler: func(app *App) {
+				wasSearching := app.search.IsActive()
 				app.search.Start()
 				// When hoisted, search only within the hoisted subtree
 				searchItems := app.outline.GetAllItems()
@@ -252,6 +253,23 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 					}
 				}
 				app.search.SetAllItems(searchItems)
+				// Only auto-navigate to first match if we just started a new search
+				// (not if we're clearing and restarting an existing search)
+				if !wasSearching && app.search.GetMatchCount() > 0 {
+					firstMatch := app.search.GetCurrentMatch()
+					if firstMatch != nil {
+						// Expand all parent nodes of the first match so it becomes visible
+						app.tree.ExpandParents(firstMatch)
+						// Find and select first match in the main tree
+						items := app.tree.GetDisplayItems()
+						for idx, dispItem := range items {
+							if dispItem.Item.ID == firstMatch.ID {
+								app.tree.SelectItem(idx)
+								break
+							}
+						}
+					}
+				}
 			},
 		},
 		{
@@ -284,6 +302,15 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Go to last node",
 			Handler: func(app *App) {
 				app.tree.SelectLast()
+			},
+		},
+		{
+			Key:         '-',
+			Description: "Select parent",
+			Handler: func(app *App) {
+				if !app.tree.SelectParent() {
+					app.SetStatus("Already at root")
+				}
 			},
 		},
 	}
@@ -328,6 +355,160 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 							app.SetStatus("Unhoisted - showing full tree")
 						} else {
 							app.SetStatus("Not currently hoisted")
+						}
+					},
+				},
+				'C': {
+					Key:         'C',
+					Description: "Close all (collapse recursively)",
+					Handler: func(app *App) {
+						app.tree.CollapseRecursive()
+						app.SetStatus("Closed all")
+						app.dirty = true
+					},
+				},
+				'O': {
+					Key:         'O',
+					Description: "Open all (expand recursively)",
+					Handler: func(app *App) {
+						app.tree.ExpandRecursive()
+						app.SetStatus("Opened all")
+						app.dirty = true
+					},
+				},
+				'c': {
+					Key:         'c',
+					Description: "Close all children",
+					Handler: func(app *App) {
+						app.tree.CollapseAllChildren()
+						app.SetStatus("Closed all children")
+						app.dirty = true
+					},
+				},
+				's': {
+					Key:         's',
+					Description: "Close all siblings",
+					Handler: func(app *App) {
+						app.tree.CollapseSiblings()
+						app.SetStatus("Closed all siblings")
+						app.dirty = true
+					},
+				},
+			},
+		},
+		{
+			Prefix:      '[',
+			Description: "Previous... ([ + key)",
+			Sequences: map[rune]KeyBinding{
+				'[': {
+					Key:         '[',
+					Description: "Go to previous sibling",
+					Handler: func(app *App) {
+						if !app.tree.SelectPrevSibling() {
+							app.SetStatus("No previous sibling")
+						}
+					},
+				},
+				'd': {
+					Key:         'd',
+					Description: "Go to previous item with date",
+					Handler: func(app *App) {
+						if !app.tree.FindPrevDateItem() {
+							app.SetStatus("No items with dates found")
+						} else {
+							app.SetStatus("Found previous item with date")
+						}
+					},
+				},
+				'w': {
+					Key:         'w',
+					Description: "Go to previous item this week",
+					Handler: func(app *App) {
+						if !app.tree.FindPrevItemWithDateInterval("week") {
+							app.SetStatus("No items this week found")
+						} else {
+							app.SetStatus("Found item this week")
+						}
+					},
+				},
+				'm': {
+					Key:         'm',
+					Description: "Go to previous item this month",
+					Handler: func(app *App) {
+						if !app.tree.FindPrevItemWithDateInterval("month") {
+							app.SetStatus("No items this month found")
+						} else {
+							app.SetStatus("Found item this month")
+						}
+					},
+				},
+				'y': {
+					Key:         'y',
+					Description: "Go to previous item this year",
+					Handler: func(app *App) {
+						if !app.tree.FindPrevItemWithDateInterval("year") {
+							app.SetStatus("No items this year found")
+						} else {
+							app.SetStatus("Found item this year")
+						}
+					},
+				},
+			},
+		},
+		{
+			Prefix:      ']',
+			Description: "Next... (] + key)",
+			Sequences: map[rune]KeyBinding{
+				']': {
+					Key:         ']',
+					Description: "Go to next sibling",
+					Handler: func(app *App) {
+						if !app.tree.SelectNextSibling() {
+							app.SetStatus("No next sibling")
+						}
+					},
+				},
+				'd': {
+					Key:         'd',
+					Description: "Go to next item with date",
+					Handler: func(app *App) {
+						if !app.tree.FindNextDateItem() {
+							app.SetStatus("No items with dates found")
+						} else {
+							app.SetStatus("Found next item with date")
+						}
+					},
+				},
+				'w': {
+					Key:         'w',
+					Description: "Go to next item this week",
+					Handler: func(app *App) {
+						if !app.tree.FindNextItemWithDateInterval("week") {
+							app.SetStatus("No items this week found")
+						} else {
+							app.SetStatus("Found item this week")
+						}
+					},
+				},
+				'm': {
+					Key:         'm',
+					Description: "Go to next item this month",
+					Handler: func(app *App) {
+						if !app.tree.FindNextItemWithDateInterval("month") {
+							app.SetStatus("No items this month found")
+						} else {
+							app.SetStatus("Found item this month")
+						}
+					},
+				},
+				'y': {
+					Key:         'y',
+					Description: "Go to next item this year",
+					Handler: func(app *App) {
+						if !app.tree.FindNextItemWithDateInterval("year") {
+							app.SetStatus("No items this year found")
+						} else {
+							app.SetStatus("Found item this year")
 						}
 					},
 				},

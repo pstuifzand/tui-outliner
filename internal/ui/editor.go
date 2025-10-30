@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
@@ -62,7 +64,24 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		return false
 	}
 
-	switch ev.Key() {
+	ch := ev.Rune()
+	key := ev.Key()
+
+	// Check for Ctrl+; using key code 256 (which is what tcell sends for Ctrl+; in many terminals)
+	// The terminal doesn't send the Ctrl modifier with ;, so we check the raw key code instead
+	if key == 256 && ch == ';' {
+		// Ctrl+; - Insert current time
+		e.InsertCurrentTime()
+		return true
+	}
+
+	// Check for Ctrl+W - delete word backwards
+	if key == tcell.KeyCtrlW {
+		e.DeleteWordBackwards()
+		return true
+	}
+
+	switch key {
 	case tcell.KeyEscape:
 		e.escapePressed = true
 		return false // Signal to exit edit mode
@@ -115,7 +134,6 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		e.text = e.text[:e.cursorPos]
 	default:
 		// Regular character input
-		ch := ev.Rune()
 		if ch > 0 && ch < 127 { // Printable ASCII
 			// If this is a new item with placeholder text, clear it on first character
 			if e.item.IsNew && e.text == "Type here..." {
@@ -254,4 +272,54 @@ func (e *Editor) SetCursorFromScreenX(relativeX int) {
 // SetCursorToStart positions the cursor at the beginning of the text
 func (e *Editor) SetCursorToStart() {
 	e.cursorPos = 0
+}
+
+// InsertCurrentDate inserts the current date at the cursor position (YYYY-MM-DD format)
+func (e *Editor) InsertCurrentDate() {
+	now := time.Now()
+	dateStr := now.Format("2006-01-02")
+	e.text = e.text[:e.cursorPos] + dateStr + e.text[e.cursorPos:]
+	e.cursorPos += len(dateStr)
+}
+
+// InsertCurrentTime inserts the current time at the beginning with a space (HH:MM format)
+func (e *Editor) InsertCurrentTime() {
+	now := time.Now()
+	timeStr := now.Format("15:04 ")  // Add space after time
+	// Always insert at the beginning
+	e.text = timeStr + e.text
+	e.cursorPos += len(timeStr)
+}
+
+// InsertCurrentDateTime inserts the current date and time at the cursor position (YYYY-MM-DD HH:MM:SS format)
+func (e *Editor) InsertCurrentDateTime() {
+	now := time.Now()
+	dateTimeStr := now.Format("2006-01-02 15:04:05")
+	e.text = e.text[:e.cursorPos] + dateTimeStr + e.text[e.cursorPos:]
+	e.cursorPos += len(dateTimeStr)
+}
+
+// DeleteWordBackwards deletes the word before the cursor
+func (e *Editor) DeleteWordBackwards() {
+	if e.cursorPos == 0 {
+		return
+	}
+
+	// Start from cursor position and move backwards
+	pos := e.cursorPos - 1
+
+	// Skip any trailing whitespace
+	for pos >= 0 && (e.text[pos] == ' ' || e.text[pos] == '\t') {
+		pos--
+	}
+
+	// Skip the word characters
+	for pos >= 0 && e.text[pos] != ' ' && e.text[pos] != '\t' {
+		pos--
+	}
+
+	// Delete from pos+1 to cursorPos
+	deleteStart := pos + 1
+	e.text = e.text[:deleteStart] + e.text[e.cursorPos:]
+	e.cursorPos = deleteStart
 }

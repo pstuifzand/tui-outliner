@@ -30,6 +30,7 @@ type App struct {
 	editor             *ui.Editor
 	search             *ui.Search
 	help               *ui.HelpScreen
+	splash             *ui.SplashScreen
 	command            *ui.CommandMode
 	statusMsg          string
 	statusTime         time.Time
@@ -37,12 +38,13 @@ type App struct {
 	autoSaveTime       time.Time
 	quit               bool
 	debugMode          bool
-	mode               Mode // Current editor mode (NormalMode, InsertMode, or VisualMode)
-	clipboard          *model.Item // For cut/paste operations
-	visualAnchor       int  // For visual mode selection (index in filteredView, -1 when not in visual mode)
-	keybindings        []KeyBinding // All keybindings
+	mode               Mode                // Current editor mode (NormalMode, InsertMode, or VisualMode)
+	clipboard          *model.Item         // For cut/paste operations
+	visualAnchor       int                 // For visual mode selection (index in filteredView, -1 when not in visual mode)
+	keybindings        []KeyBinding        // All keybindings
 	pendingKeybindings []PendingKeyBinding // Pending key definitions (g, z, etc)
-	pendingKeySeq      rune        // Current pending key waiting for second character
+	pendingKeySeq      rune                // Current pending key waiting for second character
+	hasFile            bool                // Whether a file was provided in arguments
 }
 
 // NewApp creates a new App instance
@@ -74,25 +76,34 @@ func NewApp(filePath string) (*App, error) {
 
 	tree := ui.NewTreeView(outline.Items)
 	help := ui.NewHelpScreen()
+	splash := ui.NewSplashScreen()
 	command := ui.NewCommandMode()
 
+	// Show splash screen if no file was provided
+	hasFile := filePath != ""
+	if !hasFile {
+		splash.Show()
+	}
+
 	app := &App{
-		screen:             screen,
-		outline:            outline,
-		store:              store,
-		tree:               tree,
-		editor:             nil,
-		search:             ui.NewSearch(outline.GetAllItems()),
-		help:               help,
-		command:            command,
-		statusMsg:          "Ready",
-		statusTime:         time.Now(),
-		dirty:              false,
-		autoSaveTime:       time.Now(),
-		quit:               false,
-		mode:               NormalMode,
-		visualAnchor:       -1,
-		pendingKeySeq:      0,
+		screen:        screen,
+		outline:       outline,
+		store:         store,
+		tree:          tree,
+		editor:        nil,
+		search:        ui.NewSearch(outline.GetAllItems()),
+		help:          help,
+		splash:        splash,
+		command:       command,
+		statusMsg:     "Ready",
+		statusTime:    time.Now(),
+		dirty:         false,
+		autoSaveTime:  time.Now(),
+		quit:          false,
+		mode:          NormalMode,
+		visualAnchor:  -1,
+		pendingKeySeq: 0,
+		hasFile:       hasFile,
 	}
 
 	// Initialize keybindings
@@ -181,6 +192,17 @@ func (a *App) render() {
 		}
 	}
 
+	// Draw splash screen if visible
+	if a.splash.IsVisible() {
+		a.splash.Render(a.screen)
+		// Still draw command line if active
+		if a.command.IsActive() {
+			a.command.Render(a.screen, height-1)
+		}
+		a.screen.Show()
+		return
+	}
+
 	// Draw header (title)
 	headerStyle := a.screen.HeaderStyle()
 	header := fmt.Sprintf(" %s ", a.outline.Title)
@@ -202,19 +224,8 @@ func (a *App) render() {
 		treeEndY -= 2
 	}
 
-	// If search is active, show filtered results
-	if a.search.IsActive() {
-		results := a.search.GetResults()
-		if len(results) > 0 {
-			// Create a temporary tree with search results
-			tempTree := ui.NewTreeView(results)
-			tempTree.Render(a.screen, treeStartY, -1)
-		} else {
-			a.screen.DrawString(0, treeStartY, "No results", ui.DefaultStyle())
-		}
-	} else {
-		a.tree.Render(a.screen, treeStartY, a.visualAnchor)
-	}
+	// Render the main tree (search is active but doesn't filter items)
+	a.tree.Render(a.screen, treeStartY, a.visualAnchor)
 
 	// Render editor inline if active
 	if a.editor != nil && a.editor.IsActive() {
@@ -228,7 +239,7 @@ func (a *App) render() {
 				if selected != nil {
 					// Get depth from tree view (need to find it)
 					depth := a.tree.GetSelectedDepth()
-					editorX := depth*2 + 2  // indentation + arrow + space
+					editorX := depth*2 + 2 // indentation + arrow + space
 					maxWidth := width - editorX
 					if maxWidth > 0 {
 						a.editor.Render(a.screen, editorX, itemY, maxWidth)
@@ -297,6 +308,24 @@ func (a *App) render() {
 
 // handleRawEvent processes raw input events
 func (a *App) handleRawEvent(ev tcell.Event) {
+	// Handle splash screen
+	if a.splash.IsVisible() {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			// Allow colon to enter command mode and hide splash screen
+			if keyEv.Rune() == ':' {
+				a.splash.Hide()
+				a.command.Start()
+				return
+			}
+			// Allow ESC to dismiss splash screen
+			if keyEv.Key() == tcell.KeyEscape {
+				a.splash.Hide()
+				return
+			}
+		}
+		return
+	}
+
 	// Handle command mode input
 	if a.command.IsActive() {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
@@ -313,8 +342,24 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if keyEv.Key() == tcell.KeyEscape {
 				a.search.Stop()
-			} else {
-				a.search.HandleKey(keyEv)
+			} else if a.search.HandleKey(keyEv) {
+				// Navigation command (n/N/Enter) - navigate to the current match in the main tree
+				currentMatch := a.search.GetCurrentMatch()
+				if currentMatch != nil {
+					// Expand all parent nodes of the match so it becomes visible
+					a.tree.ExpandParents(currentMatch)
+					// Find and select this item in the main tree
+					items := a.tree.GetDisplayItems()
+					for idx, dispItem := range items {
+						if dispItem.Item.ID == currentMatch.ID {
+							a.tree.SelectItem(idx)
+							break
+						}
+					}
+					matchNum := a.search.GetCurrentMatchNumber()
+					totalMatches := a.search.GetMatchCount()
+					a.SetStatus(fmt.Sprintf("Match %d of %d", matchNum, totalMatches))
+				}
 			}
 		}
 		return
@@ -347,7 +392,13 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 
 				// If Escape was pressed and item is empty, delete it
 				if escapePressed && editedItem.Text == "" {
+					// Move to previous item before deleting
+					currentIdx := a.tree.GetSelectedIndex()
 					a.tree.DeleteItem(editedItem)
+					// Select the previous item if it exists
+					if currentIdx > 0 {
+						a.tree.SelectItem(currentIdx - 1)
+					}
 					a.SetStatus("Deleted empty item")
 					a.dirty = true
 				} else if backspaceOnEmpty {
@@ -551,12 +602,12 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 
 	// Handle alternate keybindings for indent/outdent
 	switch r {
-	case '.':  // . as alternate for indent
+	case '.': // . as alternate for indent
 		if a.tree.Indent() {
 			a.SetStatus("Indented")
 			a.dirty = true
 		}
-	case ',':  // , as alternate for outdent
+	case ',': // , as alternate for outdent
 		if a.tree.Outdent() {
 			a.SetStatus("Outdented")
 			a.dirty = true
@@ -584,6 +635,19 @@ func (a *App) handleCommand(cmd string) {
 		}
 	case "q!", "quit!":
 		a.quit = true
+	case "e", "edit":
+		if len(parts) != 2 {
+			a.SetStatus(":edit <filename>")
+		} else {
+			filename := parts[1]
+			if err := a.Load(parts[1]); err != nil {
+				a.SetStatus(fmt.Sprintf("Failed to edit %s: %s", filename, err.Error()))
+			} else {
+				a.SetStatus(fmt.Sprintf("Opened %s", filename))
+				a.splash.Hide()
+				a.hasFile = true
+			}
+		}
 	case "w", "write":
 		var filename string
 		if len(parts) > 1 {
@@ -641,6 +705,45 @@ func (a *App) handleCommand(cmd string) {
 			a.dirty = true
 			a.SetStatus("Title set to: " + newTitle)
 		}
+	case "dailynote":
+		// Create or navigate to today's daily note
+		today := time.Now().Format("2006-01-02")
+
+		// Look for existing daily note with today's date
+		var foundItem *model.Item
+		for _, item := range a.tree.GetItems() {
+			if item.Text == today {
+				foundItem = item
+				break
+			}
+		}
+
+		// If not found, create new item with today's date
+		if foundItem == nil {
+			a.tree.AddItemAfter(today)
+			// Find the newly created item
+			for _, dispItem := range a.tree.GetDisplayItems() {
+				if dispItem.Item.Text == today {
+					foundItem = dispItem.Item
+					break
+				}
+			}
+			// Clear the IsNew flag since this item has meaningful content (date)
+			if foundItem != nil {
+				foundItem.IsNew = false
+			}
+			a.dirty = true
+			a.SetStatus("Created daily note for " + today)
+		} else {
+			// Navigate to existing daily note
+			for idx, dispItem := range a.tree.GetDisplayItems() {
+				if dispItem.Item.ID == foundItem.ID {
+					a.tree.SelectItem(idx)
+					break
+				}
+			}
+			a.SetStatus("Navigated to daily note for " + today)
+		}
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -654,6 +757,20 @@ func (a *App) Save() error {
 	if err := a.store.Save(a.outline); err != nil {
 		return err
 	}
+	a.dirty = false
+	a.autoSaveTime = time.Now()
+	return nil
+}
+
+func (a *App) Load(filename string) error {
+	a.store.FilePath = filename
+	outline, err := a.store.Load()
+	if err != nil {
+		return err
+	}
+
+	a.outline = outline
+	a.tree = ui.NewTreeView(outline.Items)
 	a.dirty = false
 	a.autoSaveTime = time.Now()
 	return nil
@@ -677,6 +794,12 @@ func (a *App) SaveAs(filename string) error {
 
 	// Update the store's file path for future saves
 	a.store.FilePath = filename
+
+	// Hide splash screen when saving to a file
+	if !a.hasFile {
+		a.splash.Hide()
+		a.hasFile = true
+	}
 
 	a.dirty = false
 	a.autoSaveTime = time.Now()

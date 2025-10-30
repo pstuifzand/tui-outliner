@@ -1,6 +1,9 @@
 package ui
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 // KeyBindingInfo represents a keybinding for display
 type KeyBindingInfo interface {
@@ -58,9 +61,18 @@ func (h *HelpScreen) GetKeybindings() []string {
 			line := fmt.Sprintf("  %c  - %s", pkb.GetKey(), pkb.GetDescription())
 			result = append(result, line)
 
-			// Show the sub-sequences
+			// Show the sub-sequences in sorted order
 			sequences := pkb.GetSequences()
-			for seqKey, seqDesc := range sequences {
+			var keys []rune
+			for seqKey := range sequences {
+				keys = append(keys, seqKey)
+			}
+			sort.Slice(keys, func(i, j int) bool {
+				return keys[i] < keys[j]
+			})
+
+			for _, seqKey := range keys {
+				seqDesc := sequences[seqKey]
 				line := fmt.Sprintf("    %c%c  - %s", pkb.GetKey(), seqKey, seqDesc)
 				result = append(result, line)
 			}

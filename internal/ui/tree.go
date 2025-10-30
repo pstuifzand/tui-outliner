@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -133,14 +135,126 @@ func (tv *TreeView) Expand() {
 }
 
 // Collapse collapses the selected item
+// Smart behavior: if item has no children, collapses parent instead and moves selection to parent
 func (tv *TreeView) Collapse() {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
 		item := tv.filteredView[tv.selectedIdx].Item
-		if item.Expanded {
+
+		// If item has children and is expanded, collapse it
+		if item.Expanded && len(item.Children) > 0 {
 			item.Expanded = false
 			tv.rebuildView()
+			return
+		}
+
+		// If item has no children, try to collapse parent instead and move selection to parent
+		if item.Parent != nil && item.Parent.Expanded {
+			parent := item.Parent
+			parentID := parent.ID
+
+			// Find parent's index BEFORE collapsing to know where to go
+			parentIdx := -1
+			for idx, dispItem := range tv.filteredView {
+				if dispItem.Item.ID == parentID {
+					parentIdx = idx
+					break
+				}
+			}
+
+			parent.Expanded = false
+			tv.rebuildView()
+
+			// If we found the parent, select it
+			if parentIdx >= 0 {
+				// Parent is likely still visible, but its children are hidden
+				// Find it again in case indices shifted
+				for idx, dispItem := range tv.filteredView {
+					if dispItem.Item.ID == parentID {
+						tv.selectedIdx = idx
+						break
+					}
+				}
+			}
 		}
 	}
+}
+
+// CollapseRecursive recursively collapses all items in the tree
+func (tv *TreeView) CollapseRecursive() {
+	// Collapse all root items and their descendants
+	for _, item := range tv.items {
+		tv.collapseItemRecursive(item)
+	}
+	tv.rebuildView()
+}
+
+// collapseItemRecursive is a helper that recursively collapses an item and all descendants
+func (tv *TreeView) collapseItemRecursive(item *model.Item) {
+	if item == nil {
+		return
+	}
+	item.Expanded = false
+	for _, child := range item.Children {
+		tv.collapseItemRecursive(child)
+	}
+}
+
+// ExpandRecursive recursively expands all items in the tree
+func (tv *TreeView) ExpandRecursive() {
+	// Expand all root items and their descendants
+	for _, item := range tv.items {
+		tv.expandItemRecursive(item)
+	}
+	tv.rebuildView()
+}
+
+// expandItemRecursive is a helper that recursively expands an item and all descendants
+func (tv *TreeView) expandItemRecursive(item *model.Item) {
+	if item == nil {
+		return
+	}
+	if len(item.Children) > 0 {
+		item.Expanded = true
+		for _, child := range item.Children {
+			tv.expandItemRecursive(child)
+		}
+	}
+}
+
+// CollapseAllChildren collapses all direct children of the selected item
+func (tv *TreeView) CollapseAllChildren() {
+	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
+		item := tv.filteredView[tv.selectedIdx].Item
+		for _, child := range item.Children {
+			child.Expanded = false
+		}
+		tv.rebuildView()
+	}
+}
+
+// CollapseSiblings collapses all siblings of the selected item (items at same level with same parent)
+func (tv *TreeView) CollapseSiblings() {
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return
+	}
+
+	selected := tv.filteredView[tv.selectedIdx].Item
+	if selected.Parent == nil {
+		// At root level, collapse all root siblings
+		for _, item := range tv.items {
+			if item.ID != selected.ID {
+				item.Expanded = false
+			}
+		}
+	} else {
+		// Collapse all siblings (children of same parent) except selected
+		for _, sibling := range selected.Parent.Children {
+			if sibling.ID != selected.ID {
+				sibling.Expanded = false
+			}
+		}
+	}
+	tv.rebuildView()
 }
 
 // Indent indents the selected item (increases nesting level)
@@ -857,6 +971,225 @@ func (tv *TreeView) SelectLast() {
 	if len(tv.filteredView) > 0 {
 		tv.selectedIdx = len(tv.filteredView) - 1
 	}
+}
+
+// SelectParent moves selection to the parent of the current item
+func (tv *TreeView) SelectParent() bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].Item
+	if current.Parent == nil {
+		return false // Already at root level
+	}
+
+	// Find parent in the filtered view
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.Item.ID == current.Parent.ID {
+			tv.selectedIdx = idx
+			return true
+		}
+	}
+	return false
+}
+
+// ExpandParents expands all parent nodes of the given item so it becomes visible
+func (tv *TreeView) ExpandParents(item *model.Item) {
+	if item == nil {
+		return
+	}
+	// Walk up the parent chain and expand each parent
+	current := item.Parent
+	for current != nil {
+		current.Expanded = true
+		current = current.Parent
+	}
+	tv.rebuildView()
+}
+
+// SelectNextSibling moves selection to the next sibling
+func (tv *TreeView) SelectNextSibling() bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].Item
+	currentDepth := tv.filteredView[tv.selectedIdx].Depth
+
+	// Look for next item at the same depth with the same parent
+	for i := tv.selectedIdx + 1; i < len(tv.filteredView); i++ {
+		dispItem := tv.filteredView[i]
+
+		// Stop if we go to a shallower depth (we've left this branch)
+		if dispItem.Depth < currentDepth {
+			return false
+		}
+
+		// Found next sibling at same depth
+		if dispItem.Depth == currentDepth && dispItem.Item.Parent == current.Parent {
+			tv.selectedIdx = i
+			return true
+		}
+	}
+	return false
+}
+
+// SelectPrevSibling moves selection to the previous sibling
+func (tv *TreeView) SelectPrevSibling() bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].Item
+	currentDepth := tv.filteredView[tv.selectedIdx].Depth
+
+	// Look for previous item at the same depth with the same parent
+	for i := tv.selectedIdx - 1; i >= 0; i-- {
+		dispItem := tv.filteredView[i]
+
+		// Skip items at greater depth (children/descendants)
+		if dispItem.Depth > currentDepth {
+			continue
+		}
+
+		// Stop if we go to a shallower depth (we've left this branch)
+		if dispItem.Depth < currentDepth {
+			return false
+		}
+
+		// Found previous sibling at same depth
+		if dispItem.Depth == currentDepth && dispItem.Item.Parent == current.Parent {
+			tv.selectedIdx = i
+			return true
+		}
+	}
+	return false
+}
+
+// FindNextDateItem finds the next item with a DueDate set, starting after current selection
+func (tv *TreeView) FindNextDateItem() bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	// Search forward from current position
+	for i := tv.selectedIdx + 1; i < len(tv.filteredView); i++ {
+		item := tv.filteredView[i].Item
+		if item.Metadata != nil && item.Metadata.DueDate != nil {
+			tv.selectedIdx = i
+			return true
+		}
+	}
+	return false
+}
+
+// FindPrevDateItem finds the previous item with a DueDate set, starting before current selection
+func (tv *TreeView) FindPrevDateItem() bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	// Search backward from current position
+	for i := tv.selectedIdx - 1; i >= 0; i-- {
+		item := tv.filteredView[i].Item
+		if item.Metadata != nil && item.Metadata.DueDate != nil {
+			tv.selectedIdx = i
+			return true
+		}
+	}
+	return false
+}
+
+// FindNextItemWithDateInterval finds next item within specified interval (day, week, month, year)
+// Interval: "day", "week", "month", "year"
+func (tv *TreeView) FindNextItemWithDateInterval(interval string) bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	now := time.Now()
+	var targetStart, targetEnd time.Time
+
+	switch interval {
+	case "day":
+		targetStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		targetEnd = targetStart.AddDate(0, 0, 1)
+	case "week":
+		// Start of current week (Monday)
+		days := int(now.Weekday()) - 1
+		if days < 0 {
+			days = 6
+		}
+		targetStart = now.AddDate(0, 0, -days)
+		targetStart = time.Date(targetStart.Year(), targetStart.Month(), targetStart.Day(), 0, 0, 0, 0, targetStart.Location())
+		targetEnd = targetStart.AddDate(0, 0, 7)
+	case "month":
+		targetStart = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		targetEnd = targetStart.AddDate(0, 1, 0)
+	case "year":
+		targetStart = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+		targetEnd = targetStart.AddDate(1, 0, 0)
+	default:
+		return false
+	}
+
+	// Search forward from current position
+	for i := tv.selectedIdx + 1; i < len(tv.filteredView); i++ {
+		item := tv.filteredView[i].Item
+		if item.Metadata != nil && item.Metadata.DueDate != nil {
+			if item.Metadata.DueDate.After(targetStart) && item.Metadata.DueDate.Before(targetEnd) {
+				tv.selectedIdx = i
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// FindPrevItemWithDateInterval finds previous item within specified interval (day, week, month, year)
+func (tv *TreeView) FindPrevItemWithDateInterval(interval string) bool {
+	if len(tv.filteredView) == 0 || tv.selectedIdx == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	now := time.Now()
+	var targetStart, targetEnd time.Time
+
+	switch interval {
+	case "day":
+		targetStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		targetEnd = targetStart.AddDate(0, 0, 1)
+	case "week":
+		// Start of current week (Monday)
+		days := int(now.Weekday()) - 1
+		if days < 0 {
+			days = 6
+		}
+		targetStart = now.AddDate(0, 0, -days)
+		targetStart = time.Date(targetStart.Year(), targetStart.Month(), targetStart.Day(), 0, 0, 0, 0, targetStart.Location())
+		targetEnd = targetStart.AddDate(0, 0, 7)
+	case "month":
+		targetStart = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		targetEnd = targetStart.AddDate(0, 1, 0)
+	case "year":
+		targetStart = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
+		targetEnd = targetStart.AddDate(1, 0, 0)
+	default:
+		return false
+	}
+
+	// Search backward from current position
+	for i := tv.selectedIdx - 1; i >= 0; i-- {
+		item := tv.filteredView[i].Item
+		if item.Metadata != nil && item.Metadata.DueDate != nil {
+			if item.Metadata.DueDate.After(targetStart) && item.Metadata.DueDate.Before(targetEnd) {
+				tv.selectedIdx = i
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // GetItems returns the root-level items (for saving back to outline)
