@@ -225,7 +225,13 @@ func (a *App) render() {
 	}
 
 	// Render the main tree (search is active but doesn't filter items)
-	a.tree.Render(a.screen, treeStartY, a.visualAnchor)
+	searchQuery := ""
+	currentMatchItem := (*model.Item)(nil)
+	if a.search.IsActive() {
+		searchQuery = a.search.GetQuery()
+		currentMatchItem = a.search.GetCurrentMatch()
+	}
+	a.tree.RenderWithSearchQuery(a.screen, treeStartY, a.visualAnchor, searchQuery, currentMatchItem)
 
 	// Render editor inline if active
 	if a.editor != nil && a.editor.IsActive() {

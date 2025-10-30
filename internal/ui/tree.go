@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"strings"
 	"time"
 
+	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -713,11 +715,17 @@ func (tv *TreeView) GetDisplayItems() []*displayItem {
 
 // Render renders the tree to the screen
 func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
+	tv.RenderWithSearchQuery(screen, startY, visualAnchor, "", nil)
+}
+
+// RenderWithSearchQuery renders the tree with optional search query highlighting
+func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnchor int, searchQuery string, currentMatchItem *model.Item) {
 	defaultStyle := screen.TreeNormalStyle()
 	selectedStyle := screen.TreeSelectedStyle()
 	visualStyle := screen.TreeVisualSelectionStyle()
 	visualCursorStyle := screen.TreeVisualCursorStyle()
 	newItemStyle := screen.TreeNewItemStyle()
+	highlightStyle := screen.SearchHighlightStyle()
 	screenWidth := screen.GetWidth()
 	screenHeight := screen.GetHeight()
 
@@ -841,7 +849,13 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 		// Draw the text
 		textX := prefixX + 2  // Position after the arrow and space
 		screen.SetCell(prefixX+1, y, ' ', style)  // Space after arrow
-		screen.DrawString(textX, y, text, style)
+
+		// Highlight search matches in the text only if this is the current match
+		if searchQuery != "" && currentMatchItem != nil && dispItem.Item == currentMatchItem {
+			tv.drawTextWithHighlight(screen, textX, y, text, style, highlightStyle, searchQuery)
+		} else {
+			screen.DrawString(textX, y, text, style)
+		}
 
 		// Pad to screen width with background color
 		totalLen := textX + len(text)
@@ -1287,4 +1301,51 @@ func (tv *TreeView) GetHoistBreadcrumbs() string {
 	}
 
 	return result
+}
+
+// drawTextWithHighlight draws text with highlighted search matches
+// It draws the text while highlighting case-insensitive substring matches of the search query
+func (tv *TreeView) drawTextWithHighlight(screen *Screen, x int, y int, text string, defaultStyle tcell.Style, highlightStyle tcell.Style, searchQuery string) {
+	if searchQuery == "" {
+		screen.DrawString(x, y, text, defaultStyle)
+		return
+	}
+
+	// Convert to lowercase for case-insensitive comparison
+	lowerText := strings.ToLower(text)
+	lowerQuery := strings.ToLower(searchQuery)
+
+	// Find all matches
+	currentX := x
+	lastIdx := 0
+
+	for {
+		// Find next match
+		matchIdx := strings.Index(lowerText[lastIdx:], lowerQuery)
+		if matchIdx == -1 {
+			// No more matches, draw remaining text
+			if lastIdx < len(text) {
+				screen.DrawString(currentX, y, text[lastIdx:], defaultStyle)
+			}
+			break
+		}
+
+		// Adjust matchIdx to be relative to the full string
+		matchIdx += lastIdx
+
+		// Draw text before match with default style
+		if matchIdx > lastIdx {
+			beforeText := text[lastIdx:matchIdx]
+			screen.DrawString(currentX, y, beforeText, defaultStyle)
+			currentX += len(beforeText)
+		}
+
+		// Draw matched text with highlight style
+		matchedText := text[matchIdx : matchIdx+len(searchQuery)]
+		screen.DrawString(currentX, y, matchedText, highlightStyle)
+		currentX += len(searchQuery)
+
+		// Move to next position after this match
+		lastIdx = matchIdx + len(searchQuery)
+	}
 }

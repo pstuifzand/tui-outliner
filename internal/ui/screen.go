@@ -225,6 +225,11 @@ func (s *Screen) SearchResultCountStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.SearchResultCount)
 }
 
+// SearchHighlightStyle returns the style for highlighted search matches in items
+func (s *Screen) SearchHighlightStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.SearchHighlight, s.Theme.Colors.SearchHighlightBg)
+}
+
 // CommandPromptStyle returns the style for command prompt
 func (s *Screen) CommandPromptStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.CommandPrompt)

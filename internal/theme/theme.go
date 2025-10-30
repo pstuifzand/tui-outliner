@@ -34,6 +34,8 @@ type Colors struct {
 	SearchCursor      tcell.Color
 	SearchCursorBg    tcell.Color
 	SearchResultCount tcell.Color
+	SearchHighlight   tcell.Color   // Highlight color for matching text in items
+	SearchHighlightBg tcell.Color   // Background color for matching text in items
 
 	// Command line colors
 	CommandPrompt   tcell.Color
@@ -94,6 +96,8 @@ func Default() *Theme {
 			SearchCursor:      tcell.ColorBlack,
 			SearchCursorBg:    tcell.ColorWhite,
 			SearchResultCount: tcell.ColorWhite,
+			SearchHighlight:   tcell.ColorBlack, // Black text on yellow background for search matches
+			SearchHighlightBg: tcell.ColorYellow,
 			// Command line colors
 			CommandPrompt:   tcell.ColorWhite,
 			CommandText:     tcell.ColorWhite,
