@@ -72,11 +72,6 @@ func NewApp(filePath string) (*App, error) {
 		outline.Title = "Untitled"
 	}
 
-	// If no items exist, create a sample item to start with
-	if len(outline.Items) == 0 {
-		outline.Items = append(outline.Items, model.NewItem("Welcome to tui-outliner"))
-	}
-
 	tree := ui.NewTreeView(outline.Items)
 	help := ui.NewHelpScreen()
 	splash := ui.NewSplashScreen()
