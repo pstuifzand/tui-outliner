@@ -17,6 +17,7 @@ type Search struct {
 	cursorPos       int
 	active          bool
 	allItems        []*model.Item
+	queryLocked     bool               // Whether query is locked after pressing Enter
 }
 
 // NewSearch creates a new Search
@@ -37,6 +38,7 @@ func (s *Search) Start() {
 	s.cursorPos = 0
 	s.matchIndices = nil
 	s.currentMatchIdx = 0
+	s.queryLocked = false
 }
 
 // Stop stops search mode
@@ -64,18 +66,21 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 	case tcell.KeyEnter:
 		// Enter key updates results and starts navigation to matches (stays in search mode for n/N)
 		s.updateResults()
+		s.queryLocked = true // Lock the query after pressing Enter
 		if len(s.matchIndices) > 0 {
 			return true // Signal to navigate to first match
 		}
 		return false
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
-		if s.cursorPos > 0 {
+		// Only allow backspace if query is not locked
+		if !s.queryLocked && s.cursorPos > 0 {
 			s.query = s.query[:s.cursorPos-1] + s.query[s.cursorPos:]
 			s.cursorPos--
 		}
 		return false
 	case tcell.KeyDelete:
-		if s.cursorPos < len(s.query) {
+		// Only allow delete if query is not locked
+		if !s.queryLocked && s.cursorPos < len(s.query) {
 			s.query = s.query[:s.cursorPos] + s.query[s.cursorPos+1:]
 		}
 		return false
@@ -104,6 +109,7 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 			s.results = s.allItems // Clear results back to all items
 			s.matchIndices = nil
 			s.currentMatchIdx = 0
+			s.queryLocked = false // Unlock query for new search
 			return false // Not a navigation command
 		}
 		// Handle 'n' and 'N' for navigation only if we have matches and user is done entering query
@@ -116,8 +122,8 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 			}
 			return true // Indicate this was a navigation command
 		}
-		// Regular character input
-		if ch > 0 && ch < 127 {
+		// Regular character input - only allow if query is not locked
+		if !s.queryLocked && ch > 0 && ch < 127 {
 			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
 			s.cursorPos++
 		}
