@@ -8,8 +8,8 @@ import (
 
 // CommandMode manages command line input (`:command`)
 type CommandMode struct {
-	active   bool
-	input    string
+	active    bool
+	input     string
 	cursorPos int
 }
 
@@ -39,9 +39,37 @@ func (c *CommandMode) IsActive() bool {
 	return c.active
 }
 
+// DeleteWordBackwards deletes the word before the cursor
+func (c *CommandMode) DeleteWordBackwards() {
+	if c.cursorPos == 0 {
+		return
+	}
+
+	// Start from cursor position and move backwards
+	pos := c.cursorPos - 1
+
+	// Skip any trailing whitespace
+	for pos >= 0 && (c.input[pos] == ' ' || c.input[pos] == '\t') {
+		pos--
+	}
+
+	// Skip the word characters
+	for pos >= 0 && c.input[pos] != ' ' && c.input[pos] != '\t' {
+		pos--
+	}
+
+	// Delete from pos+1 to cursorPos
+	deleteStart := pos + 1
+	c.input = c.input[:deleteStart] + c.input[c.cursorPos:]
+	c.cursorPos = deleteStart
+}
+
 // HandleKey processes a key press in command mode
 func (c *CommandMode) HandleKey(ev *tcell.EventKey) (command string, done bool) {
 	switch ev.Key() {
+	case tcell.KeyCtrlW:
+		// Check for Ctrl+W - delete word backwards
+		c.DeleteWordBackwards()
 	case tcell.KeyEscape:
 		c.Stop()
 		return "", true

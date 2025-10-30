@@ -9,15 +9,15 @@ import (
 
 // Editor manages inline text editing of outline items
 type Editor struct {
-	item               *model.Item
-	text               string
-	cursorPos          int
-	active             bool
-	enterPressed       bool // Track if Enter was pressed to create new node
-	escapePressed      bool // Track if Escape was pressed
-	backspaceOnEmpty   bool // Track if Backspace was pressed on an empty item
-	indentPressed      bool // Track if Tab was pressed to indent
-	outdentPressed     bool // Track if Shift+Tab was pressed to outdent
+	item             *model.Item
+	text             string
+	cursorPos        int
+	active           bool
+	enterPressed     bool // Track if Enter was pressed to create new node
+	escapePressed    bool // Track if Escape was pressed
+	backspaceOnEmpty bool // Track if Backspace was pressed on an empty item
+	indentPressed    bool // Track if Tab was pressed to indent
+	outdentPressed   bool // Track if Shift+Tab was pressed to outdent
 }
 
 // NewEditor creates a new Editor
@@ -75,13 +75,11 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		return true
 	}
 
-	// Check for Ctrl+W - delete word backwards
-	if key == tcell.KeyCtrlW {
+	switch key {
+	case tcell.KeyCtrlW:
+		// Check for Ctrl+W - delete word backwards
 		e.DeleteWordBackwards()
 		return true
-	}
-
-	switch key {
 	case tcell.KeyEscape:
 		e.escapePressed = true
 		return false // Signal to exit edit mode
@@ -285,7 +283,7 @@ func (e *Editor) InsertCurrentDate() {
 // InsertCurrentTime inserts the current time at the beginning with a space (HH:MM format)
 func (e *Editor) InsertCurrentTime() {
 	now := time.Now()
-	timeStr := now.Format("15:04 ")  // Add space after time
+	timeStr := now.Format("15:04 ") // Add space after time
 	// Always insert at the beginning
 	e.text = timeStr + e.text
 	e.cursorPos += len(timeStr)
