@@ -250,7 +250,7 @@ func (a *App) render() {
 				if selected != nil {
 					// Get depth from tree view (need to find it)
 					depth := a.tree.GetSelectedDepth()
-					editorX := depth*2 + 2 // indentation + arrow + space
+					editorX := depth*2 + 3 // indentation + arrow + attribute + space
 					maxWidth := width - editorX
 					if maxWidth > 0 {
 						a.editor.Render(a.screen, editorX, itemY, maxWidth)
