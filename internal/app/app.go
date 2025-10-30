@@ -279,11 +279,12 @@ func (a *App) render() {
 	lineX := 0
 
 	// Show mode indicator
-	if a.mode == InsertMode {
+	switch a.mode {
+	case InsertMode:
 		statusLine = "-- INSERT --"
-	} else if a.mode == VisualMode {
+	case VisualMode:
 		statusLine = "-- VISUAL --"
-	} else {
+	default:
 		statusLine = "-- NORMAL --"
 	}
 	a.screen.DrawString(lineX, height-1, statusLine, modeStyle)
