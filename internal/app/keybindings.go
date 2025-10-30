@@ -242,7 +242,16 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Search",
 			Handler: func(app *App) {
 				app.search.Start()
-				app.search.SetAllItems(app.outline.GetAllItems())
+				// When hoisted, search only within the hoisted subtree
+				searchItems := app.outline.GetAllItems()
+				if app.tree.IsHoisted() {
+					hoistedItem := app.tree.GetHoistedItem()
+					if hoistedItem != nil {
+						// Get all items within the hoisted subtree
+						searchItems = ui.GetAllItemsRecursive(hoistedItem)
+					}
+				}
+				app.search.SetAllItems(searchItems)
 			},
 		},
 		{
@@ -298,8 +307,31 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 		},
 		{
 			Prefix:      'z',
-			Description: "Fold... (z + key)",
-			Sequences:   map[rune]KeyBinding{}, // Placeholder for future fold operations
+			Description: "Fold/Hoist... (z + key)",
+			Sequences: map[rune]KeyBinding{
+				'h': {
+					Key:         'h',
+					Description: "Hoist (focus on subtree)",
+					Handler: func(app *App) {
+						if app.tree.Hoist() {
+							app.SetStatus("Hoisted - showing only this subtree (zu to unhoist)")
+						} else {
+							app.SetStatus("Cannot hoist: item has no children")
+						}
+					},
+				},
+				'u': {
+					Key:         'u',
+					Description: "Unhoist (return to full view)",
+					Handler: func(app *App) {
+						if app.tree.Unhoist() {
+							app.SetStatus("Unhoisted - showing full tree")
+						} else {
+							app.SetStatus("Not currently hoisted")
+						}
+					},
+				},
+			},
 		},
 	}
 }

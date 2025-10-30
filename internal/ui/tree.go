@@ -4,12 +4,26 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
+// GetAllItemsRecursive returns all items in a subtree (depth-first)
+func GetAllItemsRecursive(item *model.Item) []*model.Item {
+	items := []*model.Item{item}
+	for _, child := range item.Children {
+		items = append(items, GetAllItemsRecursive(child)...)
+	}
+	return items
+}
+
 // TreeView manages the display and navigation of the outline tree
 type TreeView struct {
-	items        []*model.Item
-	selectedIdx  int
-	filterText   string
-	filteredView []*displayItem
+	items          []*model.Item
+	selectedIdx    int
+	filterText     string
+	filteredView   []*displayItem
+	viewportOffset int // Index of first visible item in the viewport
+
+	// Hoisting state
+	hoistedItem    *model.Item   // Current hoisted node (nil if not hoisted)
+	originalItems  []*model.Item // Saved root items before hoisting
 }
 
 type displayItem struct {
@@ -60,6 +74,50 @@ func (tv *TreeView) SelectNext() {
 func (tv *TreeView) SelectPrev() {
 	if tv.selectedIdx > 0 {
 		tv.selectedIdx--
+	}
+}
+
+// ScrollPageUp scrolls the viewport up by pageSize items and moves selection
+func (tv *TreeView) ScrollPageUp(pageSize int) {
+	if pageSize <= 0 {
+		pageSize = 1
+	}
+	// Move selection up by pageSize
+	tv.selectedIdx -= pageSize
+	if tv.selectedIdx < 0 {
+		tv.selectedIdx = 0
+	}
+	// Adjust viewport offset to show the selected item at the top
+	tv.viewportOffset = tv.selectedIdx
+}
+
+// ScrollPageDown scrolls the viewport down by pageSize items and moves selection
+func (tv *TreeView) ScrollPageDown(pageSize int) {
+	if pageSize <= 0 {
+		pageSize = 1
+	}
+	// Move selection down by pageSize
+	tv.selectedIdx += pageSize
+	maxIdx := len(tv.filteredView) - 1
+	if tv.selectedIdx > maxIdx {
+		tv.selectedIdx = maxIdx
+	}
+	// Adjust viewport offset to show the selected item at the bottom of viewport
+	tv.viewportOffset = tv.selectedIdx - pageSize + 1
+	if tv.viewportOffset < 0 {
+		tv.viewportOffset = 0
+	}
+}
+
+// ensureVisible keeps the selected item within the visible viewport
+func (tv *TreeView) ensureVisible() {
+	// This would need to know the viewport size, which we'll handle in Render
+	// For now, just ensure selectedIdx is valid
+	if tv.selectedIdx >= len(tv.filteredView) && len(tv.filteredView) > 0 {
+		tv.selectedIdx = len(tv.filteredView) - 1
+	}
+	if tv.selectedIdx < 0 {
+		tv.selectedIdx = 0
 	}
 }
 
@@ -266,6 +324,10 @@ func (tv *TreeView) AddItemAfter(text string) {
 					newChildren = append(newChildren, newItem)
 					newChildren = append(newChildren, parent.Children[idx+1:]...)
 					parent.Children = newChildren
+					// When hoisted and we modify the hoisted node's children, update tv.items
+					if tv.hoistedItem != nil && parent == tv.hoistedItem {
+						tv.items = newChildren
+					}
 					break
 				}
 			}
@@ -325,6 +387,10 @@ func (tv *TreeView) AddItemBefore(text string) {
 					newChildren = append(newChildren, newItem)
 					newChildren = append(newChildren, parent.Children[idx:]...)
 					parent.Children = newChildren
+					// When hoisted and we modify the hoisted node's children, update tv.items
+					if tv.hoistedItem != nil && parent == tv.hoistedItem {
+						tv.items = newChildren
+					}
 					break
 				}
 			}
@@ -382,7 +448,12 @@ func (tv *TreeView) DeleteItem(item *model.Item) bool {
 	}
 
 	if item.Parent != nil {
+		parent := item.Parent
 		item.Parent.RemoveChild(item)
+		// When hoisted and we delete from the hoisted node's children, update tv.items
+		if tv.hoistedItem != nil && parent == tv.hoistedItem {
+			tv.items = parent.Children
+		}
 	} else {
 		// Remove from root
 		for idx, rootItem := range tv.items {
@@ -421,6 +492,10 @@ func (tv *TreeView) PasteAfter(item *model.Item) bool {
 				newChildren = append(newChildren, item)
 				newChildren = append(newChildren, parent.Children[idx+1:]...)
 				parent.Children = newChildren
+				// When hoisted and we modify the hoisted node's children, update tv.items
+				if tv.hoistedItem != nil && parent == tv.hoistedItem {
+					tv.items = newChildren
+				}
 				tv.rebuildView()
 				return true
 			}
@@ -463,6 +538,10 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 				newChildren = append(newChildren, item)
 				newChildren = append(newChildren, parent.Children[idx:]...)
 				parent.Children = newChildren
+				// When hoisted and we modify the hoisted node's children, update tv.items
+				if tv.hoistedItem != nil && parent == tv.hoistedItem {
+					tv.items = newChildren
+				}
 				tv.rebuildView()
 				return true
 			}
@@ -526,6 +605,7 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 	visualCursorStyle := screen.TreeVisualCursorStyle()
 	newItemStyle := screen.TreeNewItemStyle()
 	screenWidth := screen.GetWidth()
+	screenHeight := screen.GetHeight()
 
 	// Get background color for adding to text styles
 	bgColor := screen.Theme.Colors.Background
@@ -534,7 +614,32 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 	defaultStyle = defaultStyle.Background(bgColor)
 	newItemStyle = newItemStyle.Background(bgColor)
 
-	// Determine visual selection range
+	// Calculate available viewport height
+	viewportHeight := screenHeight - startY - 1  // Reserve 1 line for status bar
+	if viewportHeight < 1 {
+		viewportHeight = 1
+	}
+
+	// Ensure viewport offset keeps selected item visible
+	if tv.selectedIdx < tv.viewportOffset {
+		tv.viewportOffset = tv.selectedIdx
+	} else if tv.selectedIdx >= tv.viewportOffset+viewportHeight {
+		tv.viewportOffset = tv.selectedIdx - viewportHeight + 1
+	}
+
+	// Clamp viewport offset
+	maxOffset := len(tv.filteredView) - viewportHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if tv.viewportOffset > maxOffset {
+		tv.viewportOffset = maxOffset
+	}
+	if tv.viewportOffset < 0 {
+		tv.viewportOffset = 0
+	}
+
+	// Determine visual selection range (adjust for viewport offset)
 	visualStart, visualEnd := -1, -1
 	if visualAnchor >= 0 {
 		visualStart = visualAnchor
@@ -544,11 +649,12 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 		}
 	}
 
-	for idx, dispItem := range tv.filteredView {
-		y := startY + idx
-		if y >= screen.GetHeight() {
-			break
-		}
+	// Render items starting from viewportOffset
+	screenY := startY
+	for i := tv.viewportOffset; i < len(tv.filteredView) && screenY < screenHeight-1; i++ {
+		dispItem := tv.filteredView[i]
+		idx := i  // Keep track of actual index in filteredView for selection/visual comparisons
+		y := screenY
 
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
@@ -629,11 +735,13 @@ func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
 		for x := totalLen; x < screenWidth; x++ {
 			screen.SetCell(x, y, ' ', bgStyle)
 		}
+
+		screenY++  // Move to next screen line
 	}
 
 	// Clear remaining lines with background color
 	bgStyle := screen.BackgroundStyle()
-	for y := startY + len(tv.filteredView); y < screen.GetHeight()-1; y++ {
+	for y := screenY; y < screen.GetHeight()-1; y++ {
 		clearLine := ""
 		for i := 0; i < screenWidth; i++ {
 			clearLine += " "
@@ -753,5 +861,97 @@ func (tv *TreeView) SelectLast() {
 
 // GetItems returns the root-level items (for saving back to outline)
 func (tv *TreeView) GetItems() []*model.Item {
+	// When hoisted, return original items to ensure full tree is saved
+	if tv.hoistedItem != nil {
+		return tv.originalItems
+	}
 	return tv.items
+}
+
+// Hoist makes the selected item the temporary root, showing only its children
+func (tv *TreeView) Hoist() bool {
+	selected := tv.GetSelected()
+	if selected == nil || len(selected.Children) == 0 {
+		return false
+	}
+
+	// Save original root items
+	tv.originalItems = tv.items
+
+	// Set hoisted item and replace items with its children
+	tv.hoistedItem = selected
+	tv.items = selected.Children
+
+	// Rebuild view and reset selection to first child
+	tv.selectedIdx = 0
+	tv.viewportOffset = 0
+	tv.rebuildView()
+
+	return true
+}
+
+// Unhoist returns to the full tree view
+func (tv *TreeView) Unhoist() bool {
+	if tv.hoistedItem == nil {
+		return false
+	}
+
+	// Restore original items
+	tv.items = tv.originalItems
+	tv.hoistedItem = nil
+	tv.originalItems = nil
+
+	// Rebuild view
+	tv.rebuildView()
+
+	return true
+}
+
+// IsHoisted returns whether we're currently in hoisted mode
+func (tv *TreeView) IsHoisted() bool {
+	return tv.hoistedItem != nil
+}
+
+// GetHoistedItem returns the current hoist root (nil if not hoisted)
+func (tv *TreeView) GetHoistedItem() *model.Item {
+	return tv.hoistedItem
+}
+
+// GetHoistBreadcrumbs returns the full path to the hoisted item as a breadcrumb string
+// e.g., "Project A > Development > Build frontend"
+// Returns empty string if not hoisted
+func (tv *TreeView) GetHoistBreadcrumbs() string {
+	if tv.hoistedItem == nil {
+		return ""
+	}
+
+	// Build path from root to hoisted item by traversing parents
+	var path []*model.Item
+	current := tv.hoistedItem
+	for current != nil {
+		path = append(path, current)
+		current = current.Parent
+	}
+
+	// Reverse to get root-to-leaf order
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+
+	// Build breadcrumb string with separator
+	breadcrumbs := make([]string, 0, len(path))
+	for _, item := range path {
+		breadcrumbs = append(breadcrumbs, item.Text)
+	}
+
+	// Join with " > " separator
+	result := ""
+	for i, crumb := range breadcrumbs {
+		if i > 0 {
+			result += " > "
+		}
+		result += crumb
+	}
+
+	return result
 }

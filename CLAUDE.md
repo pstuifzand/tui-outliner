@@ -266,6 +266,11 @@ ls -la /home/peter/work/tui-outliner/
    - `:title My Title` sets the outline title to "My Title"
    - Supports multi-word titles
    - Marks outline as dirty when title is changed
+8. **Page Up/Down Scrolling**: Added `Ctrl+U` (page up) and `Ctrl+D` (page down) keybindings for scrolling
+   - Selection moves with the viewport (stays visible)
+   - Page size adapts to terminal height
+   - Ctrl+U previously outdented items; now use `<` or `,` for outdenting instead
+   - Smart viewport management keeps selection within visible area
 
 ## Notes
 

@@ -72,6 +72,8 @@ func (h *HelpScreen) GetKeybindings() []string {
 
 	result = append(result, "")
 	result = append(result, "Special Keys:")
+	result = append(result, "  Ctrl+U      - Page up (scroll viewport)")
+	result = append(result, "  Ctrl+D      - Page down (scroll viewport)")
 	result = append(result, "  Ctrl+S      - Save")
 	result = append(result, "  Escape      - Exit edit mode")
 	result = append(result, "  Enter       - Confirm/Exit edit mode")

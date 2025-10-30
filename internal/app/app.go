@@ -184,6 +184,15 @@ func (a *App) render() {
 	// Draw header (title)
 	headerStyle := a.screen.HeaderStyle()
 	header := fmt.Sprintf(" %s ", a.outline.Title)
+
+	// Add hoisting indicator with breadcrumbs if hoisted
+	if a.tree.IsHoisted() {
+		breadcrumbs := a.tree.GetHoistBreadcrumbs()
+		if breadcrumbs != "" {
+			header = fmt.Sprintf(" %s [%s] ", a.outline.Title, breadcrumbs)
+		}
+	}
+
 	a.screen.DrawString(0, 0, header, headerStyle)
 
 	// Draw tree
@@ -463,10 +472,19 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlU:
-		if a.tree.Outdent() {
-			a.SetStatus("Outdented")
-			a.dirty = true
+		// Page up - scroll viewport
+		height := a.screen.GetHeight()
+		treeStartY := 1
+		treeEndY := height - 2
+		if a.search.IsActive() {
+			treeEndY -= 2
 		}
+		pageSize := treeEndY - treeStartY
+		if pageSize < 1 {
+			pageSize = 1
+		}
+		a.tree.ScrollPageUp(pageSize)
+		a.SetStatus("Scrolled up")
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlS:
@@ -476,6 +494,22 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 			a.SetStatus("Saved")
 			a.dirty = false
 		}
+		a.pendingKeySeq = 0
+		return
+	case tcell.KeyCtrlD:
+		// Page down - scroll viewport
+		height := a.screen.GetHeight()
+		treeStartY := 1
+		treeEndY := height - 2
+		if a.search.IsActive() {
+			treeEndY -= 2
+		}
+		pageSize := treeEndY - treeStartY
+		if pageSize < 1 {
+			pageSize = 1
+		}
+		a.tree.ScrollPageDown(pageSize)
+		a.SetStatus("Scrolled down")
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyEscape:

@@ -23,4 +23,6 @@ vendor/
 .DS_Store
 
 # Outline files (optional - uncomment to ignore local outlines)
-# *.json
+*.json
+
+/tuo

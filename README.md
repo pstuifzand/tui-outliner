@@ -51,7 +51,8 @@ go build -o tuo
 - `A` - Append text (edit at end of current item)
 - `d` - Delete selected item
 - `l/h` or `→/←` - Expand/collapse items
-- `>/<` or `Ctrl+I/Ctrl+U` - Indent/outdent items
+- `>/<` or `Ctrl+I` - Indent/outdent items (also `<` / `,`)
+- `Ctrl+U` / `Ctrl+D` - Page up/down (scroll viewport)
 - `/` - Search/filter items
 - `Ctrl+S` - Save
 - `?` - Show help
@@ -84,7 +85,14 @@ go build -o tuo
 | Key | Action |
 |-----|--------|
 | `>` / `.` / `Ctrl+I` | Indent item (increase nesting) |
-| `<` / `,` / `Ctrl+U` | Outdent item (decrease nesting) |
+| `<` / `,` | Outdent item (decrease nesting) |
+
+### Scrolling
+
+| Key | Action |
+|-----|--------|
+| `Ctrl+U` | Page up (scroll viewport) |
+| `Ctrl+D` | Page down (scroll viewport) |
 
 ### Other
 
