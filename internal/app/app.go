@@ -191,8 +191,8 @@ func (a *App) render() {
 
 	// Fill background for entire screen
 	bgStyle := a.screen.BackgroundStyle()
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			a.screen.SetCell(x, y, ' ', bgStyle)
 		}
 	}
