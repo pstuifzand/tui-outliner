@@ -195,6 +195,11 @@ func (s *Screen) TreeVisualCursorStyle() tcell.Style {
 	return theme.ColorPairToStyle(s.Theme.Colors.TreeVisualCursor, s.Theme.Colors.TreeVisualCursorBg).Bold(true)
 }
 
+// TreeAttributeIndicatorStyle returns the style for attribute indicator symbol
+func (s *Screen) TreeAttributeIndicatorStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeAttributeIndicator)
+}
+
 // EditorStyle returns the style for editor text
 func (s *Screen) EditorStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.EditorText)

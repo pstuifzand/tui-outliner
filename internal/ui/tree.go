@@ -838,6 +838,19 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 		prefixX := dispItem.Depth * 2
 		screen.DrawString(prefixX, y, arrow, arrowStyle)
 
+		// Draw attribute indicator or space to maintain alignment
+		indicatorStyle := screen.TreeAttributeIndicatorStyle()
+		if idx == tv.selectedIdx {
+			indicatorStyle = selectedStyle  // Use selected style if item is selected
+		}
+
+		hasAttributes := dispItem.Item.Metadata != nil && len(dispItem.Item.Metadata.Attributes) > 0
+		if hasAttributes {
+			screen.SetCell(prefixX+1, y, '●', indicatorStyle)  // Filled circle for items with attributes
+		} else {
+			screen.SetCell(prefixX+1, y, ' ', style)  // Space for items without attributes
+		}
+
 		// Build the full line
 		arrowAndIndent := prefix + arrow
 		maxWidth := screenWidth - len(arrowAndIndent)
@@ -851,8 +864,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 		}
 
 		// Draw the text
-		textX := prefixX + 2  // Position after the arrow and space
-		screen.SetCell(prefixX+1, y, ' ', style)  // Space after arrow
+		textX := prefixX + 3  // Position after the arrow, indicator, and space
+		screen.SetCell(prefixX+2, y, ' ', style)  // Space after indicator
 
 		// Highlight search matches in the text only if this is the current match
 		if searchQuery != "" && currentMatchItem != nil && dispItem.Item == currentMatchItem {
