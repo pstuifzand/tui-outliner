@@ -3,12 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/pstuifzand/tui-outliner/internal/app"
 )
 
 func main() {
+	logFile, err := os.Create("tuo.log")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logFile.Close()
+	log.SetOutput(logFile)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
 	debug := flag.Bool("debug", false, "Enable debug mode (shows key events in status)")
 	flag.Parse()
 
