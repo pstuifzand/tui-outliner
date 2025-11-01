@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/pstuifzand/tui-outliner/internal/history"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	"github.com/pstuifzand/tui-outliner/internal/search"
 )
@@ -22,7 +23,7 @@ type Search struct {
 	history         *History           // Search history manager
 }
 
-// NewSearch creates a new Search
+// NewSearch creates a new Search without history persistence
 func NewSearch(items []*model.Item) *Search {
 	return &Search{
 		query:    "",
@@ -32,6 +33,24 @@ func NewSearch(items []*model.Item) *Search {
 		allItems: items,
 		history:  NewHistory(50),
 	}
+}
+
+// NewSearchWithHistory creates a new Search with history persistence
+func NewSearchWithHistory(items []*model.Item, manager *history.Manager) (*Search, error) {
+	h, err := NewHistoryWithManager(50, manager, "search.toml")
+	if err != nil {
+		// If history loading fails, continue with empty history
+		h = NewHistory(50)
+	}
+
+	return &Search{
+		query:    "",
+		results:  items,
+		cursorPos: 0,
+		active:   false,
+		allItems: items,
+		history:  h,
+	}, nil
 }
 
 // Start starts search mode

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/export"
+	"github.com/pstuifzand/tui-outliner/internal/history"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
@@ -37,6 +38,7 @@ type App struct {
 	command            *ui.CommandMode
 	attributeEditor    *ui.AttributeEditor // Attribute editing modal
 	nodeSearchWidget   *ui.NodeSearchWidget
+	historyManager     *history.Manager    // Manager for persisting command and search history
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -72,9 +74,39 @@ func NewApp(filePath string) (*App, error) {
 	tree := ui.NewTreeView(outline.Items)
 	help := ui.NewHelpScreen()
 	splash := ui.NewSplashScreen()
-	command := ui.NewCommandMode()
 	attributeEditor := ui.NewAttributeEditor()
 	nodeSearchWidget := ui.NewNodeSearchWidget()
+
+	// Initialize history manager
+	historyManager, err := history.NewManager()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize history manager: %v\n", err)
+		historyManager = nil
+	}
+
+	// Initialize command mode with history persistence
+	var command *ui.CommandMode
+	if historyManager != nil {
+		command, err = ui.NewCommandModeWithHistory(historyManager)
+		if err != nil {
+			log.Printf("Warning: Failed to load command history: %v\n", err)
+			command = ui.NewCommandMode()
+		}
+	} else {
+		command = ui.NewCommandMode()
+	}
+
+	// Initialize search with history persistence
+	var search *ui.Search
+	if historyManager != nil {
+		search, err = ui.NewSearchWithHistory(outline.GetAllItems(), historyManager)
+		if err != nil {
+			log.Printf("Warning: Failed to load search history: %v\n", err)
+			search = ui.NewSearch(outline.GetAllItems())
+		}
+	} else {
+		search = ui.NewSearch(outline.GetAllItems())
+	}
 
 	// Show splash screen if no file was provided
 	hasFile := filePath != ""
@@ -83,26 +115,27 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	app := &App{
-		screen:           screen,
-		outline:          outline,
-		store:            store,
-		tree:             tree,
-		editor:           nil,
-		search:           ui.NewSearch(outline.GetAllItems()),
-		help:             help,
-		splash:           splash,
-		command:          command,
-		attributeEditor:  attributeEditor,
-		nodeSearchWidget: nodeSearchWidget,
-		statusMsg:        "Ready",
-		statusTime:       time.Now(),
-		dirty:            false,
-		autoSaveTime:     time.Now(),
-		quit:             false,
-		mode:             NormalMode,
-		visualAnchor:     -1,
-		pendingKeySeq:    0,
-		hasFile:          hasFile,
+		screen:             screen,
+		outline:            outline,
+		store:              store,
+		tree:               tree,
+		editor:             nil,
+		search:             search,
+		help:               help,
+		splash:             splash,
+		command:            command,
+		attributeEditor:    attributeEditor,
+		nodeSearchWidget:   nodeSearchWidget,
+		historyManager:     historyManager,
+		statusMsg:          "Ready",
+		statusTime:         time.Now(),
+		dirty:              false,
+		autoSaveTime:       time.Now(),
+		quit:               false,
+		mode:               NormalMode,
+		visualAnchor:       -1,
+		pendingKeySeq:      0,
+		hasFile:            hasFile,
 	}
 
 	// Set callback for attribute editor modifications

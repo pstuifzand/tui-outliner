@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/pstuifzand/tui-outliner/internal/history"
 )
 
 // CommandMode manages command line input (`:command`)
@@ -14,7 +15,7 @@ type CommandMode struct {
 	history   *History
 }
 
-// NewCommandMode creates a new CommandMode
+// NewCommandMode creates a new CommandMode without history persistence
 func NewCommandMode() *CommandMode {
 	return &CommandMode{
 		active:    false,
@@ -22,6 +23,22 @@ func NewCommandMode() *CommandMode {
 		cursorPos: 0,
 		history:   NewHistory(50),
 	}
+}
+
+// NewCommandModeWithHistory creates a new CommandMode with history persistence
+func NewCommandModeWithHistory(manager *history.Manager) (*CommandMode, error) {
+	h, err := NewHistoryWithManager(50, manager, "command.toml")
+	if err != nil {
+		// If history loading fails, continue with empty history
+		h = NewHistory(50)
+	}
+
+	return &CommandMode{
+		active:    false,
+		input:     "",
+		cursorPos: 0,
+		history:   h,
+	}, nil
 }
 
 // Start enters command mode

@@ -1,12 +1,18 @@
 package ui
 
+import (
+	"github.com/pstuifzand/tui-outliner/internal/history"
+)
+
 // History manages input history for search and command inputs
 // It allows navigating backward and forward through previous entries
 type History struct {
-	entries         []string // All stored history entries
-	currentIndex    int      // Current position while navigating (-1 = not navigating)
-	maxEntries      int      // Maximum number of entries to keep
-	temporaryInput  string   // Stores current input before navigating history
+	entries         []string           // All stored history entries
+	currentIndex    int                // Current position while navigating (-1 = not navigating)
+	maxEntries      int                // Maximum number of entries to keep
+	temporaryInput  string             // Stores current input before navigating history
+	manager         *history.Manager   // Manager for persisting history
+	filename        string             // Filename for this history (e.g., "command.toml", "search.toml")
 }
 
 // NewHistory creates a new History with a maximum number of entries
@@ -18,9 +24,35 @@ func NewHistory(maxEntries int) *History {
 	}
 }
 
+// NewHistoryWithManager creates a new History and loads from persisted file
+func NewHistoryWithManager(maxEntries int, manager *history.Manager, filename string) (*History, error) {
+	h := &History{
+		entries:      []string{},
+		currentIndex: -1,
+		maxEntries:   maxEntries,
+		manager:      manager,
+		filename:     filename,
+	}
+
+	// Load existing history from file
+	entries, err := manager.Load(filename)
+	if err != nil {
+		return h, err
+	}
+
+	// Trim loaded history to maxEntries if needed
+	if len(entries) > maxEntries {
+		entries = entries[len(entries)-maxEntries:]
+	}
+
+	h.entries = entries
+	return h, nil
+}
+
 // Add adds an entry to the history
 // Avoids empty entries and duplicate consecutive entries
 // Automatically removes oldest entries if max size is exceeded
+// If a manager is configured, automatically saves to file
 func (h *History) Add(entry string) {
 	if entry == "" {
 		return
@@ -41,6 +73,19 @@ func (h *History) Add(entry string) {
 	// Reset navigation index when adding new entry
 	h.currentIndex = -1
 	h.temporaryInput = ""
+
+	// Save to file if manager is configured
+	if h.manager != nil && h.filename != "" {
+		h.Save()
+	}
+}
+
+// Save persists the current history entries to file
+func (h *History) Save() error {
+	if h.manager == nil || h.filename == "" {
+		return nil
+	}
+	return h.manager.Save(h.filename, h.entries)
 }
 
 // Previous returns the previous entry in history
