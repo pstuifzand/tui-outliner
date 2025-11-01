@@ -9,7 +9,7 @@ type Item struct {
 	Text     string    `json:"text"`
 	Children []*Item   `json:"children,omitempty"`
 	Metadata *Metadata `json:"metadata,omitempty"`
-	Parent   *Item     `json:"-"` // Not serialized
+	Parent   *Item     `json:"-"` // Not persisted
 	Expanded bool      `json:"-"` // UI state, not persisted
 	IsNew    bool      `json:"-"` // UI state: true for newly created placeholder items
 }
@@ -18,7 +18,7 @@ type Item struct {
 type Metadata struct {
 	Tags       []string          `json:"tags,omitempty"`
 	Notes      string            `json:"notes,omitempty"`
-	Attributes map[string]string `json:"attributes,omitempty"` // Generic key-value attributes
+	Attributes map[string]string `json:"attributes,omitempty"`
 	Created    time.Time         `json:"created"`
 	Modified   time.Time         `json:"modified"`
 }
@@ -102,7 +102,7 @@ func generateID() string {
 func randomString(length int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	result := make([]byte, length)
-	for i := 0; i < length; i++ {
+	for i := range length {
 		result[i] = chars[int(time.Now().UnixNano()+int64(i))%len(chars)]
 	}
 	return string(result)
