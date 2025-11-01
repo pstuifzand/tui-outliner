@@ -6,19 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/pstuifzand/tui-outliner/internal/model"
 )
-
-// Item represents a single outline item
-type Item struct {
-	Text     string `json:"text"`
-	Children []Item `json:"children,omitempty"`
-}
-
-// Outline represents the root structure
-type Outline struct {
-	Title string `json:"title"`
-	Items []Item `json:"items"`
-}
 
 func main() {
 	numNodes := flag.Int("nodes", 1000, "Number of nodes to generate")
@@ -43,11 +33,14 @@ func main() {
 	// Ensure directory exists
 	dir := filepath.Dir(*output)
 	if dir != "." {
-		os.MkdirAll(dir, 0755)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create directory: %v\n", err)
+			os.Exit(1)
+		}
 	}
 
 	// Write to file
-	err = os.WriteFile(*output, data, 0644)
+	err = os.WriteFile(*output, data, 0o644)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write file: %v\n", err)
 		os.Exit(1)
@@ -59,10 +52,9 @@ func main() {
 	fmt.Printf("File size: %.2f MB\n", float64(len(data))/(1024*1024))
 }
 
-func generateOutline(totalNodes int, maxDepth int) Outline {
-	outline := Outline{
-		Title: "Large Test Outline",
-		Items: []Item{},
+func generateOutline(totalNodes int, maxDepth int) model.Outline {
+	outline := model.Outline{
+		Items: []*model.Item{},
 	}
 
 	remaining := totalNodes
@@ -79,12 +71,12 @@ func generateOutline(totalNodes int, maxDepth int) Outline {
 	return outline
 }
 
-func generateItemRecursive(remaining *int, currentDepth int, maxDepth int) Item {
+func generateItemRecursive(remaining *int, currentDepth int, maxDepth int) *model.Item {
 	if *remaining <= 0 {
-		return Item{}
+		return &model.Item{}
 	}
 
-	item := Item{
+	item := model.Item{
 		Text: generateUniqueText(*remaining),
 	}
 	*remaining--
@@ -92,7 +84,7 @@ func generateItemRecursive(remaining *int, currentDepth int, maxDepth int) Item 
 	// Add children if we haven't reached max depth and still have nodes left
 	if currentDepth < maxDepth && *remaining > 0 {
 		numChildren := getChildCount(*remaining, maxDepth-currentDepth)
-		item.Children = make([]Item, 0, numChildren)
+		item.Children = make([]*model.Item, 0, numChildren)
 
 		for i := 0; i < numChildren && *remaining > 0; i++ {
 			child := generateItemRecursive(remaining, currentDepth+1, maxDepth)
@@ -102,7 +94,7 @@ func generateItemRecursive(remaining *int, currentDepth int, maxDepth int) Item 
 		}
 	}
 
-	return item
+	return &item
 }
 
 func getChildCount(remaining int, depthLeft int) int {
@@ -156,18 +148,18 @@ func generateDescription(index int) string {
 	return descriptions[index%len(descriptions)]
 }
 
-func countAllNodes(outline *Outline) int {
+func countAllNodes(outline *model.Outline) int {
 	count := 0
 	for i := range outline.Items {
-		count += countItemNodes(&outline.Items[i])
+		count += countItemNodes(outline.Items[i])
 	}
 	return count
 }
 
-func countItemNodes(item *Item) int {
+func countItemNodes(item *model.Item) int {
 	count := 1 // Count this item
 	for i := range item.Children {
-		count += countItemNodes(&item.Children[i])
+		count += countItemNodes(item.Children[i])
 	}
 	return count
 }
