@@ -290,6 +290,35 @@ func (s *Screen) HeaderStyle() tcell.Style {
 	return theme.ColorPairToStyle(s.Theme.Colors.HeaderTitle, s.Theme.Colors.HeaderBg).Bold(true)
 }
 
+// Standard color styles
+func (s *Screen) YellowStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorYellow)
+}
+
+func (s *Screen) OrangeStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorOrange)
+}
+
+func (s *Screen) RedStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorRed)
+}
+
+func (s *Screen) GreenStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorGreen)
+}
+
+func (s *Screen) BlueStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorBlue)
+}
+
+func (s *Screen) PurpleStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorPurple)
+}
+
+func (s *Screen) GrayStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.ColorGray)
+}
+
 // BackgroundStyle returns the default background style for the application
 func (s *Screen) BackgroundStyle() tcell.Style {
 	return tcell.StyleDefault.Background(s.Theme.Colors.Background)

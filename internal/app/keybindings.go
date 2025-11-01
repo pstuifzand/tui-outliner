@@ -2,6 +2,10 @@ package app
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
+	"github.com/pstuifzand/tui-outliner/internal/model"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
@@ -236,6 +240,61 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 					app.SetStatus("Outdented")
 					app.dirty = true
 				}
+			},
+		},
+		{
+			Key:         'x',
+			Description: "Rotate todo status",
+			Handler: func(app *App) {
+				selected := app.tree.GetSelected()
+				if selected == nil {
+					return
+				}
+
+				// Get todostatuses config
+				statusesStr := app.cfg.Get("todostatuses")
+				if statusesStr == "" {
+					statusesStr = "todo,doing,done" // Default
+				}
+				statuses := strings.Split(statusesStr, ",")
+
+				// Initialize metadata if needed
+				if selected.Metadata == nil {
+					selected.Metadata = &model.Metadata{
+						Attributes: make(map[string]string),
+						Created:    time.Now(),
+						Modified:   time.Now(),
+					}
+				}
+
+				// Initialize type if not already set
+				if _, hasType := selected.Metadata.Attributes["type"]; !hasType {
+					selected.Metadata.Attributes["type"] = "todo"
+				}
+
+				// Get current status
+				currentStatus := selected.Metadata.Attributes["status"]
+
+				// Find current index
+				currentIdx := -1
+				for i, s := range statuses {
+					if s == currentStatus {
+						currentIdx = i
+						break
+					}
+				}
+
+				// Rotate to next status
+				nextIdx := (currentIdx + 1) % len(statuses)
+				newStatus := statuses[nextIdx]
+				selected.Metadata.Attributes["status"] = newStatus
+				selected.Metadata.Modified = time.Now()
+
+				// Update parent status if parent is a todo
+				ui.UpdateParentStatusIfTodo(selected, statuses)
+
+				app.dirty = true
+				app.SetStatus(fmt.Sprintf("Status: %s", newStatus))
 			},
 		},
 		{

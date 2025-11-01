@@ -74,6 +74,16 @@ func NewApp(filePath string) (*App, error) {
 		cfg.Set("", "") // Initialize sessionSettings
 	}
 
+	// Set default todostatuses if not already configured
+	if cfg.Get("todostatuses") == "" {
+		cfg.Set("todostatuses", "todo,doing,done")
+	}
+
+	// Set default showprogress if not already configured
+	if cfg.Get("showprogress") == "" {
+		cfg.Set("showprogress", "true")
+	}
+
 	store := storage.NewJSONStore(filePath)
 	outline, err := store.Load()
 	if err != nil {
@@ -510,6 +520,23 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 				a.dirty = true
 				a.mode = NormalMode
 				a.SetStatus("Modified")
+
+				// Auto-detect todo checkbox pattern "[] "
+				if strings.HasPrefix(editedItem.Text, "[] ") {
+					// Initialize metadata if needed
+					if editedItem.Metadata == nil {
+						editedItem.Metadata = &model.Metadata{
+							Attributes: make(map[string]string),
+							Created:    time.Now(),
+							Modified:   time.Now(),
+						}
+					}
+					// Set type and status attributes, strip prefix from text
+					editedItem.Metadata.Attributes["type"] = "todo"
+					editedItem.Metadata.Attributes["status"] = "todo"
+					editedItem.Text = strings.TrimPrefix(editedItem.Text, "[] ")
+					editedItem.Metadata.Modified = time.Now()
+				}
 
 				// If Escape was pressed and item is empty, delete it
 				if escapePressed && editedItem.Text == "" {

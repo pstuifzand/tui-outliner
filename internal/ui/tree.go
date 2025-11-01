@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -16,6 +17,143 @@ func GetAllItemsRecursive(item *model.Item) []*model.Item {
 		items = append(items, GetAllItemsRecursive(child)...)
 	}
 	return items
+}
+
+// CalculateProgressFromChildren calculates completion metrics from children with type=todo
+// Returns: total todo children, count with last status (done), count with middle statuses (doing)
+func CalculateProgressFromChildren(item *model.Item, todoStatuses []string) (total, done, doing int) {
+	if len(todoStatuses) == 0 {
+		return 0, 0, 0
+	}
+
+	lastStatus := todoStatuses[len(todoStatuses)-1]
+
+	for _, child := range item.Children {
+		// Only count children with type=todo
+		if child.Metadata == nil || child.Metadata.Attributes == nil {
+			continue
+		}
+		if childType, ok := child.Metadata.Attributes["type"]; !ok || childType != "todo" {
+			continue
+		}
+
+		total++
+		status := child.Metadata.Attributes["status"]
+
+		if status == lastStatus {
+			done++
+		} else if status != todoStatuses[0] {
+			// Status is not first and not last, so it's in progress
+			doing++
+		}
+	}
+
+	return total, done, doing
+}
+
+// ProgressBarBlock represents a single block in the progress bar with its status
+type ProgressBarBlock struct {
+	Status string // Status of the child (todo, doing, done, etc)
+}
+
+// RenderProgressBar generates progress bar blocks for an item with todo children
+// Returns a slice of ProgressBarBlocks, one per todo child, in order
+// Only returns blocks if item has type=todo and has todo children
+func RenderProgressBar(item *model.Item, todoStatuses []string) []ProgressBarBlock {
+	if item.Metadata == nil || item.Metadata.Attributes == nil {
+		return nil
+	}
+
+	itemType, hasType := item.Metadata.Attributes["type"]
+	if !hasType || itemType != "todo" {
+		return nil
+	}
+
+	var blocks []ProgressBarBlock
+	for _, child := range item.Children {
+		// Only include blocks for children with type=todo
+		if child.Metadata == nil || child.Metadata.Attributes == nil {
+			continue
+		}
+		childType, ok := child.Metadata.Attributes["type"]
+		if !ok || childType != "todo" {
+			continue
+		}
+
+		status := child.Metadata.Attributes["status"]
+		blocks = append(blocks, ProgressBarBlock{Status: status})
+	}
+
+	if len(blocks) == 0 {
+		return nil
+	}
+	return blocks
+}
+
+// UpdateParentStatusIfTodo updates parent item's status if it has type=todo
+// Implements progressive status matching based on children's statuses
+// Recursively updates ancestors that also have type=todo
+func UpdateParentStatusIfTodo(item *model.Item, todoStatuses []string) {
+	if item.Parent == nil || len(todoStatuses) == 0 {
+		return
+	}
+
+	parent := item.Parent
+
+	// Check if parent has type=todo
+	if parent.Metadata == nil || parent.Metadata.Attributes == nil {
+		return
+	}
+	parentType, hasType := parent.Metadata.Attributes["type"]
+	if !hasType || parentType != "todo" {
+		return
+	}
+
+	// Calculate progress from children
+	total, done, doing := CalculateProgressFromChildren(parent, todoStatuses)
+
+	if total == 0 {
+		// No todo children, don't update
+		return
+	}
+
+	firstStatus := todoStatuses[0]
+	lastStatus := todoStatuses[len(todoStatuses)-1]
+	middleStatus := firstStatus
+	if len(todoStatuses) > 1 {
+		middleStatus = todoStatuses[1]
+	}
+
+	var newStatus string
+
+	// Simple status matching logic based on all children
+	if done == total {
+		// All children are done
+		newStatus = lastStatus
+	} else if done == 0 && doing == 0 {
+		// All children are todo (no progress)
+		newStatus = firstStatus
+	} else {
+		// Mix of statuses
+		newStatus = middleStatus
+	}
+
+	// Update parent status if changed
+	if parent.Metadata.Attributes["status"] != newStatus {
+		parent.Metadata.Attributes["status"] = newStatus
+		parent.Metadata.Modified = time.Now()
+	}
+
+	// Calculate and store progress metrics
+	progressPct := 0
+	if total > 0 {
+		progressPct = (done * 100) / total
+	}
+	parent.Metadata.Attributes["progress_count"] = fmt.Sprintf("%d/%d", done, total)
+	parent.Metadata.Attributes["progress_pct"] = fmt.Sprintf("%d%%", progressPct)
+
+	// Recursively update grandparent if it's also a todo
+	UpdateParentStatusIfTodo(parent, todoStatuses)
 }
 
 // TreeView manages the display and navigation of the outline tree
@@ -901,10 +1039,64 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			}
 		}
 
+		// Draw progress bar if configured and if item has todo children
+		if cfg != nil && cfg.Get("showprogress") != "false" {
+			statusesStr := cfg.Get("todostatuses")
+			if statusesStr == "" {
+				statusesStr = "todo,doing,done"
+			}
+			statuses := strings.Split(statusesStr, ",")
+
+			blocks := RenderProgressBar(dispItem.Item, statuses)
+			if len(blocks) > 0 {
+				// Add spacing before progress bar
+				barStartX := totalLen + 2
+				if barStartX < screenWidth {
+					screen.SetCell(barStartX-2, y, ' ', style)
+					screen.SetCell(barStartX-1, y, ' ', style)
+
+					// Draw each block with appropriate color
+					firstStatus := statuses[0]
+					lastStatus := statuses[len(statuses)-1]
+
+					for j, block := range blocks {
+						blockX := barStartX + j
+						if blockX >= screenWidth {
+							break
+						}
+
+						blockStyle := screen.GrayStyle().Background(bgColor) // Default to gray for todo
+						switch block.Status {
+						case lastStatus:
+							blockStyle = screen.GreenStyle().Background(bgColor) // Green for done
+						case firstStatus:
+							blockStyle = screen.GrayStyle().Background(bgColor) // Gray for todo
+						default:
+							blockStyle = screen.OrangeStyle().Background(bgColor) // Orange for doing/in-progress
+						}
+
+						// When selected, use selected background but keep status color
+						if idx == tv.selectedIdx {
+							blockStyle = blockStyle.Background(screen.Theme.Colors.TreeSelectedBg)
+						}
+
+						screen.SetCell(blockX, y, '■', blockStyle)
+					}
+					totalLen = barStartX + len(blocks)
+				}
+			}
+		}
+
 		// Pad to screen width with background color
+		// Extend selected background one space past content
 		bgStyle := screen.BackgroundStyle()
 		for x := totalLen; x < screenWidth; x++ {
-			screen.SetCell(x, y, ' ', bgStyle)
+			padStyle := bgStyle
+			if idx == tv.selectedIdx && x == totalLen {
+				// One space with selected background after content
+				padStyle = selectedStyle
+			}
+			screen.SetCell(x, y, ' ', padStyle)
 		}
 
 		screenY++ // Move to next screen line

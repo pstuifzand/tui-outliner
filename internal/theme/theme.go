@@ -25,6 +25,16 @@ type Colors struct {
 	TreeAttributeIndicator tcell.Color // Color for attribute indicator symbol
 	TreeAttributeValue   tcell.Color  // Color for visible attribute values (gray/dim)
 
+	// Standard color palette for use throughout the app
+	ColorYellow  tcell.Color
+	ColorOrange  tcell.Color
+	ColorRed     tcell.Color
+	ColorGreen   tcell.Color
+	ColorBlue    tcell.Color
+	ColorPurple  tcell.Color
+	ColorGray    tcell.Color
+	// ColorWhite and ColorBlack are available as tcell.ColorWhite and tcell.ColorBlack
+
 	// Editor colors
 	EditorText        tcell.Color
 	EditorCursor      tcell.Color
@@ -90,6 +100,14 @@ func Default() *Theme {
 			TreeVisualCursorBg:  tcell.ColorBlue,
 			TreeAttributeIndicator: tcell.NewRGBColor(0, 208, 128), // Bright teal/green (#00D080)
 			TreeAttributeValue:  tcell.ColorGray, // Dim gray for attribute values
+			// Standard color palette
+			ColorYellow: tcell.ColorYellow,
+			ColorOrange: tcell.NewRGBColor(255, 165, 0), // Standard orange (#FFA500)
+			ColorRed:    tcell.ColorRed,
+			ColorGreen:  tcell.ColorGreen,
+			ColorBlue:   tcell.ColorBlue,
+			ColorPurple: tcell.NewRGBColor(128, 0, 128), // Standard purple (#800080)
+			ColorGray:   tcell.ColorGray,
 			// Editor colors
 			EditorText:        tcell.ColorWhite,
 			EditorCursor:      tcell.ColorBlack,
