@@ -26,3 +26,5 @@ vendor/
 *.json
 
 /tuo
+generate-test-file
+.claude/settings.local.json
