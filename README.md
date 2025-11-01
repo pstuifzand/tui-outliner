@@ -112,8 +112,6 @@ Press `:` to enter command mode, then type a command and press Enter:
 |---------|-------|--------|
 | `:w` | `:write` | Save the outline to current file |
 | `:w <file>` | `:write <file>` | Save the outline to a specific file |
-| `:title <text>` | | Set the outline title |
-| `:title` | | Show current outline title |
 | `:export markdown <file>` | | Export outline as markdown (unordered list format) |
 | `:q` | `:quit` | Quit (warns if unsaved) |
 | `:q!` | `:quit!` | Force quit without saving |
@@ -128,8 +126,6 @@ Examples:
 ```
 :w                    # Save to current file
 :w backup.json        # Save to a new file
-:title My Projects    # Set outline title to "My Projects"
-:title                # Show current title
 :export markdown notes.md  # Export as markdown
 :attr add type task   # Add a 'type' attribute with value 'task'
 :attr add url https://example.com  # Add a URL attribute
@@ -212,7 +208,6 @@ Outlines are stored as JSON files with the following structure:
 
 ```json
 {
-  "title": "My Outline",
   "items": [
     {
       "id": "unique_id",
