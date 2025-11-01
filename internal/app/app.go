@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -570,7 +571,7 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 func (a *App) handleKeypress(ev *tcell.EventKey) {
 	// Debug mode: show key information
 	if a.debugMode {
-		a.SetStatus(fmt.Sprintf("Key: %v | Rune: %q | Modifiers: %v", ev.Key(), ev.Rune(), ev.Modifiers()))
+		log.Printf("Key: %v | Rune: %q | Modifiers: %v", ev.Key(), ev.Rune(), ev.Modifiers())
 	}
 
 	// Handle special keys first
