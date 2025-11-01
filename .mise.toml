@@ -1,0 +1,5 @@
+[tasks.build]
+description="Build tuo"
+run = "go build -o tuo"
+outputs = ["tuo"]
+sources = ["internal/**/*.go", "main.go"]
