@@ -541,8 +541,8 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					editedItem.Metadata.Modified = time.Now()
 				}
 
-				// If Escape was pressed and item is empty, delete it
-				if escapePressed && editedItem.Text == "" {
+				// If Escape was pressed and item is empty (and has no children), delete it
+				if escapePressed && editedItem.Text == "" && len(editedItem.Children) == 0 {
 					// Move to previous item before deleting
 					currentIdx := a.tree.GetSelectedIndex()
 					a.tree.DeleteItem(editedItem)
