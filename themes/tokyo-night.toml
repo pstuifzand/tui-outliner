@@ -1,0 +1,49 @@
+name = "tokyo-night"
+
+[colors]
+# Global background
+background = "#1a1b26"                 # Dark midnight blue
+
+# Tree view colors
+tree_normal_text = "#c0caf5"           # Light gray-blue for normal text
+tree_selected_item = "#7dcfff"         # Bright cyan for high contrast on selection
+tree_selected_bg = "#283457"           # Selection blue background
+tree_new_item = "#565f89"              # Comment gray for new/placeholder items
+tree_leaf_arrow = "#565f89"            # Dimmer (comment gray) for leaf node arrows
+tree_expandable_arrow = "#7dcfff"      # Bright cyan for expandable node arrows
+tree_expanded_arrow = "#7dcfff"        # Cyan for expanded arrows
+tree_collapsed_arrow = "#7dcfff"       # Cyan for collapsed arrows
+
+# Editor colors
+editor_text = "#c0caf5"             # Light gray-blue for editor text
+editor_cursor = "#1a1b26"           # Dark background text
+editor_cursor_bg = "#7aa2f7"        # Blue background for cursor
+
+# Search bar colors
+search_label = "#bb9af7"            # Magenta for search label
+search_text = "#c0caf5"             # Light gray-blue for search text
+search_cursor = "#1a1b26"           # Dark background text
+search_cursor_bg = "#7aa2f7"        # Blue background for cursor
+search_result_count = "#9ece6a"     # Green for result count
+
+# Command line colors
+command_prompt = "#bb9af7"          # Magenta for command prompt
+command_text = "#c0caf5"            # Light gray-blue for command text
+command_cursor = "#1a1b26"          # Dark background text
+command_cursor_bg = "#7aa2f7"       # Blue background for cursor
+
+# Help overlay colors
+help_background = "#1a1b26"         # Dark background
+help_border = "#7dcfff"             # Cyan for borders
+help_title = "#bb9af7"              # Magenta for title
+help_content = "#c0caf5"            # Light gray-blue for content
+
+# Status line colors
+status_mode = "#bb9af7"             # Magenta for mode indicator
+status_mode_bg = "#1a1b26"          # Dark background for status
+status_message = "#9ece6a"          # Green for status messages
+status_modified = "#f7768e"         # Red for modified indicator
+
+# Header colors
+header_title = "#bb9af7"            # Magenta for header title
+header_bg = "#1a1b26"               # Dark background for header

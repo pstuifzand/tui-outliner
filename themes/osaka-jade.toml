@@ -1,0 +1,56 @@
+name = "osaka-jade"
+
+[colors]
+# Global background
+background = "#111c18"                 # Main background
+
+# Tree view colors
+tree_normal_text = "#F7E8B2"           # Main text color
+tree_selected_item = "#DEB266"         # Foreground color of selected items
+tree_selected_bg = "#364538"           # Background color of selected items
+
+tree_visual_selection = "#DEB266"      # Foreground color of selected items
+tree_visual_selection_bg = "#364538"   # Background color of selected items
+
+tree_visual_cursor = "#DEB266"         # Foreground color of selected items
+tree_visual_cursor_bg = "#364538"      # Background color of selected items
+
+tree_new_item = "#32473B"              # Inactive/disabled text color
+tree_leaf_arrow = "#32473B"            # Inactive/disabled text color for leaf arrows
+tree_expandable_arrow = "#E67D64"      # Highlight color for expandable arrows
+tree_expanded_arrow = "#E67D64"        # Highlight color for expanded arrows
+tree_collapsed_arrow = "#E67D64"       # Highlight color for collapsed arrows
+
+# Editor colors
+editor_text = "#F7E8B2"                # Main text color
+editor_cursor = "#111c18"              # Dark text on cursor background
+editor_cursor_bg = "#DEB266"           # Selected foreground as cursor background
+
+# Search bar colors
+search_label = "#E67D64"               # Highlight color for search label
+search_text = "#F7E8B2"                # Main text color
+search_cursor = "#111c18"              # Dark text on cursor background
+search_cursor_bg = "#DEB266"           # Selected foreground as cursor background
+search_result_count = "#E67D64"        # Highlight color for result count
+
+# Command line colors
+command_prompt = "#E67D64"             # Highlight color for command prompt
+command_text = "#F7E8B2"               # Main text color
+command_cursor = "#111c18"             # Dark text on cursor background
+command_cursor_bg = "#DEB266"          # Selected foreground as cursor background
+
+# Help overlay colors
+help_background = "#111c18"            # Main background
+help_border = "#D6D5BC"                # Title color for borders
+help_title = "#D6D5BC"                 # Title color
+help_content = "#F7E8B2"               # Main text color
+
+# Status line colors
+status_mode = "#E67D64"                # Highlight color for mode indicator
+status_mode_bg = "#111c18"             # Main background
+status_message = "#D6D5BC"             # Title color for status messages
+status_modified = "#E67D64"            # Highlight color for modified indicator
+
+# Header colors
+header_title = "#D6D5BC"               # Title color for header
+header_bg = "#111c18"                  # Main background
