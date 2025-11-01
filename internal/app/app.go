@@ -546,7 +546,7 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 	case tcell.KeyCtrlU:
 		// Page up - scroll viewport
 		height := a.screen.GetHeight()
-		treeStartY := 1
+		treeStartY := 0
 		treeEndY := height - 2
 		if a.search.IsActive() {
 			treeEndY -= 2
@@ -571,7 +571,7 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 	case tcell.KeyCtrlD:
 		// Page down - scroll viewport
 		height := a.screen.GetHeight()
-		treeStartY := 1
+		treeStartY := 0
 		treeEndY := height - 2
 		if a.search.IsActive() {
 			treeEndY -= 2
@@ -1093,8 +1093,8 @@ func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
 
 	x, y := mouseEv.Position()
 
-	// Tree starts at Y = 1
-	treeStartY := 1
+	// FIXME: Tree starts at Y = 0
+	treeStartY := 0
 
 	// Check if click is within tree area
 	if y < treeStartY {
