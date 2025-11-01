@@ -3,3 +3,8 @@ description="Build tuo"
 run = "go build -o tuo"
 outputs = ["tuo"]
 sources = ["internal/**/*.go", "main.go"]
+
+[tasks.log]
+description="Tail log"
+depends=["build"]
+run="tail -f tuo.log"
