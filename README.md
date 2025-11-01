@@ -288,13 +288,58 @@ When you press `i`, `A`, `c`, `o`, or `O` to edit an item's text:
 
 ### Search Mode
 
-When you press `/` to search:
+Press `/` to enter search mode. The search uses a powerful filter syntax that supports:
+
+**Basic Syntax:**
+
+| Query | Matches |
+|-------|---------|
+| `task` | Items containing "task" |
+| `task project` | Items with both "task" AND "project" (implicit AND) |
+| `task \| project` | Items with "task" OR "project" |
+| `-task` | Items without "task" (NOT) |
+| `(task \| project) d:>1` | Complex expressions with grouping |
+
+**Filter Types:**
+
+| Filter | Description |
+|--------|-------------|
+| `d:N` | Depth filters: `d:0` (root), `d:>2` (deeper than 2), `d:<=1` (level 1 or less) |
+| `@KEY` | Has attribute KEY: `@url` (any value), `@type=day` (specific value) |
+| `@KEY>DATE` | Date comparison on attribute: `@deadline>-7d`, `@date>=2025-11-01` |
+| `children:N` | Children count: `children:0` (leaf nodes), `children:>0` (has children) |
+| `c:DATE` | Created date: `c:>-7d` (last 7 days), `c:<-30d` (more than 30 days ago) |
+| `m:DATE` | Modified date: `m:>-1d`, `m:2025-11-01` |
+| `p:FILTER` | Parent filter: `p:d:0` (parent is root) |
+| `a:FILTER` | Ancestor filter: `a:@type=project` (nodes under type=project) |
+
+**Navigation in Search Mode:**
 
 | Key | Action |
 |-----|--------|
+| `Enter` | Execute search and start matching |
+| `n` / `N` | Next/Previous match (after Enter) |
 | `Escape` | Exit search mode |
 | `Ctrl+A` / `Home` | Go to start of search query |
 | `Ctrl+E` / `End` | Go to end of search query |
+
+**Examples:**
+
+```
+task                          # Find items with "task"
+d:>1                          # Items deeper than depth 1
+@status=done                  # Items marked as done
+task d:>0                     # "task" items that aren't root level
+children:>0                   # Items with children (parent nodes)
+project | task                # Either projects or tasks
+m:>-7d -@archived             # Modified this week, not archived
+(d:0 | d:1) @type=project     # Root or level-1 projects
+@deadline>-7d                 # Items with deadlines in next 7 days
+@date>=-1d @type=day          # Daily notes from today
+@start>=-7d @due<-7d          # Recently started, due soon
+```
+
+See `docs/search-syntax.md` for complete documentation.
 
 ## Tips
 
@@ -306,7 +351,6 @@ When you press `/` to search:
 ## Limitations
 
 - Currently supports single outline files (no multi-document tabs yet)
-- Search is case-insensitive and matches full text
 - Attribute display in tree view not yet implemented (view via status bar with `:attr`)
 
 ## Troubleshooting

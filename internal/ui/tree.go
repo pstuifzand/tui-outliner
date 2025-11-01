@@ -718,12 +718,12 @@ func (tv *TreeView) GetDisplayItems() []*displayItem {
 }
 
 // Render renders the tree to the screen
-func (tv *TreeView) Render(screen *Screen, startY int, visualAnchor int) {
-	tv.RenderWithSearchQuery(screen, startY, visualAnchor, "", nil)
+func (tv *TreeView) Render(screen *Screen, startY, endY int, visualAnchor int) {
+	tv.RenderWithSearchQuery(screen, startY, endY, visualAnchor, "", nil)
 }
 
 // RenderWithSearchQuery renders the tree with optional search query highlighting
-func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnchor int, searchQuery string, currentMatchItem *model.Item) {
+func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visualAnchor int, searchQuery string, currentMatchItem *model.Item) {
 	defaultStyle := screen.TreeNormalStyle()
 	selectedStyle := screen.TreeSelectedStyle()
 	visualStyle := screen.TreeVisualSelectionStyle()
@@ -739,7 +739,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 	newItemStyle = newItemStyle.Background(bgColor)
 
 	// Calculate available viewport height Reserve 1 line for status bar
-	viewportHeight := max(screenHeight-startY-1, 1)
+	// viewportHeight := max(screenHeight-startY-1, 1)
+	viewportHeight := endY
 
 	// Ensure viewport offset keeps selected item visible
 	if tv.selectedIdx < tv.viewportOffset {

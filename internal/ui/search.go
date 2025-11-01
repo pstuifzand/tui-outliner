@@ -2,10 +2,10 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
+	"github.com/pstuifzand/tui-outliner/internal/search"
 )
 
 // Search manages search and filter functionality
@@ -18,6 +18,8 @@ type Search struct {
 	active          bool
 	allItems        []*model.Item
 	queryLocked     bool               // Whether query is locked after pressing Enter
+	filterExpr      search.FilterExpr  // Parsed filter expression
+	parseError      string             // Error from parsing the query
 }
 
 // NewSearch creates a new Search
@@ -135,16 +137,34 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 func (s *Search) updateResults() {
 	s.matchIndices = nil
 	s.currentMatchIdx = 0
+	s.parseError = ""
+	s.filterExpr = nil
 
 	if s.query == "" {
 		s.results = s.allItems
+		// Parse empty query to get AlwaysMatch expression
+		var err error
+		s.filterExpr, err = search.ParseQuery("")
+		if err != nil {
+			s.parseError = err.Error()
+		}
 		return
 	}
 
-	query := strings.ToLower(s.query)
+	// Parse the query
+	var err error
+	s.filterExpr, err = search.ParseQuery(s.query)
+	if err != nil {
+		s.parseError = err.Error()
+		// Return no results on parse error
+		s.results = nil
+		return
+	}
+
+	// Apply the filter to all items
 	var filtered []*model.Item
 	for idx, item := range s.allItems {
-		if strings.Contains(strings.ToLower(item.Text), query) {
+		if s.filterExpr.Matches(item) {
 			filtered = append(filtered, item)
 			s.matchIndices = append(s.matchIndices, idx)
 		}
@@ -222,6 +242,11 @@ func (s *Search) GetCurrentMatchNumber() int {
 	return s.currentMatchIdx + 1
 }
 
+// GetParseError returns the last parse error, if any
+func (s *Search) GetParseError() string {
+	return s.parseError
+}
+
 // Render renders the search bar on the screen
 func (s *Search) Render(screen *Screen, y int) {
 	labelStyle := screen.SearchLabelStyle()
@@ -260,15 +285,22 @@ func (s *Search) Render(screen *Screen, y int) {
 		}
 	}
 
-	// Draw result count with current match number
+	// Draw result count with current match number or error
 	var resultText string
-	if len(s.results) == 0 {
+	if s.parseError != "" {
+		// Display parse error
+		resultText = " (error: " + s.parseError + ")"
+	} else if len(s.results) == 0 {
 		resultText = " (no matches)"
 	} else {
 		currentNum := s.GetCurrentMatchNumber()
 		totalCount := s.GetMatchCount()
 		// Format: (1 of 5 matches)
 		resultText = " (" + fmt.Sprintf("%d", currentNum) + " of " + fmt.Sprintf("%d", totalCount) + " matches)"
+	}
+	// Truncate error message if it's too long
+	if len(resultText) > screen.GetWidth()/2 {
+		resultText = " (error: syntax)"
 	}
 	screen.DrawString(screen.GetWidth()-len(resultText), y, resultText, resultStyle)
 }

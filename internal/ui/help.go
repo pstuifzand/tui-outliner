@@ -91,6 +91,18 @@ func (h *HelpScreen) GetKeybindings() []string {
 	result = append(result, "  Enter       - Confirm/Exit edit mode")
 	result = append(result, "  Arrow Keys  - Navigate (alternative to hjkl)")
 
+	result = append(result, "")
+	result = append(result, "Search Syntax:")
+	result = append(result, "  Text search:     task project")
+	result = append(result, "  Depth filter:    d:>2  d:>=1  d:<3")
+	result = append(result, "  Children count:  children:0  children:>3")
+	result = append(result, "  Attributes:      @type=day  @status=done  @date>-7d")
+	result = append(result, "  Date filters:    c:>-7d (created)  m:<-30d (modified)")
+	result = append(result, "  Parent/Ancestor: p:d:0  a:@type=project")
+	result = append(result, "  Boolean ops:     task | project (OR)  -task (NOT)")
+	result = append(result, "  Groups:          (task | project) d:>0")
+	result = append(result, "  Use ':help search' for full documentation")
+
 	return result
 }
 

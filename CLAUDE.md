@@ -298,8 +298,80 @@ ls -la /home/peter/work/tui-outliner/
 15. **Example Outline**:
    - Created `examples/attributes_demo.json` demonstrating all attribute features
    - Examples include daily notes, URLs, custom task attributes, and navigation
+16. **Advanced Search Filter Syntax**: Complete rewrite of search functionality with powerful filter language
+   - Created `internal/search/` package with modular design
+   - **Parser** (`parser.go`): Tokenizer and recursive descent parser that builds s-expression trees
+   - **Filter Expressions** (`expr.go`): Comprehensive FilterExpr interface with 10+ filter types
+   - **Filter Types**:
+     - Text search (case-insensitive substring)
+     - Depth filters: `d:>2`, `d:<=1`, etc.
+     - Attribute filters: `a:type=day`, `a:status=done`, `a:url`
+     - Date filters: `c:>-7d` (created), `m:<-30d` (modified)
+     - Children count: `children:0` (leaf nodes), `children:>5`
+     - Parent/Ancestor: `p:d:0`, `ancestor:a:type=project`
+   - **Boolean Operators**:
+     - Implicit AND: `task project` → `task AND project`
+     - Explicit AND: `task +project`
+     - OR: `task | project`
+     - NOT: `-task`, `-children:0`
+     - Grouping: `(task | project) d:>0`
+   - **Debug Function** (`debug.go`): Pretty-print expressions and explain match results
+   - **Integration** (internal/ui/search.go): Replaced simple substring search with new parser
+   - **Testing**: Comprehensive test suite with 100% parser coverage
+   - **Documentation**:
+     - `docs/search-syntax.md` - Complete syntax reference with examples
+     - Updated README.md with search examples and syntax overview
+     - Help screen shows common search patterns
+   - **Example** (`examples/search_demo.json`): Demonstrates various attributes, depths, and dates
 
 ## Implementation Details
+
+### Search Package Architecture (internal/search/)
+- **Tokenizer** (`parser.go:Tokenizer`): Converts query string to tokens
+  - Handles filters (e.g., `d:>2`, `a:type=day`), operators (`+`, `|`, `-`), and text
+  - Recognizes quoted strings and complex filter criteria
+- **Parser** (`parser.go:Parser`): Builds s-expression tree from tokens
+  - Recursive descent parser with proper operator precedence
+  - Precedence: OR < AND < NOT < Atoms
+  - Supports parentheses for explicit grouping
+- **Filter Expressions** (`expr.go`):
+  - `FilterExpr` interface: `Matches(item) bool` and `String()` for debug output
+  - Binary operators: `AndExpr`, `OrExpr`, `NotExpr`
+  - Filter implementations: `TextExpr`, `DepthFilter`, `AttributeFilter`, `DateFilter`, `ChildrenFilter`, `ParentFilter`, `AncestorFilter`
+  - Helper functions for depth calculation, date parsing, and comparisons
+- **Debug Module** (`debug.go`):
+  - `DebugMatch()` returns detailed match information
+  - `evaluateWithReason()` explains why items matched/didn't match
+  - `ExpressionString()` pretty-prints s-expressions
+
+### Search Integration (internal/ui/search.go)
+- `updateResults()` now parses query and evaluates filter expression
+- Error handling: Parse errors shown in search bar (e.g., "error: missing value")
+- Fields added:
+  - `filterExpr FilterExpr` - Parsed filter expression
+  - `parseError string` - Error from parsing query
+- `GetParseError()` method for accessing parse errors
+
+### Attribute Date Filtering (internal/search/expr.go)
+- New `AttributeDateFilter` type for date comparisons on attributes
+- Automatically detects when attribute filter value is a date (YYYY-MM-DD or relative like `-7d`)
+- Supports all comparison operators: `>`, `>=`, `<`, `<=`, `=`, `!=`
+- Examples:
+  - `@deadline>-7d` - Attributes with dates in next 7 days
+  - `@date>=2025-11-01` - Attribute dates on or after November 1st
+  - `@completed<-30d` - Attribute dates older than 30 days
+- Integrated into `parseAttrFilter()` in parser which auto-detects date values
+
+### Search Syntax Updates
+- Changed attribute filter prefix from `a:` to `@` (no colon needed)
+  - Old: `a:type=day`, `a:url`, `a:date>-7d`
+  - New: `@type=day`, `@url`, `@date>-7d`
+- Changed ancestor filter prefix from `ancestor:` to `a:` (similar to parent `p:`)
+  - Old: `ancestor:a:type=project`
+  - New: `a:@type=project`
+- Tokenizer updated to recognize `@` as filter start character
+  - `readAttrFilter()` method handles `@key` syntax without requiring colon
+  - Parser routes `@` prefixed filters through attribute filter logic
 
 ### Data Model Changes (internal/model/outline.go)
 - Added `Attributes map[string]string` field to Metadata struct

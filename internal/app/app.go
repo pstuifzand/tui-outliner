@@ -269,7 +269,7 @@ func (a *App) render() {
 	}
 	treeEndY := height - 2
 	if a.search.IsActive() {
-		treeEndY -= 2
+		treeEndY -= 3
 	}
 
 	// Render the main tree (search is active but doesn't filter items)
@@ -279,7 +279,7 @@ func (a *App) render() {
 		searchQuery = a.search.GetQuery()
 		currentMatchItem = a.search.GetCurrentMatch()
 	}
-	a.tree.RenderWithSearchQuery(a.screen, treeStartY, a.visualAnchor, searchQuery, currentMatchItem)
+	a.tree.RenderWithSearchQuery(a.screen, treeStartY, treeEndY, a.visualAnchor, searchQuery, currentMatchItem)
 
 	// Render editor inline if active
 	if a.editor != nil && a.editor.IsActive() {
@@ -305,7 +305,7 @@ func (a *App) render() {
 
 	// Draw search bar if active
 	if a.search.IsActive() {
-		a.search.Render(a.screen, height-3)
+		a.search.Render(a.screen, height-2)
 	}
 
 	// Draw command line if active
