@@ -98,7 +98,7 @@ func TestSaveSyncesTreeItemsWithOutline(t *testing.T) {
 	tmpfile.Close()
 
 	// Create an initial outline with some items
-	outline := model.NewOutline("Test")
+	outline := model.NewOutline()
 	outline.Items = append(outline.Items, model.NewItem("First"))
 	outline.Items = append(outline.Items, model.NewItem("Second"))
 	outline.Items = append(outline.Items, model.NewItem("Third"))
