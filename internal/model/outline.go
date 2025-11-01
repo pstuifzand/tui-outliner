@@ -45,7 +45,7 @@ func NewItem(text string) *Item {
 }
 
 // NewOutline creates a new outline with the given title
-func NewOutline(title string) *Outline {
+func NewOutline() *Outline {
 	return &Outline{
 		Items: make([]*Item, 0),
 	}

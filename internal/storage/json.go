@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 
@@ -25,14 +26,14 @@ func NewJSONStore(filePath string) *JSONStore {
 func (s *JSONStore) Load() (*model.Outline, error) {
 	// If no file path specified, return a new empty outline
 	if s.FilePath == "" {
-		return model.NewOutline("Untitled"), nil
+		return model.NewOutline(), nil
 	}
 
 	data, err := os.ReadFile(s.FilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Return empty outline if file doesn't exist
-			return model.NewOutline("Untitled"), nil
+			return model.NewOutline(), nil
 		}
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -61,7 +62,7 @@ func (s *JSONStore) SaveToFile(outline *model.Outline, filePath string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(filePath)
 	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
@@ -71,7 +72,7 @@ func (s *JSONStore) SaveToFile(outline *model.Outline, filePath string) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
+	if err := os.WriteFile(filePath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
@@ -81,12 +82,13 @@ func (s *JSONStore) SaveToFile(outline *model.Outline, filePath string) error {
 // restoreParentPointers reconstructs parent pointers after JSON deserialization
 func restoreParentPointers(items []*model.Item) {
 	for _, item := range items {
-		if len(item.Children) > 0 {
-			for _, child := range item.Children {
-				child.Parent = item
-			}
-			restoreParentPointers(item.Children)
+		if item.ID == "" {
+			log.Println("Item has no parent pointers")
 		}
+		for _, child := range item.Children {
+			child.Parent = item
+		}
+		restoreParentPointers(item.Children)
 	}
 }
 
