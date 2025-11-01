@@ -10,9 +10,10 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	Theme string `toml:"theme"`
+	Theme    string            `toml:"theme"`
+	Settings map[string]string `toml:"settings"`
 
-	// Session settings (not persisted)
+	// Session settings (not persisted to TOML, overrides persisted settings)
 	sessionSettings map[string]string
 }
 
@@ -49,6 +50,11 @@ func LoadFromFile(filePath string) (*Config, error) {
 		config.Theme = "tokyo-night"
 	}
 
+	// Initialize persisted settings if not present
+	if config.Settings == nil {
+		config.Settings = make(map[string]string)
+	}
+
 	// Initialize session settings
 	config.sessionSettings = make(map[string]string)
 
@@ -69,6 +75,7 @@ func getConfigPath() (string, error) {
 func defaultConfig() *Config {
 	return &Config{
 		Theme:            "tokyo-night",
+		Settings:         make(map[string]string),
 		sessionSettings:  make(map[string]string),
 	}
 }
@@ -102,23 +109,71 @@ func (c *Config) Set(key, value string) {
 	c.sessionSettings[key] = value
 }
 
-// Get retrieves a session configuration value, returns empty string if not found
+// Get retrieves a configuration value, checking session settings first (which override persisted settings)
+// Returns empty string if not found in either source
 func (c *Config) Get(key string) string {
-	if c.sessionSettings == nil {
-		return ""
+	// Check session settings first (they override persisted settings)
+	if c.sessionSettings != nil {
+		if val, ok := c.sessionSettings[key]; ok {
+			return val
+		}
 	}
-	return c.sessionSettings[key]
+
+	// Fall back to persisted settings
+	if c.Settings != nil {
+		if val, ok := c.Settings[key]; ok {
+			return val
+		}
+	}
+
+	return ""
 }
 
-// GetAll returns all session configuration values
+// GetAll returns all configuration values (both persisted and session)
+// Session settings override persisted settings with the same key
 func (c *Config) GetAll() map[string]string {
-	if c.sessionSettings == nil {
-		return make(map[string]string)
-	}
-	// Return a copy to prevent external modifications
 	result := make(map[string]string)
-	for k, v := range c.sessionSettings {
-		result[k] = v
+
+	// First, add all persisted settings
+	if c.Settings != nil {
+		for k, v := range c.Settings {
+			result[k] = v
+		}
 	}
+
+	// Then override with session settings (they take precedence)
+	if c.sessionSettings != nil {
+		for k, v := range c.sessionSettings {
+			result[k] = v
+		}
+	}
+
 	return result
+}
+
+// Save persists the configuration to the TOML file
+// Note: This only persists the Settings map, not session settings
+func (c *Config) Save() error {
+	configPath, err := getConfigPath()
+	if err != nil {
+		return fmt.Errorf("failed to get config path: %w", err)
+	}
+
+	// Ensure the config directory exists
+	if err := EnsureConfigDir(); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Marshall the config to TOML
+	data, err := toml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	return nil
 }

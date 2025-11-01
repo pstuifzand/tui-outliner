@@ -34,6 +34,7 @@ func TestGet(t *testing.T) {
 
 func TestGetAll(t *testing.T) {
 	cfg := &Config{
+		Settings:        make(map[string]string),
 		sessionSettings: make(map[string]string),
 	}
 
@@ -56,6 +57,7 @@ func TestGetAll(t *testing.T) {
 
 func TestGetAllReturnsACopy(t *testing.T) {
 	cfg := &Config{
+		Settings:        make(map[string]string),
 		sessionSettings: make(map[string]string),
 	}
 
@@ -72,7 +74,9 @@ func TestGetAllReturnsACopy(t *testing.T) {
 }
 
 func TestNilSessionSettings(t *testing.T) {
-	cfg := &Config{}
+	cfg := &Config{
+		Settings: make(map[string]string),
+	}
 	// sessionSettings is nil
 
 	// Set should initialize it
@@ -82,7 +86,9 @@ func TestNilSessionSettings(t *testing.T) {
 	}
 
 	// Get should handle nil gracefully
-	cfg2 := &Config{}
+	cfg2 := &Config{
+		Settings: make(map[string]string),
+	}
 	if cfg2.Get("key") != "" {
 		t.Errorf("Get should return empty string for nil sessionSettings")
 	}
@@ -96,5 +102,92 @@ func TestDefaultConfig(t *testing.T) {
 
 	if cfg.sessionSettings == nil {
 		t.Errorf("defaultConfig should initialize sessionSettings")
+	}
+
+	if cfg.Settings == nil {
+		t.Errorf("defaultConfig should initialize Settings")
+	}
+}
+
+// TestGetPersistedSettings tests retrieving persisted settings from TOML
+func TestGetPersistedSettings(t *testing.T) {
+	cfg := &Config{
+		Settings: map[string]string{
+			"visattr": "date,status",
+			"theme":   "custom-theme",
+		},
+		sessionSettings: make(map[string]string),
+	}
+
+	if cfg.Get("visattr") != "date,status" {
+		t.Errorf("Expected 'date,status', got '%s'", cfg.Get("visattr"))
+	}
+
+	if cfg.Get("theme") != "custom-theme" {
+		t.Errorf("Expected 'custom-theme', got '%s'", cfg.Get("theme"))
+	}
+}
+
+// TestSessionSettingsOverridePersisted tests that session settings override persisted settings
+func TestSessionSettingsOverridePersisted(t *testing.T) {
+	cfg := &Config{
+		Settings: map[string]string{
+			"visattr": "date",
+		},
+		sessionSettings: make(map[string]string),
+	}
+
+	// Get persisted value
+	if cfg.Get("visattr") != "date" {
+		t.Errorf("Expected persisted 'date', got '%s'", cfg.Get("visattr"))
+	}
+
+	// Override with session setting
+	cfg.Set("visattr", "status")
+	if cfg.Get("visattr") != "status" {
+		t.Errorf("Expected session 'status' to override, got '%s'", cfg.Get("visattr"))
+	}
+}
+
+// TestGetAllMergesPersistedAndSession tests that GetAll merges both sources
+func TestGetAllMergesPersistedAndSession(t *testing.T) {
+	cfg := &Config{
+		Settings: map[string]string{
+			"visattr": "date",
+			"other":   "value",
+		},
+		sessionSettings: make(map[string]string),
+	}
+
+	cfg.Set("newsession", "sessionvalue")
+
+	all := cfg.GetAll()
+	if len(all) != 3 {
+		t.Errorf("Expected 3 settings, got %d", len(all))
+	}
+
+	if all["visattr"] != "date" {
+		t.Errorf("Expected 'date', got '%s'", all["visattr"])
+	}
+
+	if all["newsession"] != "sessionvalue" {
+		t.Errorf("Expected 'sessionvalue', got '%s'", all["newsession"])
+	}
+}
+
+// TestGetAllSessionOverridesInMerge tests that session overrides persisted in GetAll
+func TestGetAllSessionOverridesInMerge(t *testing.T) {
+	cfg := &Config{
+		Settings: map[string]string{
+			"key": "persisted",
+		},
+		sessionSettings: make(map[string]string),
+	}
+
+	cfg.Set("key", "session")
+
+	all := cfg.GetAll()
+	if all["key"] != "session" {
+		t.Errorf("Expected session override 'session', got '%s'", all["key"])
 	}
 }
