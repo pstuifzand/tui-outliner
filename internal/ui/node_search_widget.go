@@ -116,6 +116,31 @@ func (w *NodeSearchWidget) updateMatches() {
 	}
 }
 
+// DeleteWordBackwards deletes the word before the cursor
+func (w *NodeSearchWidget) DeleteWordBackwards() {
+	if w.cursorPos == 0 {
+		return
+	}
+
+	// Start from cursor position and move backwards
+	pos := w.cursorPos - 1
+
+	// Skip any trailing whitespace
+	for pos >= 0 && (w.query[pos] == ' ' || w.query[pos] == '\t') {
+		pos--
+	}
+
+	// Skip the word characters
+	for pos >= 0 && w.query[pos] != ' ' && w.query[pos] != '\t' {
+		pos--
+	}
+
+	// Delete from pos+1 to cursorPos
+	deleteStart := pos + 1
+	w.query = w.query[:deleteStart] + w.query[w.cursorPos:]
+	w.cursorPos = deleteStart
+}
+
 func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 	if !w.visible {
 		return false
@@ -126,24 +151,30 @@ func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 		w.Hide()
 		return true
 
-	case tcell.KeyCtrlSpace:
-		// Ctrl+Enter: Hoist the current match
-		if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
-			selected := w.matches[w.selectedIdx]
-			w.Hide()
-			if w.onHoist != nil {
-				w.onHoist(selected)
-			}
-		}
 	case tcell.KeyEnter:
-		// Enter: Select the current match
-		if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
-			selected := w.matches[w.selectedIdx]
-			w.Hide()
-			if w.onSelect != nil {
-				w.onSelect(selected)
+		if ev.Modifiers()&tcell.ModAlt != 0 {
+			// Alt+Enter: Hoist the current match
+			if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
+				selected := w.matches[w.selectedIdx]
+				w.Hide()
+				if w.onHoist != nil {
+					w.onHoist(selected)
+				}
+			}
+		} else {
+			// Enter: Select the current match
+			if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
+				selected := w.matches[w.selectedIdx]
+				w.Hide()
+				if w.onSelect != nil {
+					w.onSelect(selected)
+				}
 			}
 		}
+		return true
+
+	case tcell.KeyCtrlW:
+		w.DeleteWordBackwards()
 		return true
 
 	case tcell.KeyCtrlN:
@@ -329,6 +360,7 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 	// Draw results
 	resultsY := boxStartY + 3
 	maxDisplayResults := 9
+	canHoist := true
 	for i := 0; i < len(w.matches) && i < maxDisplayResults; i++ {
 		resultY := resultsY + i
 		if resultY >= boxStartY+boxHeight-2 {
@@ -337,6 +369,10 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 
 		item := w.matches[i]
 		isSelected := i == w.selectedIdx
+
+		if isSelected && len(item.Children) == 0 {
+			canHoist = false
+		}
 
 		// Format the result line
 		var resultLine string
@@ -363,7 +399,11 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 	footerY := boxStartY + boxHeight - 2
 	matchCount := len(w.matches)
 	totalCount := len(w.allItems)
-	footer := fmt.Sprintf(" %d of %d matches | Enter: select, Ctrl+Space: hoist, Esc: close", matchCount, totalCount)
+	hoistAction := ""
+	if canHoist {
+		hoistAction = ", Alt+Enter: hoist"
+	}
+	footer := fmt.Sprintf(" %d of %d matches | Enter: select%s, Esc: close", matchCount, totalCount, hoistAction)
 	if len(footer) > inputWidth {
 		footer = footer[:inputWidth]
 	}
