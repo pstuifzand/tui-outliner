@@ -800,13 +800,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 		leafArrowStyle := screen.TreeLeafArrowStyle().Background(bgColor)
 		expandableArrowStyle := screen.TreeExpandableArrowStyle().Background(bgColor)
 
-		// Build the prefix: 2 spaces per nesting level
-		prefix := ""
-
-		// Add indentation for parent levels (2 spaces per level)
-		for i := 0; i < dispItem.Depth; i++ {
-			prefix += "  " // 2 spaces per nesting level
-		}
+		// Add indentation for parent levels (3 spaces per level)
+		prefix := strings.Repeat("   ", dispItem.Depth)
 
 		// Draw indentation
 		if dispItem.Depth > 0 {
