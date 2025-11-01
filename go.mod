@@ -5,6 +5,7 @@ go 1.25.3
 require github.com/pelletier/go-toml/v2 v2.2.4
 
 require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect
 	github.com/gdamore/tcell/v2 v2.9.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
