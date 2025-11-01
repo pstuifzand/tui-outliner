@@ -283,7 +283,7 @@ func (a *App) render() {
 	case VisualMode:
 		statusLine = "-- VISUAL --"
 	default:
-		statusLine = "-- NORMAL --"
+		statusLine = "NORMAL"
 	}
 	a.screen.DrawString(lineX, height-1, statusLine, modeStyle)
 	lineX += len(statusLine)
