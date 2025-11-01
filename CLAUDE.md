@@ -395,6 +395,23 @@ ls -la /home/peter/work/tui-outliner/
 - `FindNextItemWithDateInterval()` parses date attributes in YYYY-MM-DD format
 - `FindPrevItemWithDateInterval()` parses date attributes in YYYY-MM-DD format
 
+17. **Node Search Widget Enhancement (Ctrl+K)**:
+   - Integrated advanced search parser into Node Search Widget
+   - Widget now supports all filter expressions: depth, attributes, dates, children, parent, ancestor
+   - Features:
+     - Real-time search as you type
+     - Advanced filter syntax same as main search (`/`)
+     - Error handling for invalid queries (falls back to text search)
+     - Results limited to 10 matches for performance
+     - Display of parse errors in red in the widget
+     - Support for hoisting (Alt+Enter) and selection (Enter)
+   - Implementation (internal/ui/node_search_widget.go):
+     - Added `parseError` and `filterExpr` fields
+     - `updateMatches()` now uses `search.ParseQuery()` instead of fuzzy search
+     - Error handling with fallback to text-only matching on parse failure
+     - Render function updated to display parse errors in red
+   - Documentation: `docs/node-search-widget.md` - complete guide with examples
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

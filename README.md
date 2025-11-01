@@ -9,7 +9,9 @@ A powerful, keyboard-driven outliner application for the terminal, built in Go. 
 - **Hierarchical Tree Structure**: Organize items in a nested, expandable/collapsible tree
 - **Flexible Attributes**: Add custom key-value attributes to items for rich metadata (tags, URLs, statuses, etc.)
 - **File Persistence**: Save and load outlines from JSON files with auto-save support
-- **Search & Filter**: Quickly find items by text search
+- **Search & Filter**: Quickly find items with advanced filter syntax (text, depth, attributes, dates, etc.)
+  - Main search mode (`/`) - persistent search bar with match navigation
+  - Node search widget (`Ctrl+K`) - modal for quick node navigation with hoisting
 - **Keyboard-Driven**: Vim-style keybindings for efficient navigation and editing
 - **TUI Interface**: Full-featured terminal UI built with tcell
 
@@ -53,7 +55,8 @@ go build -o tuo
 - `l/h` or `→/←` - Expand/collapse items
 - `>/<` or `Ctrl+I` - Indent/outdent items (also `<` / `,`)
 - `Ctrl+U` / `Ctrl+D` - Page up/down (scroll viewport)
-- `/` - Search/filter items
+- `/` - Search/filter items (persistent search bar)
+- `Ctrl+K` - Quick node search widget with advanced filters
 - `Ctrl+S` - Save
 - `?` - Show help
 - `:q` - Quit
@@ -98,7 +101,8 @@ go build -o tuo
 
 | Key | Action |
 |-----|--------|
-| `/` | Search/filter items |
+| `/` | Search/filter items (persistent search bar) |
+| `Ctrl+K` | Quick node search widget (advanced filters, hoisting support) |
 | `?` | Toggle help screen |
 | `:` | Enter command mode |
 | `Ctrl+S` | Save outline |
@@ -340,6 +344,34 @@ m:>-7d -@archived             # Modified this week, not archived
 ```
 
 See `docs/search-syntax.md` for complete documentation.
+
+### Node Search Widget
+
+Press `Ctrl+K` to open the Node Search Widget - a modal popup for quick node navigation:
+
+**Features:**
+- Uses the same advanced filter syntax as the main search
+- Real-time search results as you type
+- Supports quick hoisting with `Alt+Enter`
+- Error messages for invalid queries
+- Limited to 10 results for performance
+
+**Keyboard Controls:**
+- `Ctrl+N` / `Ctrl+P` - Move up/down in results
+- `Enter` - Jump to selected node
+- `Alt+Enter` - Hoist selected node (if has children)
+- `Escape` - Close without selecting
+- Standard editing keys (backspace, delete, Ctrl+W for delete word)
+
+**Examples:**
+```
+task                # Find items with "task"
+d:>1 @status=done  # Done items deeper than level 1
+children:0         # All leaf nodes
+@deadline>-7d      # Items with deadlines in next 7 days
+```
+
+See `docs/node-search-widget.md` for detailed documentation.
 
 ## Tips
 

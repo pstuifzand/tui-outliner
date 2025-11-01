@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pstuifzand/tui-outliner/internal/model"
+	"github.com/pstuifzand/tui-outliner/internal/search"
 )
 
 type NodeSearchWidget struct {
@@ -16,6 +16,8 @@ type NodeSearchWidget struct {
 	selectedIdx int
 	cursorPos   int
 	maxResults  int
+	parseError  string           // Error from parsing advanced search query
+	filterExpr  search.FilterExpr // Parsed filter expression
 	onSelect    func(*model.Item)
 	onHoist     func(*model.Item)
 }
@@ -60,59 +62,45 @@ func (w *NodeSearchWidget) IsVisible() bool {
 	return w.visible
 }
 
-// updateMatches performs fuzzy search on all items and updates matches
+// updateMatches uses advanced search filter expressions to match items
 func (w *NodeSearchWidget) updateMatches() {
 	w.matches = nil
 	w.selectedIdx = 0
+	w.parseError = ""
+	w.filterExpr = nil
 
 	if w.query == "" {
 		return
 	}
 
-	// Collect all item texts and map them to items
-	type itemWithText struct {
-		text string
-		item *model.Item
+	// Try to parse as advanced search query
+	expr, err := search.ParseQuery(w.query)
+	if err != nil {
+		// If parsing fails, treat as simple text search
+		w.parseError = err.Error()
+		w.filterExpr = nil
+		// Fall back to text-only matching
+		for _, item := range w.allItems {
+			textExpr := search.NewTextExpr(w.query)
+			if textExpr.Matches(item) {
+				w.matches = append(w.matches, item)
+				if len(w.matches) >= w.maxResults {
+					break
+				}
+			}
+		}
+		return
 	}
 
-	var candidates []itemWithText
+	// Apply the filter expression to all items
+	w.filterExpr = expr
 	for _, item := range w.allItems {
-		candidates = append(candidates, itemWithText{
-			text: item.Text,
-			item: item,
-		})
-	}
-
-	// Use fuzzy ranking to get sorted matches (case-insensitive)
-	query := w.query
-	var matchedItems []itemWithText
-
-	// Use RankFindFold for case-insensitive scoring and sorting
-	rankCandidates := make([]string, len(candidates))
-	for i, c := range candidates {
-		rankCandidates[i] = c.text
-	}
-
-	ranks := fuzzy.RankFindFold(query, rankCandidates)
-
-	// Build matches list from ranked results
-	for _, rank := range ranks {
-		for _, candidate := range candidates {
-			if candidate.text == rank.Target {
-				matchedItems = append(matchedItems, candidate)
+		if expr.Matches(item) {
+			w.matches = append(w.matches, item)
+			if len(w.matches) >= w.maxResults {
 				break
 			}
 		}
-	}
-
-	// Limit to maxResults
-	if len(matchedItems) > w.maxResults {
-		matchedItems = matchedItems[:w.maxResults]
-	}
-
-	// Extract just the items
-	for _, mi := range matchedItems {
-		w.matches = append(w.matches, mi.item)
 	}
 }
 
@@ -393,6 +381,17 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 		}
 
 		screen.DrawStringLimited(inputX, resultY, resultLine, inputWidth, resultStyle)
+	}
+
+	// Draw error message if parse error exists
+	if w.parseError != "" {
+		errorY := boxStartY + 3
+		errorMsg := "Parse error: " + w.parseError
+		if len(errorMsg) > inputWidth {
+			errorMsg = errorMsg[:inputWidth]
+		}
+		errorStyle := borderStyle.Foreground(tcell.ColorRed)
+		screen.DrawStringLimited(inputX, errorY, errorMsg, inputWidth, errorStyle)
 	}
 
 	// Draw footer with match count
