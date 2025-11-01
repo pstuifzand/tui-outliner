@@ -23,9 +23,9 @@ func (kb *KeyBinding) GetDescription() string {
 
 // PendingKeyBinding represents a pending key (like 'g' or 'z') that waits for a second key
 type PendingKeyBinding struct {
-	Prefix      rune                          // The first key (e.g., 'g' or 'z')
-	Description string                        // Description of what the pending key does
-	Sequences   map[rune]KeyBinding           // Map of second key to keybinding
+	Prefix      rune                // The first key (e.g., 'g' or 'z')
+	Description string              // Description of what the pending key does
+	Sequences   map[rune]KeyBinding // Map of second key to keybinding
 }
 
 // GetKey returns the prefix key

@@ -35,6 +35,7 @@ type App struct {
 	splash             *ui.SplashScreen
 	command            *ui.CommandMode
 	attributeEditor    *ui.AttributeEditor // Attribute editing modal
+	nodeSearchWidget   *ui.NodeSearchWidget
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -72,6 +73,7 @@ func NewApp(filePath string) (*App, error) {
 	splash := ui.NewSplashScreen()
 	command := ui.NewCommandMode()
 	attributeEditor := ui.NewAttributeEditor()
+	nodeSearchWidget := ui.NewNodeSearchWidget()
 
 	// Show splash screen if no file was provided
 	hasFile := filePath != ""
@@ -80,30 +82,72 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	app := &App{
-		screen:          screen,
-		outline:         outline,
-		store:           store,
-		tree:            tree,
-		editor:          nil,
-		search:          ui.NewSearch(outline.GetAllItems()),
-		help:            help,
-		splash:          splash,
-		command:         command,
-		attributeEditor: attributeEditor,
-		statusMsg:       "Ready",
-		statusTime:      time.Now(),
-		dirty:           false,
-		autoSaveTime:    time.Now(),
-		quit:            false,
-		mode:            NormalMode,
-		visualAnchor:    -1,
-		pendingKeySeq:   0,
-		hasFile:         hasFile,
+		screen:           screen,
+		outline:          outline,
+		store:            store,
+		tree:             tree,
+		editor:           nil,
+		search:           ui.NewSearch(outline.GetAllItems()),
+		help:             help,
+		splash:           splash,
+		command:          command,
+		attributeEditor:  attributeEditor,
+		nodeSearchWidget: nodeSearchWidget,
+		statusMsg:        "Ready",
+		statusTime:       time.Now(),
+		dirty:            false,
+		autoSaveTime:     time.Now(),
+		quit:             false,
+		mode:             NormalMode,
+		visualAnchor:     -1,
+		pendingKeySeq:    0,
+		hasFile:          hasFile,
 	}
 
 	// Set callback for attribute editor modifications
 	attributeEditor.SetOnModified(func() {
 		app.dirty = true
+	})
+
+	// Set callbacks for node search widget
+	nodeSearchWidget.SetOnSelect(func(item *model.Item) {
+		// Expand parents and navigate to item in current tree
+		app.tree.ExpandParents(item)
+		items := app.tree.GetDisplayItems()
+		for idx, dispItem := range items {
+			if dispItem.Item.ID == item.ID {
+				app.tree.SelectItem(idx)
+				app.SetStatus(fmt.Sprintf("Selected: %s", item.Text))
+				break
+			}
+		}
+	})
+
+	nodeSearchWidget.SetOnHoist(func(item *model.Item) {
+		// Navigate to item and hoist it
+		app.tree.ExpandParents(item)
+
+		// Find the item in the display and select it
+		items := app.tree.GetDisplayItems()
+		found := false
+		for idx, dispItem := range items {
+			if dispItem.Item.ID == item.ID {
+				app.tree.SelectItem(idx)
+				found = true
+				break
+			}
+		}
+
+		// Now hoist the selected item
+		if found {
+			if app.tree.Hoist() {
+				app.SetStatus(fmt.Sprintf("Hoisted: %s", item.Text))
+			} else {
+				app.SetStatus("Cannot hoist (no children)")
+			}
+		} else {
+			app.SetStatus("Item not found in tree")
+		}
 	})
 
 	// Initialize keybindings
@@ -316,6 +360,9 @@ func (a *App) render() {
 	// Draw attribute editor if visible
 	a.attributeEditor.Render(a.screen)
 
+	// Draw node search widget if visible
+	a.nodeSearchWidget.Render(a.screen)
+
 	a.screen.Show()
 }
 
@@ -354,6 +401,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 	if a.attributeEditor.IsVisible() {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			a.attributeEditor.HandleKeyEvent(keyEv)
+		}
+		return
+	}
+
+	// Handle node search widget input
+	if a.nodeSearchWidget.IsVisible() {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			a.nodeSearchWidget.HandleKeyEvent(keyEv)
 		}
 		return
 	}
@@ -556,7 +611,18 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 			pageSize = 1
 		}
 		a.tree.ScrollPageUp(pageSize)
-		a.SetStatus("Scrolled up")
+		a.pendingKeySeq = 0
+		return
+	case tcell.KeyCtrlD:
+		// Page down - scroll viewport
+		height := a.screen.GetHeight()
+		treeStartY := 0
+		treeEndY := height - 2
+		if a.search.IsActive() {
+			treeEndY -= 2
+		}
+		pageSize := max(treeEndY-treeStartY, 1)
+		a.tree.ScrollPageDown(pageSize)
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlS:
@@ -568,21 +634,15 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 		}
 		a.pendingKeySeq = 0
 		return
-	case tcell.KeyCtrlD:
-		// Page down - scroll viewport
-		height := a.screen.GetHeight()
-		treeStartY := 0
-		treeEndY := height - 2
-		if a.search.IsActive() {
-			treeEndY -= 2
-		}
-		pageSize := treeEndY - treeStartY
-		if pageSize < 1 {
-			pageSize = 1
-		}
-		a.tree.ScrollPageDown(pageSize)
-		a.SetStatus("Scrolled down")
+	case tcell.KeyCtrlK:
 		a.pendingKeySeq = 0
+		// Collect all searchable items
+		var allItems []*model.Item
+		for _, item := range a.tree.GetItems() {
+			allItems = append(allItems, ui.GetAllItemsRecursive(item)...)
+		}
+		a.nodeSearchWidget.SetItems(allItems)
+		a.nodeSearchWidget.Show()
 		return
 	case tcell.KeyEscape:
 		// Can be used for various purposes (just ignore for now)
