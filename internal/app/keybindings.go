@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
@@ -319,11 +320,28 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 		},
 		{
 			Key:         '-',
-			Description: "Select parent",
+			Description: "Select parent (or hoist to parent if at hoisted root)",
 			Handler: func(app *App) {
-				if !app.tree.SelectParent() {
-					app.SetStatus("Already at root")
+				// First try normal parent selection
+				if app.tree.SelectParent() {
+					return
 				}
+
+				// If that failed and we're at root of hoisted view, hoist to parent
+				if app.tree.IsAtRootOfHoistedView() {
+					if app.tree.HoistToParent() {
+						hoistedItem := app.tree.GetHoistedItem()
+						if hoistedItem != nil {
+							app.SetStatus(fmt.Sprintf("Hoisted to parent: %s", hoistedItem.Text))
+						} else {
+							app.SetStatus("Unhoisted")
+						}
+						return
+					}
+				}
+
+				// Otherwise report we're at root
+				app.SetStatus("Already at root")
 			},
 		},
 	}

@@ -990,7 +990,10 @@ func (tv *TreeView) SelectLast() {
 	}
 }
 
-// SelectParent moves selection to the parent of the current item
+// SelectParent moves selection to the parent of the current item.
+// Returns: true if parent was found and selected, false otherwise.
+// Special case: when hoisted and at root of hoisted view, returns false
+// (caller should handle hoisting to parent).
 func (tv *TreeView) SelectParent() bool {
 	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
 		return false
@@ -1009,6 +1012,87 @@ func (tv *TreeView) SelectParent() bool {
 		}
 	}
 	return false
+}
+
+// IsAtRootOfHoistedView returns true if we're hoisted and the current selection
+// is at the root level of the hoisted view (i.e., a direct child of the hoisted item)
+func (tv *TreeView) IsAtRootOfHoistedView() bool {
+	if !tv.IsHoisted() {
+		return false
+	}
+	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].Item
+	// Check if current item's parent is the hoisted item
+	return current.Parent != nil && current.Parent.ID == tv.hoistedItem.ID
+}
+
+// HoistToParent moves the hoist up to the parent of the currently hoisted node.
+// If the hoisted node has no parent, unhoist completely.
+// Returns true if successful, false if not hoisted.
+func (tv *TreeView) HoistToParent() bool {
+	if !tv.IsHoisted() {
+		return false
+	}
+
+	hoistedItem := tv.GetHoistedItem()
+	if hoistedItem == nil {
+		return false
+	}
+
+	// If hoisted item has a parent, hoist to that parent
+	if hoistedItem.Parent != nil {
+		// The originalItems should contain the root, which has the parent item
+		if tv.originalItems == nil {
+			return false
+		}
+
+		// Find the parent item in originalItems (recursively if needed)
+		var parentItem *model.Item
+		for _, item := range tv.originalItems {
+			if item.ID == hoistedItem.Parent.ID {
+				parentItem = item
+				break
+			}
+			// Also check recursively in case parent is nested deeper
+			if found := findItemRecursive(item, hoistedItem.Parent.ID); found != nil {
+				parentItem = found
+				break
+			}
+		}
+
+		if parentItem == nil {
+			return false
+		}
+
+		// Now set the parent as the new hoisted item
+		// Keep originalItems pointing to the root for proper unhoist
+		tv.hoistedItem = parentItem
+		tv.items = parentItem.Children
+		tv.selectedIdx = 0
+		tv.viewportOffset = 0
+		tv.rebuildView()
+
+		return true
+	}
+
+	// No parent, so unhoist completely
+	return tv.Unhoist()
+}
+
+// findItemRecursive is a helper to find an item by ID in a tree
+func findItemRecursive(item *model.Item, targetID string) *model.Item {
+	if item.ID == targetID {
+		return item
+	}
+	for _, child := range item.Children {
+		if found := findItemRecursive(child, targetID); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // ExpandParents expands all parent nodes of the given item so it becomes visible
