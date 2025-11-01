@@ -23,6 +23,7 @@ type Colors struct {
 	TreeVisualCursor     tcell.Color  // Foreground color for visual mode cursor
 	TreeVisualCursorBg   tcell.Color  // Background color for visual mode cursor
 	TreeAttributeIndicator tcell.Color // Color for attribute indicator symbol
+	TreeAttributeValue   tcell.Color  // Color for visible attribute values (gray/dim)
 
 	// Editor colors
 	EditorText        tcell.Color
@@ -88,6 +89,7 @@ func Default() *Theme {
 			TreeVisualCursor:    tcell.ColorBlack,
 			TreeVisualCursorBg:  tcell.ColorBlue,
 			TreeAttributeIndicator: tcell.NewRGBColor(0, 208, 128), // Bright teal/green (#00D080)
+			TreeAttributeValue:  tcell.ColorGray, // Dim gray for attribute values
 			// Editor colors
 			EditorText:        tcell.ColorWhite,
 			EditorCursor:      tcell.ColorBlack,

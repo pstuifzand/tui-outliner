@@ -11,6 +11,9 @@ import (
 // Config holds application configuration
 type Config struct {
 	Theme string `toml:"theme"`
+
+	// Session settings (not persisted)
+	sessionSettings map[string]string
 }
 
 // Load loads the config file from the standard location
@@ -46,6 +49,9 @@ func LoadFromFile(filePath string) (*Config, error) {
 		config.Theme = "tokyo-night"
 	}
 
+	// Initialize session settings
+	config.sessionSettings = make(map[string]string)
+
 	return &config, nil
 }
 
@@ -62,7 +68,8 @@ func getConfigPath() (string, error) {
 // defaultConfig returns the default configuration
 func defaultConfig() *Config {
 	return &Config{
-		Theme: "tokyo-night",
+		Theme:            "tokyo-night",
+		sessionSettings:  make(map[string]string),
 	}
 }
 
@@ -85,4 +92,33 @@ func EnsureConfigDir() error {
 	}
 
 	return os.MkdirAll(configDir, 0755)
+}
+
+// Set sets a session configuration value
+func (c *Config) Set(key, value string) {
+	if c.sessionSettings == nil {
+		c.sessionSettings = make(map[string]string)
+	}
+	c.sessionSettings[key] = value
+}
+
+// Get retrieves a session configuration value, returns empty string if not found
+func (c *Config) Get(key string) string {
+	if c.sessionSettings == nil {
+		return ""
+	}
+	return c.sessionSettings[key]
+}
+
+// GetAll returns all session configuration values
+func (c *Config) GetAll() map[string]string {
+	if c.sessionSettings == nil {
+		return make(map[string]string)
+	}
+	// Return a copy to prevent external modifications
+	result := make(map[string]string)
+	for k, v := range c.sessionSettings {
+		result[k] = v
+	}
+	return result
 }

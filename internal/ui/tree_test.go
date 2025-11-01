@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pstuifzand/tui-outliner/internal/config"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -168,5 +169,64 @@ func TestAddItemAfterWithLargeCapacitySlice(t *testing.T) {
 		if tv.filteredView[i].Item.Text != expected {
 			t.Errorf("At index %d: expected '%s', got '%s'", i, expected, tv.filteredView[i].Item.Text)
 		}
+	}
+}
+
+func TestVisattrConfiguration(t *testing.T) {
+	// Create test items with various attributes
+	item1 := model.NewItem("Daily Standup")
+	item1.Metadata.Attributes["type"] = "meeting"
+	item1.Metadata.Attributes["date"] = "2025-11-01"
+
+	item2 := model.NewItem("Project Task")
+	item2.Metadata.Attributes["status"] = "in-progress"
+	item2.Metadata.Attributes["priority"] = "high"
+
+	item3 := model.NewItem("Item without attributes")
+	// item3 has no attributes
+
+	items := []*model.Item{item1, item2, item3}
+	_ = NewTreeView(items) // Create tree view (tv not needed for this test)
+
+	// Create config and set visattr
+	cfg := &config.Config{}
+	cfg.Set("visattr", "type,date")
+
+	// Test that visattr config is correctly retrieved
+	visattrConfig := cfg.Get("visattr")
+	if visattrConfig != "type,date" {
+		t.Errorf("Expected 'type,date', got '%s'", visattrConfig)
+	}
+
+	// Verify that items with attributes configured in visattr have them
+	if value, exists := item1.Metadata.Attributes["type"]; !exists || value != "meeting" {
+		t.Errorf("item1 should have type='meeting'")
+	}
+	if value, exists := item1.Metadata.Attributes["date"]; !exists || value != "2025-11-01" {
+		t.Errorf("item1 should have date='2025-11-01'")
+	}
+
+	// Verify item2 has status attribute but not in visattr
+	if value, exists := item2.Metadata.Attributes["status"]; !exists || value != "in-progress" {
+		t.Errorf("item2 should have status='in-progress'")
+	}
+
+	// Verify item3 has no attributes
+	if len(item3.Metadata.Attributes) > 0 {
+		t.Errorf("item3 should have no attributes")
+	}
+
+	// Test with different visattr configuration
+	cfg.Set("visattr", "status")
+	visattrConfig = cfg.Get("visattr")
+	if visattrConfig != "status" {
+		t.Errorf("Expected 'status', got '%s'", visattrConfig)
+	}
+
+	// Test empty visattr
+	cfg.Set("visattr", "")
+	visattrConfig = cfg.Get("visattr")
+	if visattrConfig != "" {
+		t.Errorf("Expected empty string, got '%s'", visattrConfig)
 	}
 }

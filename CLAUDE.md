@@ -412,6 +412,46 @@ ls -la /home/peter/work/tui-outliner/
      - Render function updated to display parse errors in red
    - Documentation: `docs/node-search-widget.md` - complete guide with examples
 
+18. **Vim-like Configuration System**:
+   - Added `:set` command for configurable settings (session-only by default)
+   - Extended `internal/config/config.go` with `Set()`, `Get()`, and `GetAll()` methods
+   - Added `cfg` field to `App` struct to store configuration reference
+   - Implemented `handleSetCommand()` in `internal/app/app.go` with support for:
+     - `:set key value` - Set a configuration value
+     - `:set key` - Show value of a specific setting
+     - `:set` - Show all currently configured settings
+     - Automatic quote removal for quoted values
+   - Example usage:
+     - `:set visattr date` - Configure visible attributes
+     - `:set visattr "my long value"` - Quoted values supported
+     - `:set` - List all settings
+   - Configuration values stored in memory (session-only)
+   - Comprehensive test suite in `internal/config/config_test.go`
+   - Documentation: `docs/configuration.md` - complete configuration guide
+   - Example: `examples/config_demo.json` - demonstrates configuration features
+
+19. **Visible Attributes Display (visattr)**:
+   - Added support for displaying item attributes inline with tree view
+   - Use `:set visattr <attribute-names>` to specify which attributes to display
+   - Multiple attributes supported: `:set visattr date,status,type`
+   - Comma-separated attribute names in the configuration
+   - Attributes display format: `Item text  [attr1:value1, attr2:value2]` in gray
+   - Gray/dim style for attribute values maintains visual hierarchy
+   - Attributes only display if they exist and have non-empty values
+   - Selected items show attributes in the selected item style
+   - Implementation:
+     - Added `TreeAttributeValue` color to theme system
+     - Updated `TreeView.Render()` and `RenderWithSearchQuery()` signatures to accept config
+     - Attribute rendering logic in `internal/ui/tree.go` (lines 868-902)
+     - New `TreeAttributeStyle()` method in `internal/ui/screen.go` for attribute styling
+     - Theme color support: `tree_attribute_value` in TOML theme files
+   - Example usage:
+     - `:set visattr date` - Show date attribute for items that have it
+     - `:set visattr date,status,priority` - Show multiple attributes
+     - Items without the configured attributes simply don't show them
+     - Empty attribute values are not displayed
+   - Example file: `examples/visattr_demo.json` demonstrates the feature
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/pstuifzand/tui-outliner/internal/config"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -718,12 +719,12 @@ func (tv *TreeView) GetDisplayItems() []*displayItem {
 }
 
 // Render renders the tree to the screen
-func (tv *TreeView) Render(screen *Screen, startY, endY int, visualAnchor int) {
-	tv.RenderWithSearchQuery(screen, startY, endY, visualAnchor, "", nil)
+func (tv *TreeView) Render(screen *Screen, startY, endY int, visualAnchor int, cfg *config.Config) {
+	tv.RenderWithSearchQuery(screen, startY, endY, visualAnchor, "", nil, cfg)
 }
 
 // RenderWithSearchQuery renders the tree with optional search query highlighting
-func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visualAnchor int, searchQuery string, currentMatchItem *model.Item) {
+func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visualAnchor int, searchQuery string, currentMatchItem *model.Item, cfg *config.Config) {
 	defaultStyle := screen.TreeNormalStyle()
 	selectedStyle := screen.TreeSelectedStyle()
 	visualStyle := screen.TreeVisualSelectionStyle()
@@ -864,8 +865,43 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			screen.DrawString(textX, y, text, style)
 		}
 
-		// Pad to screen width with background color
+		// Draw visible attributes if configured
 		totalLen := textX + len(text)
+		if cfg != nil {
+			visattrConfig := cfg.Get("visattr")
+			if visattrConfig != "" {
+				// Parse comma-separated attribute names
+				attrNames := strings.Split(visattrConfig, ",")
+				var visibleAttrs []string
+
+				if dispItem.Item.Metadata != nil && len(dispItem.Item.Metadata.Attributes) > 0 {
+					for _, attrName := range attrNames {
+						attrName = strings.TrimSpace(attrName)
+						if value, exists := dispItem.Item.Metadata.Attributes[attrName]; exists && value != "" {
+							visibleAttrs = append(visibleAttrs, attrName+":"+value)
+						}
+					}
+				}
+
+				// Draw attributes in gray if any are found
+				if len(visibleAttrs) > 0 {
+					attrStr := "  [" + strings.Join(visibleAttrs, ", ") + "]"
+					attrStyle := screen.TreeAttributeStyle().Background(bgColor) // Gray/dim style with background color
+					if idx == tv.selectedIdx {
+						attrStyle = selectedStyle // Use selected style if item is selected
+					}
+
+					// Draw the attribute string if it fits on screen
+					attrX := totalLen
+					if attrX+len(attrStr) <= screenWidth {
+						screen.DrawString(attrX, y, attrStr, attrStyle)
+						totalLen = attrX + len(attrStr)
+					}
+				}
+			}
+		}
+
+		// Pad to screen width with background color
 		bgStyle := screen.BackgroundStyle()
 		for x := totalLen; x < screenWidth; x++ {
 			screen.SetCell(x, y, ' ', bgStyle)

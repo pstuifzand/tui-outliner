@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/pstuifzand/tui-outliner/internal/config"
 	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/history"
 	"github.com/pstuifzand/tui-outliner/internal/model"
@@ -39,6 +40,7 @@ type App struct {
 	attributeEditor    *ui.AttributeEditor // Attribute editing modal
 	nodeSearchWidget   *ui.NodeSearchWidget
 	historyManager     *history.Manager    // Manager for persisting command and search history
+	cfg                *config.Config      // Application configuration
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -63,6 +65,14 @@ func NewApp(filePath string) (*App, error) {
 
 	// Enable mouse support if available
 	screen.EnableMouse()
+
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Printf("Warning: Failed to load config: %v\n", err)
+		cfg = &config.Config{}
+		cfg.Set("", "") // Initialize sessionSettings
+	}
 
 	store := storage.NewJSONStore(filePath)
 	outline, err := store.Load()
@@ -127,6 +137,7 @@ func NewApp(filePath string) (*App, error) {
 		attributeEditor:    attributeEditor,
 		nodeSearchWidget:   nodeSearchWidget,
 		historyManager:     historyManager,
+		cfg:                cfg,
 		statusMsg:          "Ready",
 		statusTime:         time.Now(),
 		dirty:              false,
@@ -312,7 +323,7 @@ func (a *App) render() {
 		searchQuery = a.search.GetQuery()
 		currentMatchItem = a.search.GetCurrentMatch()
 	}
-	a.tree.RenderWithSearchQuery(a.screen, treeStartY, treeEndY, a.visualAnchor, searchQuery, currentMatchItem)
+	a.tree.RenderWithSearchQuery(a.screen, treeStartY, treeEndY, a.visualAnchor, searchQuery, currentMatchItem, a.cfg)
 
 	// Render editor inline if active
 	if a.editor != nil && a.editor.IsActive() {
@@ -928,6 +939,8 @@ func (a *App) handleCommand(cmd string) {
 		}
 	case "attr":
 		a.handleAttrCommand(parts)
+	case "set":
+		a.handleSetCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -1400,4 +1413,53 @@ func (a *App) handleGoCommand() {
 	} else {
 		a.SetStatus(fmt.Sprintf("Opening URL: %s", url))
 	}
+}
+
+// handleSetCommand processes :set configuration commands
+// Examples:
+//   :set visattr "date"
+//   :set visattr date
+//   :set (shows all settings)
+//   :set visattr (shows visattr value)
+func (a *App) handleSetCommand(parts []string) {
+	if len(parts) == 1 {
+		// Show all settings
+		allSettings := a.cfg.GetAll()
+		if len(allSettings) == 0 {
+			a.SetStatus("No configuration settings set")
+			return
+		}
+		var settingsList []string
+		for key, value := range allSettings {
+			settingsList = append(settingsList, fmt.Sprintf("%s=%s", key, value))
+		}
+		a.SetStatus("Settings: " + strings.Join(settingsList, ", "))
+		return
+	}
+
+	key := parts[1]
+
+	if len(parts) == 2 {
+		// Show specific setting
+		value := a.cfg.Get(key)
+		if value == "" {
+			a.SetStatus(fmt.Sprintf("Setting '%s' is not set", key))
+		} else {
+			a.SetStatus(fmt.Sprintf("%s=%s", key, value))
+		}
+		return
+	}
+
+	// Set the configuration value
+	// Combine all parts after the key to support values with spaces
+	value := strings.Join(parts[2:], " ")
+
+	// Remove surrounding quotes if present
+	if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') ||
+		(value[0] == '\'' && value[len(value)-1] == '\'')) {
+		value = value[1 : len(value)-1]
+	}
+
+	a.cfg.Set(key, value)
+	a.SetStatus(fmt.Sprintf("Set %s = %s", key, value))
 }

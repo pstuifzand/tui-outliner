@@ -200,6 +200,11 @@ func (s *Screen) TreeAttributeIndicatorStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeAttributeIndicator)
 }
 
+// TreeAttributeStyle returns the style for visible attribute values (gray/dim)
+func (s *Screen) TreeAttributeStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeAttributeValue)
+}
+
 // EditorStyle returns the style for editor text
 func (s *Screen) EditorStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.EditorText)
