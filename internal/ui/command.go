@@ -11,6 +11,7 @@ type CommandMode struct {
 	active    bool
 	input     string
 	cursorPos int
+	history   *History
 }
 
 // NewCommandMode creates a new CommandMode
@@ -19,6 +20,7 @@ func NewCommandMode() *CommandMode {
 		active:    false,
 		input:     "",
 		cursorPos: 0,
+		history:   NewHistory(50),
 	}
 }
 
@@ -27,6 +29,7 @@ func (c *CommandMode) Start() {
 	c.active = true
 	c.input = ""
 	c.cursorPos = 0
+	c.history.Reset()
 }
 
 // Stop exits command mode
@@ -75,8 +78,25 @@ func (c *CommandMode) HandleKey(ev *tcell.EventKey) (command string, done bool) 
 		return "", true
 	case tcell.KeyEnter:
 		cmd := strings.TrimSpace(c.input)
+		c.history.Add(cmd)
 		c.Stop()
 		return cmd, true
+	case tcell.KeyUp:
+		// Store current input before navigating history (on first Up press)
+		if !c.history.IsNavigating() {
+			c.history.SetTemporary(c.input)
+		}
+		// Navigate to previous command in history
+		if prevCmd, ok := c.history.Previous(); ok {
+			c.input = prevCmd
+			c.cursorPos = len(c.input)
+		}
+	case tcell.KeyDown:
+		// Navigate to next command in history
+		if nextCmd, ok := c.history.Next(); ok {
+			c.input = nextCmd
+			c.cursorPos = len(c.input)
+		}
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if c.cursorPos > 0 {
 			c.input = c.input[:c.cursorPos-1] + c.input[c.cursorPos:]

@@ -19,16 +19,18 @@ type Search struct {
 	allItems        []*model.Item
 	filterExpr      search.FilterExpr  // Parsed filter expression
 	parseError      string             // Error from parsing the query
+	history         *History           // Search history manager
 }
 
 // NewSearch creates a new Search
 func NewSearch(items []*model.Item) *Search {
 	return &Search{
-		query:     "",
-		results:   items,
+		query:    "",
+		results:  items,
 		cursorPos: 0,
-		active:    false,
-		allItems:  items,
+		active:   false,
+		allItems: items,
+		history:  NewHistory(50),
 	}
 }
 
@@ -39,16 +41,23 @@ func (s *Search) Start() {
 	s.cursorPos = 0
 	s.matchIndices = nil
 	s.currentMatchIdx = 0
+	s.history.Reset()
 }
 
 // Stop stops search mode
 func (s *Search) Stop() {
 	s.active = false
+	s.history.Reset()
 }
 
 // IsActive returns whether search mode is active
 func (s *Search) IsActive() bool {
 	return s.active
+}
+
+// GetHistory returns a copy of the search history
+func (s *Search) GetHistory() []string {
+	return s.history.GetAll()
 }
 
 // HandleKey handles key presses during search mode
@@ -64,12 +73,33 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		s.Stop()
 		return false
 	case tcell.KeyEnter:
-		// Enter key updates results and exits search mode
+		// Enter key updates results and adds to history, then exits search mode
 		s.updateResults()
+		s.history.Add(s.query)
 		s.Stop()
 		// If there are matches, navigate to first one
 		if len(s.matchIndices) > 0 {
 			return true // Signal to navigate to first match in normal mode
+		}
+		return false
+	case tcell.KeyUp:
+		// Store current query before navigating history (on first Up press)
+		if !s.history.IsNavigating() {
+			s.history.SetTemporary(s.query)
+		}
+		// Navigate to previous search in history
+		if prevQuery, ok := s.history.Previous(); ok {
+			s.query = prevQuery
+			s.cursorPos = len(s.query)
+			s.updateResults()
+		}
+		return false
+	case tcell.KeyDown:
+		// Navigate to next search in history
+		if nextQuery, ok := s.history.Next(); ok {
+			s.query = nextQuery
+			s.cursorPos = len(s.query)
+			s.updateResults()
 		}
 		return false
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
