@@ -281,6 +281,64 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			},
 		},
 		{
+			Key:         'n',
+			Description: "Next search match",
+			Handler: func(app *App) {
+				if !app.search.HasResults() {
+					app.SetStatus("No active search")
+					return
+				}
+				if !app.search.NextMatch() {
+					app.SetStatus("No search results")
+					return
+				}
+				// Navigate to the current match
+				currentMatch := app.search.GetCurrentMatch()
+				if currentMatch != nil {
+					app.tree.ExpandParents(currentMatch)
+					items := app.tree.GetDisplayItems()
+					for idx, dispItem := range items {
+						if dispItem.Item.ID == currentMatch.ID {
+							app.tree.SelectItem(idx)
+							break
+						}
+					}
+					matchNum := app.search.GetCurrentMatchNumber()
+					totalMatches := app.search.GetMatchCount()
+					app.SetStatus(fmt.Sprintf("Match %d of %d", matchNum, totalMatches))
+				}
+			},
+		},
+		{
+			Key:         'N',
+			Description: "Previous search match",
+			Handler: func(app *App) {
+				if !app.search.HasResults() {
+					app.SetStatus("No active search")
+					return
+				}
+				if !app.search.PrevMatch() {
+					app.SetStatus("No search results")
+					return
+				}
+				// Navigate to the current match
+				currentMatch := app.search.GetCurrentMatch()
+				if currentMatch != nil {
+					app.tree.ExpandParents(currentMatch)
+					items := app.tree.GetDisplayItems()
+					for idx, dispItem := range items {
+						if dispItem.Item.ID == currentMatch.ID {
+							app.tree.SelectItem(idx)
+							break
+						}
+					}
+					matchNum := app.search.GetCurrentMatchNumber()
+					totalMatches := app.search.GetMatchCount()
+					app.SetStatus(fmt.Sprintf("Match %d of %d", matchNum, totalMatches))
+				}
+			},
+		},
+		{
 			Key:         ':',
 			Description: "Command mode",
 			Handler: func(app *App) {

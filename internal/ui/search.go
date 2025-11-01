@@ -17,7 +17,6 @@ type Search struct {
 	cursorPos       int
 	active          bool
 	allItems        []*model.Item
-	queryLocked     bool               // Whether query is locked after pressing Enter
 	filterExpr      search.FilterExpr  // Parsed filter expression
 	parseError      string             // Error from parsing the query
 }
@@ -40,7 +39,6 @@ func (s *Search) Start() {
 	s.cursorPos = 0
 	s.matchIndices = nil
 	s.currentMatchIdx = 0
-	s.queryLocked = false
 }
 
 // Stop stops search mode
@@ -53,9 +51,9 @@ func (s *Search) IsActive() bool {
 	return s.active
 }
 
-// HandleKey handles key presses during search
-// Returns true if the key was handled and should navigate to a match
-// Returns false if the key was normal search input
+// HandleKey handles key presses during search mode
+// Returns true if the key was a navigation command that should stay in search
+// Returns false otherwise
 func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 	if !s.active {
 		return false
@@ -66,23 +64,22 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		s.Stop()
 		return false
 	case tcell.KeyEnter:
-		// Enter key updates results and starts navigation to matches (stays in search mode for n/N)
+		// Enter key updates results and exits search mode
 		s.updateResults()
-		s.queryLocked = true // Lock the query after pressing Enter
+		s.Stop()
+		// If there are matches, navigate to first one
 		if len(s.matchIndices) > 0 {
-			return true // Signal to navigate to first match
+			return true // Signal to navigate to first match in normal mode
 		}
 		return false
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
-		// Only allow backspace if query is not locked
-		if !s.queryLocked && s.cursorPos > 0 {
+		if s.cursorPos > 0 {
 			s.query = s.query[:s.cursorPos-1] + s.query[s.cursorPos:]
 			s.cursorPos--
 		}
 		return false
 	case tcell.KeyDelete:
-		// Only allow delete if query is not locked
-		if !s.queryLocked && s.cursorPos < len(s.query) {
+		if s.cursorPos < len(s.query) {
 			s.query = s.query[:s.cursorPos] + s.query[s.cursorPos+1:]
 		}
 		return false
@@ -111,21 +108,10 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 			s.results = s.allItems // Clear results back to all items
 			s.matchIndices = nil
 			s.currentMatchIdx = 0
-			s.queryLocked = false // Unlock query for new search
-			return false // Not a navigation command
+			return false
 		}
-		// Handle 'n' and 'N' for navigation only if we have matches and user is done entering query
-		// (i.e., only treat as navigation if there are matches, not while typing)
-		if (ch == 'n' || ch == 'N') && len(s.matchIndices) > 0 {
-			if ch == 'n' {
-				s.NextMatch()
-			} else {
-				s.PrevMatch()
-			}
-			return true // Indicate this was a navigation command
-		}
-		// Regular character input - only allow if query is not locked
-		if !s.queryLocked && ch > 0 && ch < 127 {
+		// Regular character input
+		if ch > 0 && ch < 127 {
 			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
 			s.cursorPos++
 		}
@@ -245,6 +231,11 @@ func (s *Search) GetCurrentMatchNumber() int {
 // GetParseError returns the last parse error, if any
 func (s *Search) GetParseError() string {
 	return s.parseError
+}
+
+// HasResults returns true if there are active search results
+func (s *Search) HasResults() bool {
+	return len(s.matchIndices) > 0
 }
 
 // Render renders the search bar on the screen
