@@ -733,10 +733,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 	screenWidth := screen.GetWidth()
 	screenHeight := screen.GetHeight()
 
-	// Get background color for adding to text styles
-	bgColor := screen.Theme.Colors.Background
-
 	// Add background to non-selected styles
+	bgColor := screen.Theme.Colors.Background
 	defaultStyle = defaultStyle.Background(bgColor)
 	newItemStyle = newItemStyle.Background(bgColor)
 
@@ -783,10 +781,16 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 			style = newItemStyle
 		}
 
+		// Prepare arrow style with background color
+		leafArrowStyle := screen.TreeLeafArrowStyle().Background(bgColor)
+		expandableArrowStyle := screen.TreeExpandableArrowStyle().Background(bgColor)
+
 		// Check if in visual selection range
 		inVisualRange := visualStart >= 0 && idx >= visualStart && idx <= visualEnd
 
 		if inVisualRange {
+			leafArrowStyle = visualCursorStyle
+			expandableArrowStyle = visualCursorStyle
 			if idx == tv.selectedIdx {
 				style = visualCursorStyle
 			} else {
@@ -795,10 +799,6 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 		} else if idx == tv.selectedIdx {
 			style = selectedStyle
 		}
-
-		// Prepare arrow style with background color
-		leafArrowStyle := screen.TreeLeafArrowStyle().Background(bgColor)
-		expandableArrowStyle := screen.TreeExpandableArrowStyle().Background(bgColor)
 
 		// Add indentation for parent levels (3 spaces per level)
 		prefix := strings.Repeat("   ", dispItem.Depth)
@@ -815,7 +815,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 			// For nodes with children, use brighter expandable arrow style
 			arrowStyle = expandableArrowStyle
 		}
-		if idx == tv.selectedIdx {
+		if !inVisualRange && idx == tv.selectedIdx {
 			arrowStyle = selectedStyle // Use selected style if item is selected
 		}
 
@@ -876,10 +876,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY int, visualAnch
 	// Clear remaining lines with background color
 	bgStyle := screen.BackgroundStyle()
 	for y := screenY; y < screen.GetHeight()-1; y++ {
-		clearLine := ""
-		for i := 0; i < screenWidth; i++ {
-			clearLine += " "
-		}
+		clearLine := strings.Repeat(" ", screenWidth)
 		screen.DrawString(0, y, clearLine, bgStyle)
 	}
 }
