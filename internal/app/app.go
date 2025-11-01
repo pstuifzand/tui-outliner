@@ -40,8 +40,8 @@ type App struct {
 	command            *ui.CommandMode
 	attributeEditor    *ui.AttributeEditor // Attribute editing modal
 	nodeSearchWidget   *ui.NodeSearchWidget
-	historyManager     *history.Manager    // Manager for persisting command and search history
-	cfg                *config.Config      // Application configuration
+	historyManager     *history.Manager // Manager for persisting command and search history
+	cfg                *config.Config   // Application configuration
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -136,28 +136,28 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	app := &App{
-		screen:             screen,
-		outline:            outline,
-		store:              store,
-		tree:               tree,
-		editor:             nil,
-		search:             search,
-		help:               help,
-		splash:             splash,
-		command:            command,
-		attributeEditor:    attributeEditor,
-		nodeSearchWidget:   nodeSearchWidget,
-		historyManager:     historyManager,
-		cfg:                cfg,
-		statusMsg:          "Ready",
-		statusTime:         time.Now(),
-		dirty:              false,
-		autoSaveTime:       time.Now(),
-		quit:               false,
-		mode:               NormalMode,
-		visualAnchor:       -1,
-		pendingKeySeq:      0,
-		hasFile:            hasFile,
+		screen:           screen,
+		outline:          outline,
+		store:            store,
+		tree:             tree,
+		editor:           nil,
+		search:           search,
+		help:             help,
+		splash:           splash,
+		command:          command,
+		attributeEditor:  attributeEditor,
+		nodeSearchWidget: nodeSearchWidget,
+		historyManager:   historyManager,
+		cfg:              cfg,
+		statusMsg:        "Ready",
+		statusTime:       time.Now(),
+		dirty:            false,
+		autoSaveTime:     time.Now(),
+		quit:             false,
+		mode:             NormalMode,
+		visualAnchor:     -1,
+		pendingKeySeq:    0,
+		hasFile:          hasFile,
 	}
 
 	// Set callback for attribute editor modifications
@@ -595,7 +595,8 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					a.mode = InsertMode
 				} else if enterPressed {
 					// If Enter was pressed, create new node below and enter insert mode
-					a.tree.AddItemAfter("")
+					item := model.NewItem("")
+					a.tree.AddItemAfter(item)
 					a.SetStatus("Created new item below")
 					a.dirty = true
 					// Enter insert mode for the new item
@@ -930,7 +931,8 @@ func (a *App) handleCommand(cmd string) {
 
 		// If not found, create new item with today's date
 		if foundItem == nil {
-			a.tree.AddItemAfter(today)
+			item := model.NewItem(today)
+			a.tree.AddItemAfter(item)
 			// Find the newly created item
 			for _, dispItem := range a.tree.GetDisplayItems() {
 				if dispItem.Item.Text == today {
@@ -1449,10 +1451,11 @@ func (a *App) handleGoCommand() {
 
 // handleSetCommand processes :set configuration commands
 // Examples:
-//   :set visattr "date"
-//   :set visattr date
-//   :set (shows all settings)
-//   :set visattr (shows visattr value)
+//
+//	:set visattr "date"
+//	:set visattr date
+//	:set (shows all settings)
+//	:set visattr (shows visattr value)
 func (a *App) handleSetCommand(parts []string) {
 	if len(parts) == 1 {
 		// Show all settings
@@ -1511,22 +1514,10 @@ func (a *App) handleSearchCommand(parts []string) {
 	searchNode := model.NewItem("[Search] " + query)
 	searchNode.Metadata.Attributes["type"] = "search"
 	searchNode.Metadata.Attributes["query"] = query
+	searchNode.IsNew = false
 
-	// Add to the outline (as root item or as child of current item)
-	selected := a.tree.GetSelected()
-	if selected != nil {
-		// Add as child of selected item
-		selected.AddChild(searchNode)
-		selected.Expanded = true
-	} else {
-		// Add as root item
-		a.outline.Items = append(a.outline.Items, searchNode)
-	}
-
-	// Rebuild the tree to show the new search node
-	a.outline.BuildIndex()
-	a.tree.RebuildView()
-
+	a.tree.AddItemAfter(searchNode)
+	a.refreshSearchNodes()
 	a.SetStatus(fmt.Sprintf("Created search node for: %s (use l to expand)", query))
 	a.dirty = true
 }

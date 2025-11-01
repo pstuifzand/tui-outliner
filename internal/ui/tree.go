@@ -170,10 +170,10 @@ type TreeView struct {
 }
 
 type displayItem struct {
-	Item          *model.Item
-	Depth         int
-	IsVirtual     bool        // True if this is a virtual child reference
-	OriginalItem  *model.Item // Points to the original if IsVirtual (for virtual references)
+	Item         *model.Item
+	Depth        int
+	IsVirtual    bool        // True if this is a virtual child reference
+	OriginalItem *model.Item // Points to the original if IsVirtual (for virtual references)
 }
 
 // NewTreeView creates a new TreeView
@@ -602,8 +602,7 @@ func (tv *TreeView) MoveItemUp() bool {
 }
 
 // AddItemAfter adds a new item after the selected item
-func (tv *TreeView) AddItemAfter(text string) {
-	newItem := model.NewItem(text)
+func (tv *TreeView) AddItemAfter(newItem *model.Item) {
 	if len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
 		tv.items = append(tv.items, newItem)
 	} else {
@@ -997,13 +996,13 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			arrowStyle = selectedStyle // Use selected style if item is selected
 		}
 
-	// For virtual children, always use the arrow indicator instead of expand/collapse
-	arrow := "▶"
-	if dispItem.IsVirtual {
-		arrow = "→"
-	} else if hasChildren && dispItem.Item.Expanded {
-		arrow = "▼"
-	}
+		// For virtual children, always use the arrow indicator instead of expand/collapse
+		arrow := "▶"
+		if dispItem.IsVirtual {
+			arrow = "→"
+		} else if hasChildren && dispItem.Item.Expanded {
+			arrow = "▼"
+		}
 
 		prefixX := dispItem.Depth * 3
 		screen.DrawString(prefixX, y, arrow, arrowStyle)

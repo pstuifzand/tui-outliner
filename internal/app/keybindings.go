@@ -237,7 +237,8 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'o',
 			Description: "Insert new item after",
 			Handler: func(app *App) {
-				app.tree.AddItemAfter("")
+				item := model.NewItem("")
+				app.tree.AddItemAfter(item)
 				app.SetStatus("Created new item after")
 				app.dirty = true
 				// Enter insert mode for the new item

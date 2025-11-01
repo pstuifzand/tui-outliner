@@ -26,7 +26,8 @@ func TestAddItemAfter(t *testing.T) {
 	tv.SelectItem(4)
 
 	// Add item after Fifth
-	tv.AddItemAfter("After fifth")
+	item := model.NewItem("After fifth")
+	tv.AddItemAfter(item)
 
 	// Check the state
 	t.Logf("Total items: %d", len(tv.filteredView))
@@ -100,7 +101,8 @@ func TestAddItemAfterSimulatingRealScenario(t *testing.T) {
 	t.Logf("Selected before: %s (idx: %d)", selectedBefore.Text, tv.GetSelectedIndex())
 
 	// Simulate what happens in the 'o' keybinding
-	tv.AddItemAfter("")  // Create new empty item
+	item := model.NewItem("")
+	tv.AddItemAfter(item) // Create new empty item
 
 	t.Logf("After AddItemAfter:")
 	for i, item := range tv.filteredView {
@@ -152,7 +154,8 @@ func TestAddItemAfterWithLargeCapacitySlice(t *testing.T) {
 	tv.SelectItem(4)
 
 	// Add a new item after it
-	tv.AddItemAfter("New Item")
+	item := model.NewItem("New Item")
+	tv.AddItemAfter(item)
 
 	// Verify all items are present
 	if len(tv.filteredView) != 7 {

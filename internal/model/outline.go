@@ -1,19 +1,23 @@
 // Package model contains the model for the outline
 package model
 
-import "time"
+import (
+	"crypto/rand"
+	"slices"
+	"time"
+)
 
 // Item represents a single node in the outline tree
 type Item struct {
-	ID              string    `json:"id"`
-	Text            string    `json:"text"`
-	Children        []*Item   `json:"children,omitempty"`
-	VirtualChildRefs []string `json:"virtual_children,omitempty"` // IDs of items to show as children (not duplicated)
-	Metadata        *Metadata `json:"metadata,omitempty"`
-	Parent          *Item     `json:"-"` // Not persisted
-	Expanded        bool      `json:"-"` // UI state, not persisted
-	IsNew           bool      `json:"-"` // UI state: true for newly created placeholder items
-	virtualChildren []*Item   `json:"-"` // Resolved virtual child pointers (runtime only)
+	ID               string    `json:"id"`
+	Text             string    `json:"text"`
+	Children         []*Item   `json:"children,omitempty"`
+	VirtualChildRefs []string  `json:"virtual_children,omitempty"` // IDs of items to show as children (not duplicated)
+	Metadata         *Metadata `json:"metadata,omitempty"`
+	Parent           *Item     `json:"-"` // Not persisted
+	Expanded         bool      `json:"-"` // UI state, not persisted
+	IsNew            bool      `json:"-"` // UI state: true for newly created placeholder items
+	virtualChildren  []*Item   `json:"-"` // Resolved virtual child pointers (runtime only)
 }
 
 // Metadata holds rich information about an item
@@ -27,32 +31,29 @@ type Metadata struct {
 
 // Outline represents the entire outline document
 type Outline struct {
-	Items     []*Item            `json:"items"`
-	itemIndex map[string]*Item   `json:"-"` // Fast O(1) ID lookup cache
+	Items     []*Item          `json:"items"`
+	itemIndex map[string]*Item `json:"-"` // Fast O(1) ID lookup cache
 }
 
 // NewItem creates a new outline item with a generated ID
 func NewItem(text string) *Item {
 	return &Item{
-		ID:               generateID(),
-		Text:             text,
-		Children:         make([]*Item, 0),
-		VirtualChildRefs: make([]string, 0),
+		ID:   generateID(),
+		Text: text,
 		Metadata: &Metadata{
 			Attributes: make(map[string]string),
 			Created:    time.Now(),
 			Modified:   time.Now(),
 		},
-		Expanded:        true,
-		IsNew:           true,
-		virtualChildren: make([]*Item, 0),
+		Expanded: true,
+		IsNew:    true,
 	}
 }
 
 // NewOutline creates a new outline with the given title
 func NewOutline() *Outline {
 	return &Outline{
-		Items:     make([]*Item, 0),
+		Items:     nil,
 		itemIndex: make(map[string]*Item),
 	}
 }
@@ -61,13 +62,6 @@ func NewOutline() *Outline {
 func (i *Item) AddChild(child *Item) {
 	child.Parent = i
 	i.Children = append(i.Children, child)
-	// Initialize virtual children if needed
-	if child.virtualChildren == nil {
-		child.virtualChildren = make([]*Item, 0)
-	}
-	if child.VirtualChildRefs == nil {
-		child.VirtualChildRefs = make([]string, 0)
-	}
 }
 
 // RemoveChild removes a child item from this item
@@ -110,6 +104,7 @@ func (o *Outline) FindItemByID(id string) *Item {
 	// Fallback to linear search (O(n))
 	for _, item := range o.GetAllItems() {
 		if item.ID == id {
+			o.itemIndex[id] = item
 			return item
 		}
 	}
@@ -136,7 +131,7 @@ func (o *Outline) ResolveVirtualChildren() {
 func (o *Outline) resolveVirtualChildrenRecursive(item *Item, visitedPath map[string]bool) {
 	if visitedPath[item.ID] {
 		// Circular reference detected, skip
-		item.virtualChildren = make([]*Item, 0)
+		item.virtualChildren = nil
 		return
 	}
 
@@ -169,10 +164,8 @@ func (i *Item) GetVirtualChildren() []*Item {
 
 // AddVirtualChild adds a virtual child reference by ID
 func (i *Item) AddVirtualChild(itemID string) {
-	for _, ref := range i.VirtualChildRefs {
-		if ref == itemID {
-			return // Already exists
-		}
+	if slices.Contains(i.VirtualChildRefs, itemID) {
+		return // Already exists
 	}
 	i.VirtualChildRefs = append(i.VirtualChildRefs, itemID)
 }
@@ -189,8 +182,8 @@ func (i *Item) RemoveVirtualChild(itemID string) {
 
 // ClearVirtualChildren clears all virtual child references
 func (i *Item) ClearVirtualChildren() {
-	i.VirtualChildRefs = make([]string, 0)
-	i.virtualChildren = make([]*Item, 0)
+	i.VirtualChildRefs = nil
+	i.virtualChildren = nil
 }
 
 // IsSearchNode returns true if this item is a search node (has type="search" attribute)
@@ -227,14 +220,5 @@ func (o *Outline) PopulateSearchNode(item *Item, matchingIDs []string) int {
 }
 
 func generateID() string {
-	return "item_" + time.Now().Format("20060102150405") + "_" + randomString(8)
-}
-
-func randomString(length int) string {
-	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
-	result := make([]byte, length)
-	for i := range length {
-		result[i] = chars[int(time.Now().UnixNano()+int64(i))%len(chars)]
-	}
-	return string(result)
+	return "item_" + time.Now().Format("20060102150405") + "_" + rand.Text()
 }

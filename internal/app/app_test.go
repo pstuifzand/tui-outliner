@@ -114,7 +114,8 @@ func TestSaveSyncesTreeItemsWithOutline(t *testing.T) {
 
 	// Add a new item to the tree (this modifies tree.items but not outline.Items)
 	tree.SelectItem(1)
-	tree.AddItemAfter("New Item")
+	item := model.NewItem("New Item")
+	tree.AddItemAfter(item)
 
 	// Create an app instance
 	app := &App{
