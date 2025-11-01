@@ -67,11 +67,6 @@ func NewApp(filePath string) (*App, error) {
 		return nil, fmt.Errorf("failed to load outline: %w", err)
 	}
 
-	// If title is empty, set it based on filename
-	if outline.Title == "" {
-		outline.Title = "Untitled"
-	}
-
 	tree := ui.NewTreeView(outline.Items)
 	help := ui.NewHelpScreen()
 	splash := ui.NewSplashScreen()
@@ -210,13 +205,13 @@ func (a *App) render() {
 
 	// Draw header (title)
 	headerStyle := a.screen.HeaderStyle()
-	header := fmt.Sprintf(" %s ", a.outline.Title)
+	var header string
 
 	// Add hoisting indicator with breadcrumbs if hoisted
 	if a.tree.IsHoisted() {
 		breadcrumbs := a.tree.GetHoistBreadcrumbs()
 		if breadcrumbs != "" {
-			header = fmt.Sprintf(" %s [%s] ", a.outline.Title, breadcrumbs)
+			header = fmt.Sprintf("[%s] ", breadcrumbs)
 		}
 	}
 
@@ -224,6 +219,9 @@ func (a *App) render() {
 
 	// Draw tree
 	treeStartY := 1
+	if header == "" {
+		treeStartY = 0
+	}
 	treeEndY := height - 2
 	if a.search.IsActive() {
 		treeEndY -= 2
@@ -781,17 +779,6 @@ func (a *App) handleCommand(cmd string) {
 			}
 		default:
 			a.SetStatus("Unknown export format: " + format + " (use 'markdown' or 'text')")
-		}
-	case "title":
-		if len(parts) < 2 {
-			// Show current title
-			a.SetStatus("Title: " + a.outline.Title)
-		} else {
-			// Set new title (everything after "title")
-			newTitle := strings.Join(parts[1:], " ")
-			a.outline.Title = newTitle
-			a.dirty = true
-			a.SetStatus("Title set to: " + newTitle)
 		}
 	case "dailynote":
 		// Create or navigate to today's daily note

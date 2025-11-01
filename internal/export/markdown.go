@@ -13,12 +13,8 @@ import (
 func ExportToMarkdown(outline *model.Outline, filePath string) error {
 	var sb strings.Builder
 
-	// Write outline title as a markdown header if present
-	if outline.Title != "" {
-		sb.WriteString("# ")
-		sb.WriteString(outline.Title)
-		sb.WriteString("\n\n")
-	}
+	// TODO: When writing Hugo markdown, write the attributes from the root node
+	// as frontmatter yaml
 
 	// Write all items as markdown bullets
 	for _, item := range outline.Items {
@@ -27,7 +23,7 @@ func ExportToMarkdown(outline *model.Outline, filePath string) error {
 
 	// Write to file
 	content := sb.String()
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("failed to write markdown file: %w", err)
 	}
 

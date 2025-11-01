@@ -11,7 +11,6 @@ import (
 func TestExportToMarkdown(t *testing.T) {
 	// Create a test outline
 	outline := &model.Outline{
-		Title: "Test Outline",
 		Items: []*model.Item{
 			{
 				ID:   "1",
@@ -59,9 +58,7 @@ func TestExportToMarkdown(t *testing.T) {
 		t.Fatalf("Failed to read output file: %v", err)
 	}
 
-	expectedContent := `# Test Outline
-
-- First Item
+	expectedContent := `- First Item
   - Nested Item 1
   - Nested Item 2
     - Deep Item
@@ -76,7 +73,6 @@ func TestExportToMarkdown(t *testing.T) {
 func TestExportToMarkdownWithEmptyItems(t *testing.T) {
 	// Create a test outline with empty items
 	outline := &model.Outline{
-		Title: "Test Empty Items",
 		Items: []*model.Item{
 			{
 				ID:   "1",
@@ -110,9 +106,7 @@ func TestExportToMarkdownWithEmptyItems(t *testing.T) {
 		t.Fatalf("Failed to read output file: %v", err)
 	}
 
-	expectedContent := `# Test Empty Items
-
-- Item with content
+	expectedContent := `- Item with content
   - Another item
 `
 

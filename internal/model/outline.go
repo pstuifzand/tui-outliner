@@ -1,16 +1,17 @@
+// Package model contains the model for the outline
 package model
 
 import "time"
 
 // Item represents a single node in the outline tree
 type Item struct {
-	ID        string      `json:"id"`
-	Text      string      `json:"text"`
-	Children  []*Item     `json:"children,omitempty"`
-	Metadata  *Metadata   `json:"metadata,omitempty"`
-	Parent    *Item       `json:"-"` // Not serialized
-	Expanded  bool        `json:"-"` // UI state, not persisted
-	IsNew     bool        `json:"-"` // UI state: true for newly created placeholder items
+	ID       string    `json:"id"`
+	Text     string    `json:"text"`
+	Children []*Item   `json:"children,omitempty"`
+	Metadata *Metadata `json:"metadata,omitempty"`
+	Parent   *Item     `json:"-"` // Not serialized
+	Expanded bool      `json:"-"` // UI state, not persisted
+	IsNew    bool      `json:"-"` // UI state: true for newly created placeholder items
 }
 
 // Metadata holds rich information about an item
@@ -24,7 +25,6 @@ type Metadata struct {
 
 // Outline represents the entire outline document
 type Outline struct {
-	Title string  `json:"title"`
 	Items []*Item `json:"items"`
 }
 
@@ -47,7 +47,6 @@ func NewItem(text string) *Item {
 // NewOutline creates a new outline with the given title
 func NewOutline(title string) *Outline {
 	return &Outline{
-		Title: title,
 		Items: make([]*Item, 0),
 	}
 }
