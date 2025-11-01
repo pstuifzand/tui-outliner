@@ -46,6 +46,12 @@ func (s *JSONStore) Load() (*model.Outline, error) {
 	// Restore parent pointers after deserialization
 	restoreParentPointers(outline.Items)
 
+	// Build ID index for fast lookups
+	outline.BuildIndex()
+
+	// Resolve virtual child references
+	outline.ResolveVirtualChildren()
+
 	return &outline, nil
 }
 

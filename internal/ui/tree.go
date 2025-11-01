@@ -170,8 +170,10 @@ type TreeView struct {
 }
 
 type displayItem struct {
-	Item  *model.Item
-	Depth int
+	Item          *model.Item
+	Depth         int
+	IsVirtual     bool        // True if this is a virtual child reference
+	OriginalItem  *model.Item // Points to the original if IsVirtual (for virtual references)
 }
 
 // NewTreeView creates a new TreeView
@@ -180,12 +182,12 @@ func NewTreeView(items []*model.Item) *TreeView {
 		items:       items,
 		selectedIdx: 0,
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 	return tv
 }
 
-// rebuildView rebuilds the filtered/display view
-func (tv *TreeView) rebuildView() {
+// RebuildView rebuilds the filtered/display view
+func (tv *TreeView) RebuildView() {
 	tv.filteredView = tv.buildDisplayItems(tv.items, 0)
 	if tv.selectedIdx >= len(tv.filteredView) && len(tv.filteredView) > 0 {
 		tv.selectedIdx = len(tv.filteredView) - 1
@@ -193,13 +195,46 @@ func (tv *TreeView) rebuildView() {
 }
 
 func (tv *TreeView) buildDisplayItems(items []*model.Item, depth int) []*displayItem {
+	return tv.buildDisplayItemsInternal(items, depth, false)
+}
+
+func (tv *TreeView) buildDisplayItemsInternal(items []*model.Item, depth int, parentIsVirtual bool) []*displayItem {
 	var result []*displayItem
 	for _, item := range items {
-		// Only show if expanded or at top level
-		if depth == 0 || (item.Parent != nil && item.Parent.Expanded) {
-			result = append(result, &displayItem{Item: item, Depth: depth})
-			if item.Expanded && len(item.Children) > 0 {
-				result = append(result, tv.buildDisplayItems(item.Children, depth+1)...)
+		// Check if item should be displayed
+		shouldDisplay := false
+		if depth == 0 {
+			shouldDisplay = true
+		} else if parentIsVirtual {
+			// Virtual children are always displayed (parent is already expanded)
+			shouldDisplay = true
+		} else if item.Parent != nil && item.Parent.Expanded {
+			// Real children are displayed if parent is expanded
+			shouldDisplay = true
+		}
+
+		if shouldDisplay {
+			// If parent was virtual, this item is also shown as virtual
+			result = append(result, &displayItem{
+				Item:         item,
+				Depth:        depth,
+				IsVirtual:    parentIsVirtual,
+				OriginalItem: item,
+			})
+			if item.Expanded {
+				// Add real children
+				if len(item.Children) > 0 {
+					result = append(result, tv.buildDisplayItemsInternal(item.Children, depth+1, parentIsVirtual)...)
+				}
+				// Add virtual children (only if this item is not already virtual)
+				if !parentIsVirtual {
+					virtualChildren := item.GetVirtualChildren()
+					if len(virtualChildren) > 0 {
+						for _, virtualChild := range virtualChildren {
+							result = append(result, tv.buildDisplayItemsInternal([]*model.Item{virtualChild}, depth+1, true)...)
+						}
+					}
+				}
 			}
 		}
 	}
@@ -268,12 +303,13 @@ func (tv *TreeView) ensureVisible() {
 func (tv *TreeView) Expand() {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
 		item := tv.filteredView[tv.selectedIdx].Item
-		if !item.Expanded && len(item.Children) > 0 {
+		hasChildren := len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0
+		if !item.Expanded && hasChildren {
 			item.Expanded = true
-			tv.rebuildView()
+			tv.RebuildView()
 		}
 		// Always move to the first child if the item has children
-		if len(item.Children) > 0 && tv.selectedIdx < len(tv.filteredView)-1 {
+		if hasChildren && tv.selectedIdx < len(tv.filteredView)-1 {
 			tv.selectedIdx++
 		}
 	}
@@ -286,9 +322,10 @@ func (tv *TreeView) Collapse() {
 		item := tv.filteredView[tv.selectedIdx].Item
 
 		// If item has children and is expanded, collapse it
-		if item.Expanded && len(item.Children) > 0 {
+		hasChildren := len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0
+		if item.Expanded && hasChildren {
 			item.Expanded = false
-			tv.rebuildView()
+			tv.RebuildView()
 			return
 		}
 
@@ -307,7 +344,7 @@ func (tv *TreeView) Collapse() {
 			}
 
 			parent.Expanded = false
-			tv.rebuildView()
+			tv.RebuildView()
 
 			// If we found the parent, select it
 			if parentIdx >= 0 {
@@ -330,7 +367,7 @@ func (tv *TreeView) CollapseRecursive() {
 	for _, item := range tv.items {
 		tv.collapseItemRecursive(item)
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 }
 
 // collapseItemRecursive is a helper that recursively collapses an item and all descendants
@@ -350,7 +387,7 @@ func (tv *TreeView) ExpandRecursive() {
 	for _, item := range tv.items {
 		tv.expandItemRecursive(item)
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 }
 
 // expandItemRecursive is a helper that recursively expands an item and all descendants
@@ -373,7 +410,7 @@ func (tv *TreeView) CollapseAllChildren() {
 		for _, child := range item.Children {
 			child.Expanded = false
 		}
-		tv.rebuildView()
+		tv.RebuildView()
 	}
 }
 
@@ -399,7 +436,7 @@ func (tv *TreeView) CollapseSiblings() {
 			}
 		}
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 }
 
 // Indent indents the selected item (increases nesting level)
@@ -432,7 +469,7 @@ func (tv *TreeView) Indent() bool {
 	// Expand previous item to show the moved item
 	prevItem.Expanded = true
 
-	tv.rebuildView()
+	tv.RebuildView()
 	return true
 }
 
@@ -462,7 +499,7 @@ func (tv *TreeView) Outdent() bool {
 		tv.items = append(tv.items, current)
 	}
 
-	tv.rebuildView()
+	tv.RebuildView()
 	return true
 }
 
@@ -510,7 +547,7 @@ func (tv *TreeView) MoveItemDown() bool {
 	// Swap items in the slice
 	children[currentIdx], children[nextIdx] = children[nextIdx], children[currentIdx]
 
-	tv.rebuildView()
+	tv.RebuildView()
 	tv.selectedIdx++ // Move selection to follow the item
 	return true
 }
@@ -559,7 +596,7 @@ func (tv *TreeView) MoveItemUp() bool {
 	// Swap items in the slice
 	children[currentIdx], children[prevIdx] = children[prevIdx], children[currentIdx]
 
-	tv.rebuildView()
+	tv.RebuildView()
 	tv.selectedIdx-- // Move selection to follow the item
 	return true
 }
@@ -604,7 +641,7 @@ func (tv *TreeView) AddItemAfter(text string) {
 			}
 		}
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 	// Find and select the new item in the filtered view
 	for idx, dispItem := range tv.filteredView {
 		if dispItem.Item.ID == newItem.ID {
@@ -624,7 +661,7 @@ func (tv *TreeView) AddItemAsChild(text string) {
 	} else {
 		tv.items = append(tv.items, newItem)
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 }
 
 // AddItemBefore adds a new item before the selected item
@@ -667,7 +704,7 @@ func (tv *TreeView) AddItemBefore(text string) {
 			}
 		}
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 	// Find and select the new item in the filtered view
 	for idx, dispItem := range tv.filteredView {
 		if dispItem.Item.ID == newItem.ID {
@@ -696,7 +733,7 @@ func (tv *TreeView) DeleteSelected() bool {
 		}
 	}
 
-	tv.rebuildView()
+	tv.RebuildView()
 	return true
 }
 
@@ -723,7 +760,7 @@ func (tv *TreeView) DeleteItem(item *model.Item) bool {
 		}
 	}
 
-	tv.rebuildView()
+	tv.RebuildView()
 	// Move selection back if needed
 	if tv.selectedIdx >= len(tv.filteredView) && len(tv.filteredView) > 0 {
 		tv.selectedIdx = len(tv.filteredView) - 1
@@ -755,7 +792,7 @@ func (tv *TreeView) PasteAfter(item *model.Item) bool {
 				if tv.hoistedItem != nil && parent == tv.hoistedItem {
 					tv.items = newChildren
 				}
-				tv.rebuildView()
+				tv.RebuildView()
 				return true
 			}
 		}
@@ -769,7 +806,7 @@ func (tv *TreeView) PasteAfter(item *model.Item) bool {
 				newItems = append(newItems, item)
 				newItems = append(newItems, tv.items[idx+1:]...)
 				tv.items = newItems
-				tv.rebuildView()
+				tv.RebuildView()
 				return true
 			}
 		}
@@ -801,7 +838,7 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 				if tv.hoistedItem != nil && parent == tv.hoistedItem {
 					tv.items = newChildren
 				}
-				tv.rebuildView()
+				tv.RebuildView()
 				return true
 			}
 		}
@@ -815,7 +852,7 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 				newItems = append(newItems, item)
 				newItems = append(newItems, tv.items[idx:]...)
 				tv.items = newItems
-				tv.rebuildView()
+				tv.RebuildView()
 				return true
 			}
 		}
@@ -951,7 +988,8 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		// Always draw an arrow
 		// Use different colors for leaf vs expandable nodes
 		arrowStyle := leafArrowStyle // Default to leaf (dimmer)
-		if len(dispItem.Item.Children) > 0 {
+		hasChildren := len(dispItem.Item.Children) > 0 || len(dispItem.Item.GetVirtualChildren()) > 0
+		if hasChildren {
 			// For nodes with children, use brighter expandable arrow style
 			arrowStyle = expandableArrowStyle
 		}
@@ -959,10 +997,13 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			arrowStyle = selectedStyle // Use selected style if item is selected
 		}
 
-		arrow := "▶"
-		if len(dispItem.Item.Children) > 0 && dispItem.Item.Expanded {
-			arrow = "▼"
-		}
+	// For virtual children, always use the arrow indicator instead of expand/collapse
+	arrow := "▶"
+	if dispItem.IsVirtual {
+		arrow = "→"
+	} else if hasChildren && dispItem.Item.Expanded {
+		arrow = "▼"
+	}
 
 		prefixX := dispItem.Depth * 3
 		screen.DrawString(prefixX, y, arrow, arrowStyle)
@@ -1176,7 +1217,7 @@ func (tv *TreeView) IndentItem(item *model.Item) bool {
 	// Expand previous item to show the moved item
 	prevItem.Expanded = true
 
-	tv.rebuildView()
+	tv.RebuildView()
 	return true
 }
 
@@ -1203,7 +1244,7 @@ func (tv *TreeView) OutdentItem(item *model.Item) bool {
 		tv.items = append(tv.items, item)
 	}
 
-	tv.rebuildView()
+	tv.RebuildView()
 	return true
 }
 
@@ -1302,7 +1343,7 @@ func (tv *TreeView) HoistToParent() bool {
 		tv.items = parentItem.Children
 		tv.selectedIdx = 0
 		tv.viewportOffset = 0
-		tv.rebuildView()
+		tv.RebuildView()
 
 		return true
 	}
@@ -1335,7 +1376,7 @@ func (tv *TreeView) ExpandParents(item *model.Item) {
 		current.Expanded = true
 		current = current.Parent
 	}
-	tv.rebuildView()
+	tv.RebuildView()
 }
 
 // SelectNextSibling moves selection to the next sibling
@@ -1568,7 +1609,7 @@ func (tv *TreeView) Hoist() bool {
 	// Rebuild view and reset selection to first child
 	tv.selectedIdx = 0
 	tv.viewportOffset = 0
-	tv.rebuildView()
+	tv.RebuildView()
 
 	return true
 }
@@ -1585,7 +1626,7 @@ func (tv *TreeView) Unhoist() bool {
 	tv.originalItems = nil
 
 	// Rebuild view
-	tv.rebuildView()
+	tv.RebuildView()
 
 	return true
 }

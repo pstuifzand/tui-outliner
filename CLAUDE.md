@@ -158,8 +158,6 @@ Export functions are in `internal/export/markdown.go`:
 
 Commands in `app.go`:
 - `:export markdown <filename>` - Export current outline to markdown file
-- `:title <text>` - Set outline title
-- `:title` - Show current outline title (marks as dirty if changed)
 
 ## Common Development Tasks
 

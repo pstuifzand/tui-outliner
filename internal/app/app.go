@@ -13,6 +13,7 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/history"
 	"github.com/pstuifzand/tui-outliner/internal/model"
+	"github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
@@ -520,6 +521,8 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 				a.dirty = true
 				a.mode = NormalMode
 				a.SetStatus("Modified")
+				// Refresh any expanded search nodes with new/updated items
+				a.refreshSearchNodes()
 
 				// Auto-detect todo checkbox pattern "[] "
 				if strings.HasPrefix(editedItem.Text, "[] ") {
@@ -968,6 +971,8 @@ func (a *App) handleCommand(cmd string) {
 		a.handleAttrCommand(parts)
 	case "set":
 		a.handleSetCommand(parts)
+	case "search":
+		a.handleSearchCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -1489,4 +1494,73 @@ func (a *App) handleSetCommand(parts []string) {
 
 	a.cfg.Set(key, value)
 	a.SetStatus(fmt.Sprintf("Set %s = %s", key, value))
+}
+
+// handleSearchCommand creates a new search node with the given query
+// Usage: :search <query>
+func (a *App) handleSearchCommand(parts []string) {
+	if len(parts) < 2 {
+		a.SetStatus("Usage: :search <query>")
+		return
+	}
+
+	// Combine all parts after the command to form the query
+	query := strings.Join(parts[1:], " ")
+
+	// Create a new search node
+	searchNode := model.NewItem("[Search] " + query)
+	searchNode.Metadata.Attributes["type"] = "search"
+	searchNode.Metadata.Attributes["query"] = query
+
+	// Add to the outline (as root item or as child of current item)
+	selected := a.tree.GetSelected()
+	if selected != nil {
+		// Add as child of selected item
+		selected.AddChild(searchNode)
+		selected.Expanded = true
+	} else {
+		// Add as root item
+		a.outline.Items = append(a.outline.Items, searchNode)
+	}
+
+	// Rebuild the tree to show the new search node
+	a.outline.BuildIndex()
+	a.tree.RebuildView()
+
+	a.SetStatus(fmt.Sprintf("Created search node for: %s (use l to expand)", query))
+	a.dirty = true
+}
+
+// refreshSearchNodes refreshes all expanded search nodes with current results
+func (a *App) refreshSearchNodes() {
+	// Sync outline with tree before searching
+	a.outline.Items = a.tree.GetItems()
+	a.outline.BuildIndex()
+
+	// Find all search nodes and refresh them
+	for _, item := range a.outline.GetAllItems() {
+		if item.IsSearchNode() && item.Expanded {
+			queryStr := item.GetSearchQuery()
+			if queryStr != "" {
+				// Parse and execute the query
+				filterExpr, err := search.ParseQuery(queryStr)
+				if err == nil {
+					// Find matching items
+					var matchingIDs []string
+					for _, candidate := range a.outline.GetAllItems() {
+						if candidate.ID == item.ID {
+							continue
+						}
+						if filterExpr.Matches(candidate) {
+							matchingIDs = append(matchingIDs, candidate.ID)
+						}
+					}
+					a.outline.PopulateSearchNode(item, matchingIDs)
+				}
+			}
+		}
+	}
+
+	// Rebuild the tree view to show updated results
+	a.tree.RebuildView()
 }
