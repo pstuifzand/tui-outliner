@@ -73,12 +73,10 @@ func generateOutline(totalNodes int, maxDepth int) model.Outline {
 
 func generateItemRecursive(remaining *int, currentDepth int, maxDepth int) *model.Item {
 	if *remaining <= 0 {
-		return &model.Item{}
+		return nil
 	}
 
-	item := model.Item{
-		Text: generateUniqueText(*remaining),
-	}
+	item := model.NewItem(generateUniqueText(*remaining))
 	*remaining--
 
 	// Add children if we haven't reached max depth and still have nodes left
@@ -88,13 +86,13 @@ func generateItemRecursive(remaining *int, currentDepth int, maxDepth int) *mode
 
 		for i := 0; i < numChildren && *remaining > 0; i++ {
 			child := generateItemRecursive(remaining, currentDepth+1, maxDepth)
-			if child.Text != "" {
+			if child != nil {
 				item.Children = append(item.Children, child)
 			}
 		}
 	}
 
-	return &item
+	return item
 }
 
 func getChildCount(remaining int, depthLeft int) int {
