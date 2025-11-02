@@ -127,6 +127,7 @@ func (w *NodeSearchWidget) DeleteWordBackwards() {
 	deleteStart := pos + 1
 	w.query = w.query[:deleteStart] + w.query[w.cursorPos:]
 	w.cursorPos = deleteStart
+	w.updateMatches()
 }
 
 func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {

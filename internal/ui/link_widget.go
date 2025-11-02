@@ -6,6 +6,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
+	"github.com/pstuifzand/tui-outliner/internal/search"
 )
 
 // LinkAutocompleteWidget provides inline autocomplete for [[links]] while editing
@@ -17,7 +18,9 @@ type LinkAutocompleteWidget struct {
 	selectedIdx int
 	cursorPos   int
 	maxResults  int
-	onSelect    func(*model.Item) // Called when link is selected, should insert [[id|text]]
+	parseError  string             // Error from parsing advanced search query
+	filterExpr  search.FilterExpr  // Parsed filter expression
+	onSelect    func(*model.Item)  // Called when link is selected, should insert [[id|text]]
 }
 
 func NewLinkAutocompleteWidget() *LinkAutocompleteWidget {
@@ -57,10 +60,16 @@ func (w *LinkAutocompleteWidget) IsVisible() bool {
 	return w.visible
 }
 
-// updateMatches filters items by text search on query
+func (w *LinkAutocompleteWidget) GetParseError() string {
+	return w.parseError
+}
+
+// updateMatches filters items by advanced search or text search on query
 func (w *LinkAutocompleteWidget) updateMatches() {
 	w.matches = nil
 	w.selectedIdx = 0
+	w.parseError = ""
+	w.filterExpr = nil
 
 	if w.query == "" {
 		// Show all items when query is empty
@@ -71,7 +80,24 @@ func (w *LinkAutocompleteWidget) updateMatches() {
 		return
 	}
 
-	// Case-insensitive substring search
+	// Try to parse as advanced search query
+	expr, err := search.ParseQuery(w.query)
+	if err == nil {
+		// Successfully parsed - use the filter expression
+		w.filterExpr = expr
+		for _, item := range w.allItems {
+			if expr.Matches(item) {
+				w.matches = append(w.matches, item)
+				if len(w.matches) >= w.maxResults {
+					break
+				}
+			}
+		}
+		return
+	}
+
+	// Parse error - fall back to text-only matching
+	w.parseError = err.Error()
 	queryLower := strings.ToLower(w.query)
 	for _, item := range w.allItems {
 		if strings.Contains(strings.ToLower(item.Text), queryLower) {
@@ -88,6 +114,29 @@ func (w *LinkAutocompleteWidget) UpdateQuery(newQuery string) {
 	w.query = newQuery
 	w.cursorPos = len(newQuery)
 	w.updateMatches()
+}
+
+// deleteWordBackward deletes from cursor position back to the start of the previous word
+func (w *LinkAutocompleteWidget) deleteWordBackward() {
+	if w.cursorPos == 0 {
+		return
+	}
+
+	// Start from cursor position and move backward
+	endPos := w.cursorPos
+
+	// Skip any trailing whitespace
+	for w.cursorPos > 0 && (w.query[w.cursorPos-1] == ' ' || w.query[w.cursorPos-1] == '\t') {
+		w.cursorPos--
+	}
+
+	// Delete until we hit whitespace or start of string
+	for w.cursorPos > 0 && w.query[w.cursorPos-1] != ' ' && w.query[w.cursorPos-1] != '\t' {
+		w.cursorPos--
+	}
+
+	// Delete the word
+	w.query = w.query[:w.cursorPos] + w.query[endPos:]
 }
 
 func (w *LinkAutocompleteWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
@@ -146,6 +195,12 @@ func (w *LinkAutocompleteWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 			w.query = w.query[:w.cursorPos] + w.query[w.cursorPos+1:]
 			w.updateMatches()
 		}
+		return true
+
+	case tcell.KeyCtrlW:
+		// Ctrl+W: Delete word backward
+		w.deleteWordBackward()
+		w.updateMatches()
 		return true
 
 	case tcell.KeyLeft:
@@ -291,11 +346,23 @@ func (w *LinkAutocompleteWidget) Render(screen *Screen) {
 		}
 	}
 
+	// Draw error message if parse error exists
+	resultsStartY := boxStartY + 3
+	if w.parseError != "" {
+		errorMsg := "Parse error: " + w.parseError
+		if len(errorMsg) > inputWidth {
+			errorMsg = errorMsg[:inputWidth]
+		}
+		errorStyle := borderStyle.Foreground(tcell.ColorRed)
+		screen.DrawStringLimited(inputX, resultsStartY, errorMsg, inputWidth, errorStyle)
+		resultsStartY++ // Offset results below the error
+	}
+
 	// Draw results
-	resultsY := boxStartY + 3
 	maxDisplayResults := 7
-	for i := 0; i < len(w.matches) && i < maxDisplayResults; i++ {
-		resultY := resultsY + i
+	resultCount := 0
+	for i := 0; i < len(w.matches) && i < maxDisplayResults && resultCount < maxDisplayResults; i++ {
+		resultY := resultsStartY + resultCount
 		if resultY >= boxStartY+boxHeight-2 {
 			break
 		}
@@ -327,6 +394,7 @@ func (w *LinkAutocompleteWidget) Render(screen *Screen) {
 		}
 
 		screen.DrawStringLimited(inputX, resultY, resultLine, inputWidth, resultStyle)
+		resultCount++
 	}
 
 	// Draw footer with match count
