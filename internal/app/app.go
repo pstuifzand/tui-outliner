@@ -454,6 +454,30 @@ func (a *App) render() {
 					// Render editor (may span multiple lines)
 					// Render call will call SetMaxWidth internally
 					a.editor.Render(a.screen, editorX, itemY, maxWidth)
+
+					// Clear remaining lines if editor is shorter than original item
+					editorLineCount := a.editor.GetWrappedLineCount()
+					editorEndY := itemY + editorLineCount
+
+					// Find how many display lines the original item occupied
+					itemLineCount := 0
+					for idx := displayLineIdx; idx < len(displayLines); idx++ {
+						if idx > displayLineIdx && displayLines[idx].ItemStartLine {
+							// Next item found
+							break
+						}
+						itemLineCount++
+					}
+
+					// Clear lines below editor if item was taller
+					itemEndY := itemY + itemLineCount
+					if editorEndY < itemEndY {
+						editingStyle := a.screen.BackgroundStyle()
+						for y := editorEndY; y < itemEndY && y < treeEndY; y++ {
+							clearLine := strings.Repeat(" ", width)
+							a.screen.DrawString(0, y, clearLine, editingStyle)
+						}
+					}
 				}
 			}
 		}

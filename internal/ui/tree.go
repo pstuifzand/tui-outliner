@@ -1493,22 +1493,48 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 				}
 			}
 
-			// Pad to screen width with background color on first line only
+			// Pad to wrap width with background color on first line only
+			// Use the same wrap width that the editor uses for consistent alignment
+			wrapEndX := textX + tv.maxWidth
+			if wrapEndX > screenWidth {
+				wrapEndX = screenWidth
+			}
 			bgStyle := screen.BackgroundStyle()
-			for x := totalLen; x < screenWidth; x++ {
+			for x := totalLen; x < wrapEndX; x++ {
 				padStyle := bgStyle
-				if isLinePartOfSelected && x == totalLen {
-					// One space with selected background after content
+				if isLinePartOfSelected {
+					// Fill entire padding with selected background
 					padStyle = selectedStyle
 				}
 				screen.SetCell(x, y, ' ', padStyle)
 			}
 		} else {
-			// For continuation lines, align with first line's text position
+			// Align with first line's text position
 			textX := displayLine.Depth*3 + 3
 
+			// Calculate wrap width for continuation lines
+			// Use the same wrap width that the editor uses for consistent alignment
+			wrapEndX := textX + tv.maxWidth
+			if wrapEndX > screenWidth {
+				wrapEndX = screenWidth
+			}
+
+			// For continuation lines, fill entire wrap width with background or selection color first
+			bgStyle := screen.BackgroundStyle()
+			lineStyle := style
+			for x := 0; x < wrapEndX; x++ {
+				fillStyle := bgStyle
+				if isLinePartOfSelected {
+					fillStyle = selectedStyle
+				}
+				screen.SetCell(x, y, ' ', fillStyle)
+			}
+			if isLinePartOfSelected {
+				lineStyle = selectedStyle
+			}
+
 			// Render continuation line text with full width available
-			maxTextWidth := screenWidth - textX
+			maxTextWidth := wrapEndX - textX
 			if maxTextWidth < 0 {
 				maxTextWidth = 0
 			}
@@ -1524,18 +1550,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			}
 
 			// Draw continuation line text
-			screen.DrawString(textX, y, text, style)
-
-			// Pad to screen width
-			totalLen := textX + len(text)
-			bgStyle := screen.BackgroundStyle()
-			for x := totalLen; x < screenWidth; x++ {
-				padStyle := bgStyle
-				if isLinePartOfSelected && x == totalLen {
-					padStyle = selectedStyle
-				}
-				screen.SetCell(x, y, ' ', padStyle)
-			}
+			screen.DrawString(textX, y, text, lineStyle)
 		}
 
 		screenY++ // Move to next screen line
