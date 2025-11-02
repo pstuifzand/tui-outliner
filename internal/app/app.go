@@ -227,6 +227,7 @@ func NewApp(filePath string) (*App, error) {
 	// Calendar date selection handler (context-dependent)
 	calendarWidget.SetOnDateSelected(func(selectedDate time.Time) {
 		dateStr := selectedDate.Format("2006-01-02")
+		formattedDate := selectedDate.Format("Mon, Jan 2, 2006") // Short day name format for display
 
 		// Check context mode
 		if app.calendarWidget.GetContextMode() == ui.CalendarAttributeMode {
@@ -268,8 +269,8 @@ func NewApp(filePath string) (*App, error) {
 					return
 				}
 				if matchingItem == nil {
-					// Create new daily note if it doesn't exist
-					newItem := model.NewItem(dateStr)
+					// Create new daily notes container if it doesn't exist
+					newItem := model.NewItem("Daily Notes")
 					newItem.Metadata.Attributes["type"] = "dailynotes"
 					newItem.IsNew = false
 					app.tree.AddItemAfter(newItem)
@@ -279,8 +280,8 @@ func NewApp(filePath string) (*App, error) {
 					app.tree.SelectItemByID(matchingItem.ID)
 				}
 
-				// Create new daily note if it doesn't exist
-				newItem := model.NewItem(dateStr)
+				// Create new daily note with formatted date
+				newItem := model.NewItem(formattedDate)
 				newItem.Metadata.Attributes["type"] = "day"
 				newItem.Metadata.Attributes["date"] = dateStr
 				newItem.IsNew = false
@@ -288,7 +289,7 @@ func NewApp(filePath string) (*App, error) {
 				app.tree.AddItemAsChild(newItem)
 
 				app.dirty = true
-				app.SetStatus(fmt.Sprintf("Created: %s", dateStr))
+				app.SetStatus(fmt.Sprintf("Created: %s", formattedDate))
 			}
 		}
 	})
@@ -1074,24 +1075,28 @@ func (a *App) handleCommand(cmd string) {
 		}
 	case "dailynote":
 		// Create or navigate to today's daily note
-		today := time.Now().Format("2006-01-02")
+		now := time.Now()
+		today := now.Format("2006-01-02") // ISO format for attribute storage
+		formattedDate := now.Format("Mon, Jan 2, 2006") // Short day name format for display
 
-		// Look for existing daily note with today's date
+		// Look for existing daily note with today's date (search by date attribute)
 		var foundItem *model.Item
 		for _, item := range a.tree.GetItems() {
-			if item.Text == today {
-				foundItem = item
-				break
+			if item.Metadata != nil && item.Metadata.Attributes != nil {
+				if item.Metadata.Attributes["date"] == today {
+					foundItem = item
+					break
+				}
 			}
 		}
 
-		// If not found, create new item with today's date
+		// If not found, create new item with formatted date
 		if foundItem == nil {
-			item := model.NewItem(today)
+			item := model.NewItem(formattedDate)
 			a.tree.AddItemAfter(item)
 			// Find the newly created item
 			for _, dispItem := range a.tree.GetDisplayItems() {
-				if dispItem.Item.Text == today {
+				if dispItem.Item.Text == formattedDate {
 					foundItem = dispItem.Item
 					break
 				}
@@ -1114,7 +1119,7 @@ func (a *App) handleCommand(cmd string) {
 				foundItem.Metadata.Attributes["date"] = today
 			}
 			a.dirty = true
-			a.SetStatus("Created daily note for " + today)
+			a.SetStatus("Created daily note for " + formattedDate)
 		} else {
 			// Navigate to existing daily note
 			for idx, dispItem := range a.tree.GetDisplayItems() {
@@ -1123,7 +1128,7 @@ func (a *App) handleCommand(cmd string) {
 					break
 				}
 			}
-			a.SetStatus("Navigated to daily note for " + today)
+			a.SetStatus("Navigated to daily note for " + formattedDate)
 		}
 	case "attr":
 		a.handleAttrCommand(parts)

@@ -115,6 +115,7 @@ editor.WasOutdentPressed()     // Shift+Tab (outdent)
 |-----|--------|
 | Any Character | Insert character at cursor |
 | Shift+Enter | Insert newline (multi-line text) |
+| Ctrl+; | Insert current time at beginning (HH:MM) |
 | Enter | Finish editing, create new item |
 | Backspace | Delete character before cursor |
 | Delete | Delete character at cursor |
@@ -277,12 +278,26 @@ Line 3:   Second paragraph after \n
 - Rendering limited to contiguous screen area
 - No undo/redo functionality (delegated to caller)
 
+## Date and Time Insertion
+
+The editor supports convenient insertion of date and time information:
+
+### Methods
+- **InsertCurrentTime()** (Ctrl+;): Inserts `HH:MM ` at the beginning of text (24-hour format with trailing space)
+- **InsertCurrentDate()**: Inserts `YYYY-MM-DD` at cursor position
+- **InsertCurrentDateTime()**: Inserts `YYYY-MM-DD HH:MM:SS` at cursor position
+
+### Usage Examples
+- **Ctrl+;** while editing creates a timestamped note: `15:04 Your note text here`
+- All insertions can be undone with **Ctrl+Z**
+- Useful for maintaining time-tracked logs or timestamped lists
+
 ## Future Enhancements
 
 1. **Cursor animation**: Blinking cursor indicator
 2. **Syntax highlighting**: Color different parts of text
 3. **Search/highlight**: Find and highlight text within editor
-4. **Undo/redo**: History of edits
-5. **Rich text**: Support for formatting markers
-6. **Selection**: Highlight text ranges
-7. **Copy/paste**: Clipboard integration
+4. **Rich text**: Support for formatting markers
+5. **Selection**: Highlight text ranges
+6. **Copy/paste**: Clipboard integration
+7. **Keybindings for date/time methods**: Additional shortcuts for InsertCurrentDate() and InsertCurrentDateTime()
