@@ -13,25 +13,25 @@ import (
 type Search struct {
 	query           string
 	results         []*model.Item
-	matchIndices    []int              // Indices of matches in allItems
-	currentMatchIdx int                // Index in matchIndices array (which match we're on)
+	matchIndices    []int // Indices of matches in allItems
+	currentMatchIdx int   // Index in matchIndices array (which match we're on)
 	cursorPos       int
 	active          bool
 	allItems        []*model.Item
-	filterExpr      search.FilterExpr  // Parsed filter expression
-	parseError      string             // Error from parsing the query
-	history         *History           // Search history manager
+	filterExpr      search.FilterExpr // Parsed filter expression
+	parseError      string            // Error from parsing the query
+	history         *History          // Search history manager
 }
 
 // NewSearch creates a new Search without history persistence
 func NewSearch(items []*model.Item) *Search {
 	return &Search{
-		query:    "",
-		results:  items,
+		query:     "",
+		results:   items,
 		cursorPos: 0,
-		active:   false,
-		allItems: items,
-		history:  NewHistory(50),
+		active:    false,
+		allItems:  items,
+		history:   NewHistory(50),
 	}
 }
 
@@ -44,12 +44,12 @@ func NewSearchWithHistory(items []*model.Item, manager *history.Manager) (*Searc
 	}
 
 	return &Search{
-		query:    "",
-		results:  items,
+		query:     "",
+		results:   items,
 		cursorPos: 0,
-		active:   false,
-		allItems: items,
-		history:  h,
+		active:    false,
+		allItems:  items,
+		history:   h,
 	}, nil
 }
 
@@ -300,11 +300,12 @@ func (s *Search) Render(screen *Screen, y int) {
 	cursorStyle := screen.SearchCursorStyle()
 	resultStyle := screen.SearchResultCountStyle()
 
+	const Label = "Search: "
 	// Draw label
-	screen.DrawString(0, y, "Search: ", labelStyle)
+	screen.DrawString(0, y, Label, labelStyle)
 
 	// Draw query
-	x := 8
+	x := len(Label)
 	maxWidth := screen.GetWidth() - x
 	displayQuery := s.query
 	if len(displayQuery) > maxWidth {
@@ -325,7 +326,7 @@ func (s *Search) Render(screen *Screen, y int) {
 	}
 
 	// Clear remainder
-	for i := len(displayQuery); i < maxWidth; i++ {
+	for i := len(displayQuery) + 1; i < maxWidth; i++ {
 		if x+i < screen.GetWidth() {
 			screen.SetCell(x+i, y, ' ', textStyle)
 		}
