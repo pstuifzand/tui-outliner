@@ -40,8 +40,7 @@ command_cursor = "#111c18"             # Dark text on cursor background
 command_cursor_bg = "#DEB266"          # Selected foreground as cursor background
 
 # Help overlay colors
-#help_background = "#111c18"            # Main background
-help_background = "#000000"            # Main background
+help_background = "#111c18"            # Main background
 help_border = "#D6D5BC"                # Title color for borders
 help_title = "#D6D5BC"                 # Title color
 help_content = "#F7E8B2"               # Main text color
