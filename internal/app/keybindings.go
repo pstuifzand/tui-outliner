@@ -531,6 +531,13 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						app.handleGoCommand()
 					},
 				},
+				'r': {
+					Key:         'r',
+					Description: "Go to referenced (original) item",
+					Handler: func(app *App) {
+						app.handleGoReferencedCommand()
+					},
+				},
 			},
 		},
 		{

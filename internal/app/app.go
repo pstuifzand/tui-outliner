@@ -1449,6 +1449,53 @@ func (a *App) handleGoCommand() {
 	}
 }
 
+// handleGoReferencedCommand navigates to the referenced (original) item if the current item is a virtual reference
+func (a *App) handleGoReferencedCommand() {
+	// Get the currently selected display item to check if it's a virtual reference
+	displayItems := a.tree.GetDisplayItems()
+	if len(displayItems) == 0 {
+		a.SetStatus("No items in tree")
+		return
+	}
+
+	selectedIdx := a.tree.GetSelectedIndex()
+	if selectedIdx < 0 || selectedIdx >= len(displayItems) {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	displayItem := displayItems[selectedIdx]
+
+	// Check if this is a virtual reference
+	if !displayItem.IsVirtual {
+		a.SetStatus("Current item is not a reference")
+		return
+	}
+
+	// Get the original item
+	originalItem := displayItem.OriginalItem
+	if originalItem == nil {
+		a.SetStatus("Reference has no original item")
+		return
+	}
+
+	// Expand parents to make the original item visible
+	a.tree.ExpandParents(originalItem)
+
+	// Find and select the original item in the display items
+	updatedDisplayItems := a.tree.GetDisplayItems()
+	for idx, dispItem := range updatedDisplayItems {
+		if dispItem.Item.ID == originalItem.ID {
+			a.tree.SelectItem(idx)
+			a.SetStatus(fmt.Sprintf("Navigated to referenced item: %s", originalItem.Text))
+			return
+		}
+	}
+
+	// If we couldn't find it after expanding parents, something went wrong
+	a.SetStatus("Could not navigate to referenced item")
+}
+
 // handleSetCommand processes :set configuration commands
 // Examples:
 //

@@ -450,6 +450,27 @@ ls -la /home/peter/work/tui-outliner/
      - Empty attribute values are not displayed
    - Example file: `examples/visattr_demo.json` demonstrates the feature
 
+20. **Go to Referenced Item Keybinding (gr)**:
+   - Added `gr` keybinding to navigate from a virtual reference (item shown in search nodes) to its original item in the tree
+   - Implementation:
+     - Added `'r'` keybinding to the `'g'` pending keybinding group (gr = go referenced)
+     - Implemented `handleGoReferencedCommand()` in `internal/app/app.go`
+     - Checks if current item is a virtual reference using `displayItem.IsVirtual` flag
+     - Shows error in status if not a reference or if reference can't be resolved
+     - Navigates to the original item by:
+       1. Getting the original item from `displayItem.OriginalItem`
+       2. Expanding parent nodes to make it visible with `tree.ExpandParents()`
+       3. Finding and selecting the original item in the display items
+       4. Displaying a status message with the referenced item's text
+   - Error messages:
+     - "No items in tree" - No items exist
+     - "No item selected" - Selection out of bounds
+     - "Current item is not a reference" - Not a virtual reference
+     - "Reference has no original item" - Broken reference
+     - "Could not navigate to referenced item" - Item not found after expanding parents
+   - Works with search nodes that have virtual children (created with virtual_children field)
+   - Example: In `examples/reference_test.json`, search nodes show referenced items; press `gr` to jump to original
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI
