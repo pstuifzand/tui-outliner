@@ -40,7 +40,8 @@ command_cursor = "#111c18"             # Dark text on cursor background
 command_cursor_bg = "#DEB266"          # Selected foreground as cursor background
 
 # Help overlay colors
-help_background = "#111c18"            # Main background
+#help_background = "#111c18"            # Main background
+help_background = "#000000"            # Main background
 help_border = "#D6D5BC"                # Title color for borders
 help_title = "#D6D5BC"                 # Title color
 help_content = "#F7E8B2"               # Main text color
@@ -54,3 +55,10 @@ status_modified = "#E67D64"            # Highlight color for modified indicator
 # Header colors
 header_title = "#D6D5BC"               # Title color for header
 header_bg = "#111c18"                  # Main background
+
+# Calendar colors
+calendar_day_text = "#F7E8B2"           # Text color for regular day cells
+calendar_day_bg = "#1F2B28"             # Background color for regular day cells (muted sage green)
+
+calendar_inactive_day_text = "#6B8077" # Text color for inactive days (prev/next month)
+calendar_inactive_day_bg = "#192320"   # Background color for inactive days (cooler-toned dark green)

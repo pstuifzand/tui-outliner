@@ -538,6 +538,14 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						app.handleGoReferencedCommand()
 					},
 				},
+				'c': {
+					Key:         'c',
+					Description: "Go to calendar date picker",
+					Handler: func(app *App) {
+						app.calendarWidget.Show()
+						app.SetStatus("Calendar opened - select a date to search")
+					},
+				},
 			},
 		},
 		{

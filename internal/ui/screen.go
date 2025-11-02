@@ -323,3 +323,18 @@ func (s *Screen) GrayStyle() tcell.Style {
 func (s *Screen) BackgroundStyle() tcell.Style {
 	return tcell.StyleDefault.Background(s.Theme.Colors.Background)
 }
+
+// CalendarDayStyle returns the style for calendar day cells
+func (s *Screen) CalendarDayStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.CalendarDayText, s.Theme.Colors.CalendarDayBg)
+}
+
+// CalendarInactiveDayStyle returns the style for inactive calendar days (prev/next month)
+func (s *Screen) CalendarInactiveDayStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.CalendarInactiveDayText, s.Theme.Colors.CalendarInactiveDayBg)
+}
+
+// CalendarDayIndicatorStyle returns the style for indicator dots with indicator foreground and day background
+func (s *Screen) CalendarDayIndicatorStyle() tcell.Style {
+	return theme.ColorPairToStyle(s.Theme.Colors.TreeAttributeIndicator, s.Theme.Colors.CalendarDayBg)
+}

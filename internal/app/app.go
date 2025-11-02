@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,8 +41,9 @@ type App struct {
 	command            *ui.CommandMode
 	attributeEditor    *ui.AttributeEditor // Attribute editing modal
 	nodeSearchWidget   *ui.NodeSearchWidget
-	historyManager     *history.Manager // Manager for persisting command and search history
-	cfg                *config.Config   // Application configuration
+	calendarWidget     *ui.CalendarWidget // Calendar date picker widget
+	historyManager     *history.Manager   // Manager for persisting command and search history
+	cfg                *config.Config     // Application configuration
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -97,6 +99,14 @@ func NewApp(filePath string) (*App, error) {
 	splash := ui.NewSplashScreen()
 	attributeEditor := ui.NewAttributeEditor()
 	nodeSearchWidget := ui.NewNodeSearchWidget()
+	calendarWidget := ui.NewCalendarWidget()
+
+	// Apply weekstart config if set (0=Sunday, 1=Monday, etc.)
+	if weekstartStr := cfg.Get("weekstart"); weekstartStr != "" {
+		if weekstart, err := strconv.Atoi(weekstartStr); err == nil && weekstart >= 0 && weekstart <= 6 {
+			calendarWidget.SetWeekStart(weekstart)
+		}
+	}
 
 	// Initialize history manager
 	historyManager, err := history.NewManager()
@@ -147,6 +157,7 @@ func NewApp(filePath string) (*App, error) {
 		command:          command,
 		attributeEditor:  attributeEditor,
 		nodeSearchWidget: nodeSearchWidget,
+		calendarWidget:   calendarWidget,
 		historyManager:   historyManager,
 		cfg:              cfg,
 		statusMsg:        "Ready",
@@ -203,6 +214,102 @@ func NewApp(filePath string) (*App, error) {
 			}
 		} else {
 			app.SetStatus("Item not found in tree")
+		}
+	})
+
+	// Set up calendar widget with all items for date detection
+	calendarWidget.SetItems(outline.GetAllItems())
+
+	// Calendar date selection handler (context-dependent)
+	calendarWidget.SetOnDateSelected(func(selectedDate time.Time) {
+		dateStr := selectedDate.Format("2006-01-02")
+
+		// Check context mode
+		if app.calendarWidget.GetContextMode() == ui.CalendarAttributeMode {
+			// Set the date attribute on current item
+			selected := app.tree.GetSelected()
+			if selected != nil {
+				selected.Metadata.Attributes[app.calendarWidget.GetAttributeName()] = dateStr
+				app.dirty = true
+				app.SetStatus(fmt.Sprintf("Set %s to %s", app.calendarWidget.GetAttributeName(), dateStr))
+			} else {
+				app.SetStatus("No item selected")
+			}
+		} else {
+			// Search mode: look for daily note (type=day) with matching date
+			allItems := app.outline.GetAllItems()
+			var matchingItem *model.Item
+
+			// First priority: Look for items with type=day attribute and matching date
+			for _, item := range allItems {
+				if item.Metadata != nil && item.Metadata.Attributes != nil {
+					// Check if this is a daily note (type=day)
+					if typeVal, ok := item.Metadata.Attributes["type"]; ok && typeVal == "day" {
+						// Check if date matches
+						if itemDate, ok := item.Metadata.Attributes["date"]; ok && itemDate == dateStr {
+							matchingItem = item
+							break
+						}
+					}
+				}
+			}
+
+			// Second priority: Look for items with matching date (or matching text)
+			// if matchingItem == nil {
+			// 	for _, item := range allItems {
+			// 		itemMatches := false
+			//
+			// 		// Check date attribute
+			// 		if item.Metadata != nil && item.Metadata.Attributes != nil {
+			// 			if itemDate, ok := item.Metadata.Attributes["date"]; ok {
+			// 				if itemDate == dateStr {
+			// 					itemMatches = true
+			// 				}
+			// 			}
+			// 		}
+			//
+			// 		// Check item text
+			// 		if item.Text == dateStr {
+			// 			itemMatches = true
+			// 		}
+			//
+			// 		if itemMatches {
+			// 			matchingItem = item
+			// 			break
+			// 		}
+			// 	}
+			// }
+
+			if matchingItem != nil {
+				// Navigate to existing item
+				app.tree.ExpandParents(matchingItem)
+				items := app.tree.GetDisplayItems()
+				for idx, dispItem := range items {
+					if dispItem.Item.ID == matchingItem.ID {
+						app.tree.SelectItem(idx)
+						app.SetStatus(fmt.Sprintf("Selected: %s", matchingItem.Text))
+						return
+					}
+				}
+			} else {
+				// Create new daily note if it doesn't exist
+				newItem := model.NewItem(dateStr)
+				newItem.Metadata.Attributes["type"] = "day"
+				newItem.Metadata.Attributes["date"] = dateStr
+				newItem.IsNew = false
+
+				// Add after current selected item
+				selected := app.tree.GetSelected()
+				if selected != nil {
+					app.tree.AddItemAfter(newItem)
+				} else {
+					// Add to root if nothing selected
+					app.outline.Items = append(app.outline.Items, newItem)
+				}
+
+				app.dirty = true
+				app.SetStatus(fmt.Sprintf("Created: %s", dateStr))
+			}
 		}
 	})
 
@@ -419,6 +526,9 @@ func (a *App) render() {
 	// Draw node search widget if visible
 	a.nodeSearchWidget.Render(a.screen)
 
+	// Draw calendar widget if visible
+	a.calendarWidget.Render(a.screen)
+
 	a.screen.Show()
 }
 
@@ -465,6 +575,21 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 	if a.nodeSearchWidget.IsVisible() {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			a.nodeSearchWidget.HandleKeyEvent(keyEv)
+		}
+		return
+	}
+
+	// Handle calendar widget input
+	if a.calendarWidget.IsVisible() {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			a.calendarWidget.HandleKeyEvent(keyEv)
+		}
+		if mouseEv, ok := ev.(*tcell.EventMouse); ok {
+			x, y := mouseEv.Position()
+			// Only handle left mouse button clicks
+			if mouseEv.Buttons()&tcell.Button1 != 0 {
+				a.calendarWidget.HandleMouseEvent(x, y)
+			}
 		}
 		return
 	}
@@ -975,6 +1100,8 @@ func (a *App) handleCommand(cmd string) {
 		a.handleSetCommand(parts)
 	case "search":
 		a.handleSearchCommand(parts)
+	case "calendar":
+		a.handleCalendarCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -1543,7 +1670,19 @@ func (a *App) handleSetCommand(parts []string) {
 	}
 
 	a.cfg.Set(key, value)
-	a.SetStatus(fmt.Sprintf("Set %s = %s", key, value))
+
+	// Handle special settings that need to be applied immediately
+	if key == "weekstart" {
+		// Validate and apply weekstart to calendar widget
+		if weekstart, err := strconv.Atoi(value); err == nil && weekstart >= 0 && weekstart <= 6 {
+			a.calendarWidget.SetWeekStart(weekstart)
+			a.SetStatus(fmt.Sprintf("Set %s = %s (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)", key, value))
+		} else {
+			a.SetStatus(fmt.Sprintf("Invalid weekstart value '%s'. Use 0-6 (0=Sunday, 1=Monday, ...)", value))
+		}
+	} else {
+		a.SetStatus(fmt.Sprintf("Set %s = %s", key, value))
+	}
 }
 
 // handleSearchCommand creates a new search node with the given query
@@ -1613,4 +1752,41 @@ func (a *App) refreshSearchNodes() {
 
 	// Rebuild the tree view to show updated results
 	a.tree.RebuildView()
+}
+
+// handleCalendarCommand handles the :calendar command
+// Usage:
+//
+//	:calendar - opens calendar in search mode
+//	:calendar attr <name> - opens calendar in attribute mode for setting an attribute
+func (a *App) handleCalendarCommand(parts []string) {
+	if len(parts) == 1 {
+		// Open calendar in search mode
+		a.calendarWidget.Show()
+		a.SetStatus("Calendar opened (press Esc to close)")
+		return
+	}
+
+	if len(parts) >= 2 && parts[1] == "attr" {
+		if len(parts) < 3 {
+			a.SetStatus("Usage: :calendar attr <attribute-name>")
+			return
+		}
+		attrName := parts[2]
+
+		// Get current item and its attribute value if it exists
+		currentItem := a.tree.GetSelected()
+		dateValue := ""
+		if currentItem != nil && currentItem.Metadata != nil && currentItem.Metadata.Attributes != nil {
+			if val, ok := currentItem.Metadata.Attributes[attrName]; ok {
+				dateValue = val
+			}
+		}
+
+		a.calendarWidget.ShowForAttributeWithValue(attrName, dateValue)
+		a.SetStatus(fmt.Sprintf("Calendar opened to set '%s' attribute", attrName))
+		return
+	}
+
+	a.SetStatus("Usage: :calendar or :calendar attr <name>")
 }

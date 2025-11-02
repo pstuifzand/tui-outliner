@@ -471,6 +471,47 @@ ls -la /home/peter/work/tui-outliner/
    - Works with search nodes that have virtual children (created with virtual_children field)
    - Example: In `examples/reference_test.json`, search nodes show referenced items; press `gr` to jump to original
 
+21. **Interactive Calendar Widget**:
+   - Added calendar date picker widget for selecting dates and navigating items by date
+   - Features:
+     - Opened with `gc` keybinding (g + c) or `:calendar` command
+     - Two modes: Search mode (navigate to items with a date) and Attribute mode (set date attribute)
+     - Command syntax:
+       - `:calendar` - Open calendar in search mode
+       - `:calendar attr <attribute-name>` - Open calendar in attribute mode
+   - Keyboard Navigation (vim-style):
+     - `h`/`l` or arrow left/right: Previous/next day
+     - `j`/`k` or arrow down/up: Previous/next week
+     - `J`/`K` (Shift): Previous/next month
+     - `H`/`L` (Shift): Previous/next year
+     - `t`: Jump to today
+   - Smart Enter Behavior:
+     - In search mode: If date node exists, navigate to it; if not, create it
+     - In attribute mode: Set the specified attribute on current item
+     - Escape: Close calendar
+   - Mouse Support:
+     - Click on any date to select
+     - Click navigation arrows `<< < > >>` to navigate month/year
+   - Visual Indicators:
+     - Currently selected date: Highlighted with tree selection color
+     - Today: Green and bold
+     - Dates with items: Displayed with dot (•) indicator
+   - Configuration:
+     - `:set weekstart <0-6>` - Configure which day the week starts on
+       - 0 = Sunday (default), 1 = Monday, 2 = Tuesday, etc.
+       - Affects weekday header display and date grid positioning
+     - Changes are applied immediately and persist for the session
+   - Auto Month Navigation:
+     - When navigating outside current month with day/week keys, automatically switches to prev/next month
+     - Seamless navigation across month boundaries
+   - Implementation:
+     - New file: `internal/ui/calendar.go` (~500 lines)
+     - Integrated into App event loop for keyboard and mouse handling
+     - Smart date selection callback with conditional create logic
+     - Properly handles modal overlay rendering with background fill
+   - Documentation: `docs/calendar-widget.md` with complete usage guide
+   - Example: `examples/calendar_demo.json` with various dated items and events
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

@@ -70,6 +70,12 @@ type Colors struct {
 	// Header colors
 	HeaderTitle tcell.Color
 	HeaderBg    tcell.Color
+
+	// Calendar colors
+	CalendarDayText       tcell.Color
+	CalendarDayBg         tcell.Color
+	CalendarInactiveDayText tcell.Color
+	CalendarInactiveDayBg   tcell.Color
 }
 
 // Theme represents a complete color theme
@@ -138,6 +144,11 @@ func Default() *Theme {
 			// Header colors
 			HeaderTitle: tcell.ColorWhite,
 			HeaderBg:    tcell.ColorBlack,
+			// Calendar colors
+			CalendarDayText:         tcell.ColorWhite,
+			CalendarDayBg:           tcell.ColorBlack,
+			CalendarInactiveDayText: tcell.ColorGray,
+			CalendarInactiveDayBg:   tcell.ColorBlack,
 		},
 	}
 }

@@ -47,8 +47,12 @@ type ThemeConfig struct {
 		StatusModeBg      string `toml:"status_mode_bg"`
 		StatusMessage     string `toml:"status_message"`
 		StatusModified    string `toml:"status_modified"`
-		HeaderTitle       string `toml:"header_title"`
-		HeaderBg          string `toml:"header_bg"`
+		HeaderTitle           string `toml:"header_title"`
+		HeaderBg              string `toml:"header_bg"`
+		CalendarDayText       string `toml:"calendar_day_text"`
+		CalendarDayBg         string `toml:"calendar_day_bg"`
+		CalendarInactiveDayText string `toml:"calendar_inactive_day_text"`
+		CalendarInactiveDayBg   string `toml:"calendar_inactive_day_bg"`
 	} `toml:"colors"`
 }
 
@@ -225,6 +229,18 @@ func configToTheme(config ThemeConfig) *Theme {
 	}
 	if config.Colors.HeaderBg != "" {
 		baseTheme.Colors.HeaderBg = ParseColorString(config.Colors.HeaderBg)
+	}
+	if config.Colors.CalendarDayText != "" {
+		baseTheme.Colors.CalendarDayText = ParseColorString(config.Colors.CalendarDayText)
+	}
+	if config.Colors.CalendarDayBg != "" {
+		baseTheme.Colors.CalendarDayBg = ParseColorString(config.Colors.CalendarDayBg)
+	}
+	if config.Colors.CalendarInactiveDayText != "" {
+		baseTheme.Colors.CalendarInactiveDayText = ParseColorString(config.Colors.CalendarInactiveDayText)
+	}
+	if config.Colors.CalendarInactiveDayBg != "" {
+		baseTheme.Colors.CalendarInactiveDayBg = ParseColorString(config.Colors.CalendarInactiveDayBg)
 	}
 
 	if config.Name != "" {
