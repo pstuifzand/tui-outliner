@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gdamore/tcell/v2"
-	"github.com/pstuifzand/tui-outliner/internal/theme"
 	"github.com/pstuifzand/tui-outliner/internal/config"
+	"github.com/pstuifzand/tui-outliner/internal/theme"
 )
 
 // Screen manages the tcell screen and rendering
@@ -162,7 +162,7 @@ func StyleDim() tcell.Style {
 
 // TreeNormalStyle returns the style for normal tree items
 func (s *Screen) TreeNormalStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.TreeNormalText)
+	return theme.ColorPairToStyle(s.Theme.Colors.TreeNormalText, s.Theme.Colors.Background)
 }
 
 // TreeSelectedStyle returns the style for selected tree items
@@ -262,12 +262,12 @@ func (s *Screen) HelpStyle() tcell.Style {
 
 // HelpBorderStyle returns the style for help borders
 func (s *Screen) HelpBorderStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.HelpBorder)
+	return theme.ColorPairToStyle(s.Theme.Colors.HelpBorder, s.Theme.Colors.HelpBackground)
 }
 
 // HelpTitleStyle returns the style for help title
 func (s *Screen) HelpTitleStyle() tcell.Style {
-	return theme.ColorToStyle(s.Theme.Colors.HelpTitle).Bold(true)
+	return theme.ColorPairToStyle(s.Theme.Colors.HelpTitle, s.Theme.Colors.HelpBackground).Bold(true)
 }
 
 // StatusModeStyle returns the style for mode indicator
