@@ -20,6 +20,7 @@ tree_leaf_arrow = "#32473B"            # Inactive/disabled text color for leaf a
 tree_expandable_arrow = "#E67D64"      # Highlight color for expandable arrows
 tree_expanded_arrow = "#E67D64"        # Highlight color for expanded arrows
 tree_collapsed_arrow = "#E67D64"       # Highlight color for collapsed arrows
+tree_link_text = "#7AA2C6"             # Blue for wiki-style links
 
 # Editor colors
 editor_text = "#F7E8B2"                # Main text color

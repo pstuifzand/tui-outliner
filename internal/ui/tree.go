@@ -7,6 +7,7 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/config"
+	"github.com/pstuifzand/tui-outliner/internal/links"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -1397,16 +1398,19 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 				}
 			}
 
-			// Draw the text
-			// Highlight search matches in the text only if this is the current match
+			// Draw the text with link and search highlighting
+			// Links are always highlighted, search highlighting is applied only to current match
+			linkStyle := screen.TreeLinkStyle()
+			var displayLen int
 			if searchQuery != "" && currentMatchItem != nil && displayLine.Item == currentMatchItem {
-				tv.drawTextWithSearchHighlight(screen, textX, y, text, style, highlightStyle, searchQuery)
+				_, displayLen = tv.drawTextWithLinksAndSearch(screen, textX, y, text, style, highlightStyle, linkStyle, searchQuery)
 			} else {
-				screen.DrawString(textX, y, text, style)
+				_, displayLen = tv.drawTextWithLinksAndSearch(screen, textX, y, text, style, highlightStyle, linkStyle, "")
 			}
 
 			// Draw visible attributes if configured (only on item start line)
-			totalLen := textX + len(text)
+			// Use displayLen (actual displayed length after link compression) instead of original text length
+			totalLen := textX + displayLen
 			if cfg != nil {
 				visattrConfig := cfg.Get("visattr")
 				if visattrConfig != "" {
@@ -2205,4 +2209,110 @@ func (tv *TreeView) drawTextWithHighlight(screen *Screen, x int, y int, text str
 		// Move to next position after this match
 		lastIdx = matchIdx + len(searchQuery)
 	}
+}
+
+// drawTextWithLinksAndSearch draws text with both wiki-style links and search highlighting
+// Links are shown in cyan with underline, but displayed text hides the [[id|...]] brackets
+// Search matches have background highlight
+// Returns: parsed links, display text length (accounting for link compression)
+func (tv *TreeView) drawTextWithLinksAndSearch(screen *Screen, x int, y int, text string,
+	defaultStyle tcell.Style, highlightStyle tcell.Style, linkStyle tcell.Style, searchQuery string) ([]links.Link, int) {
+
+	// Parse links from the text
+	itemLinks := links.ParseLinks(text)
+
+	// If no links, just draw normally (with search highlighting if needed)
+	if len(itemLinks) == 0 {
+		if searchQuery == "" {
+			screen.DrawString(x, y, text, defaultStyle)
+			return itemLinks, len(text)
+		}
+		// Draw with search highlighting only
+		tv.drawTextWithHighlight(screen, x, y, text, defaultStyle, highlightStyle, searchQuery)
+		return itemLinks, len(text)
+	}
+
+	// Build display text and track where links appear in display
+	var displayParts []string
+	var displayLinkRanges []struct {
+		start, end int
+	}
+	displayPos := 0
+
+	lastEnd := 0
+	for _, link := range itemLinks {
+		// Add text before this link
+		if link.StartPos > lastEnd {
+			displayParts = append(displayParts, text[lastEnd:link.StartPos])
+			displayPos += link.StartPos - lastEnd
+		}
+
+		// Add link display text (with link styling)
+		linkDisplay := link.GetDisplayText()
+		displayParts = append(displayParts, linkDisplay)
+		displayLinkRanges = append(displayLinkRanges, struct {
+			start, end int
+		}{displayPos, displayPos + len(linkDisplay)})
+		displayPos += len(linkDisplay)
+
+		lastEnd = link.EndPos
+	}
+	// Add remaining text after last link
+	if lastEnd < len(text) {
+		displayParts = append(displayParts, text[lastEnd:])
+	}
+
+	displayText := strings.Join(displayParts, "")
+
+	// Build map of which characters in original text are in search matches
+	searchMatches := make([]bool, len(text))
+	if searchQuery != "" {
+		lowerText := strings.ToLower(text)
+		lowerQuery := strings.ToLower(searchQuery)
+		idx := 0
+		for {
+			matchIdx := strings.Index(lowerText[idx:], lowerQuery)
+			if matchIdx == -1 {
+				break
+			}
+			matchIdx += idx
+			for i := 0; i < len(searchQuery); i++ {
+				if matchIdx+i < len(text) {
+					searchMatches[matchIdx+i] = true
+				}
+			}
+			idx = matchIdx + len(searchQuery)
+		}
+	}
+
+	// Draw display text character by character with appropriate styling
+	currentX := x
+	for i, r := range displayText {
+		charStyle := defaultStyle
+
+		// Check if this display position is in a link
+		inLink := false
+		for _, linkRange := range displayLinkRanges {
+			if i >= linkRange.start && i < linkRange.end {
+				// Apply link color with underline, but preserve background from defaultStyle
+				// Start with defaultStyle and apply link foreground and underline
+				fg, _, _ := linkStyle.Decompose()
+				charStyle = defaultStyle.Foreground(fg).Underline(true)
+				inLink = true
+				break
+			}
+		}
+
+		// Apply search highlighting if not already in a link
+		if !inLink && searchQuery != "" {
+			// For search matching, we'd need to map back to original positions
+			// For now, skip search highlighting in links (or could apply both)
+		}
+
+		screen.SetCell(currentX, y, r, charStyle)
+		currentX++
+	}
+
+	// Return the display text length (shorter than original due to link compression)
+	return itemLinks, len(displayText)
 }

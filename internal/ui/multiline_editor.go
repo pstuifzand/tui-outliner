@@ -16,21 +16,23 @@ type editorState struct {
 
 // MultiLineEditor manages multi-line text editing with word wrapping
 type MultiLineEditor struct {
-	item             *model.Item
-	text             string
-	cursorPos        int // Absolute position in text
-	active           bool
-	enterPressed     bool // Plain Enter - create new node
-	escapePressed    bool
-	backspaceOnEmpty bool
-	indentPressed    bool
-	outdentPressed   bool
-	maxWidth         int // Maximum width for text wrapping
-	wrappedLines     []string
-	lineStartOffsets []int // Starting text offset for each wrapped line
-	undoStack        []editorState
-	redoStack        []editorState
-	maxUndoLevels    int // Maximum undo history levels
+	item                      *model.Item
+	text                      string
+	cursorPos                 int // Absolute position in text
+	active                    bool
+	enterPressed              bool // Plain Enter - create new node
+	escapePressed             bool
+	backspaceOnEmpty          bool
+	indentPressed             bool
+	outdentPressed            bool
+	maxWidth                  int // Maximum width for text wrapping
+	wrappedLines              []string
+	lineStartOffsets          []int // Starting text offset for each wrapped line
+	undoStack                 []editorState
+	redoStack                 []editorState
+	maxUndoLevels             int // Maximum undo history levels
+	linkAutocompleteTriggered bool // [[ was typed - app should show link widget
+	linkAutocompleteStartPos  int  // Position where [[ started
 }
 
 // NewMultiLineEditor creates a new MultiLineEditor
@@ -355,6 +357,15 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 			mle.saveUndoState()
 			mle.text = mle.text[:mle.cursorPos] + string(ch) + mle.text[mle.cursorPos:]
 			mle.cursorPos++
+
+			// Check for [[ trigger for link autocomplete
+			if ch == '[' && mle.cursorPos >= 2 && mle.text[mle.cursorPos-2] == '[' {
+				mle.linkAutocompleteTriggered = true
+				mle.linkAutocompleteStartPos = mle.cursorPos - 2 // Position of first [
+				mle.calculateWrappedLines()
+				return false // Return false to signal app to open link widget immediately
+			}
+
 			mle.calculateWrappedLines()
 		}
 		return true
@@ -500,6 +511,40 @@ func (mle *MultiLineEditor) WasOutdentPressed() bool {
 	pressed := mle.outdentPressed
 	mle.outdentPressed = false
 	return pressed
+}
+
+// WasLinkAutocompleteTriggered returns whether [[ was typed and resets the flag
+func (mle *MultiLineEditor) WasLinkAutocompleteTriggered() bool {
+	triggered := mle.linkAutocompleteTriggered
+	mle.linkAutocompleteTriggered = false
+	return triggered
+}
+
+// GetLinkAutocompleteStartPos returns the position where [[ was typed
+func (mle *MultiLineEditor) GetLinkAutocompleteStartPos() int {
+	return mle.linkAutocompleteStartPos
+}
+
+// InsertLink inserts a link in the format [[id|text]] at the autocomplete start position
+// and removes the initial [[ characters
+func (mle *MultiLineEditor) InsertLink(itemID string, itemText string) {
+	if mle.linkAutocompleteStartPos < 0 || mle.linkAutocompleteStartPos > len(mle.text) {
+		return
+	}
+
+	// Replace [[ with the full link
+	linkStr := "[[" + itemID + "|" + itemText + "]]"
+	mle.text = mle.text[:mle.linkAutocompleteStartPos] + linkStr + mle.text[mle.cursorPos:]
+	mle.cursorPos = mle.linkAutocompleteStartPos + len(linkStr)
+	mle.linkAutocompleteTriggered = false
+	mle.calculateWrappedLines()
+}
+
+// CancelLinkAutocomplete resets the link autocomplete state (e.g., when widget is closed)
+func (mle *MultiLineEditor) CancelLinkAutocomplete() {
+	mle.linkAutocompleteTriggered = false
+	mle.linkAutocompleteStartPos = -1
+	// Leave the [[ in the text - user can continue editing or delete it manually
 }
 
 // deleteWordBackwards deletes the word before the cursor

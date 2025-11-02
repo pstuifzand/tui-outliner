@@ -565,6 +565,13 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						app.handlePasteAsChildCommand()
 					},
 				},
+				'f': {
+					Key:         'f',
+					Description: "Follow link under cursor",
+					Handler: func(app *App) {
+						app.handleFollowLinkCommand()
+					},
+				},
 			},
 		},
 		{

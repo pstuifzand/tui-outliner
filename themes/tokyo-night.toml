@@ -13,6 +13,7 @@ tree_leaf_arrow = "#565f89"            # Dimmer (comment gray) for leaf node arr
 tree_expandable_arrow = "#7dcfff"      # Bright cyan for expandable node arrows
 tree_expanded_arrow = "#7dcfff"        # Cyan for expanded arrows
 tree_collapsed_arrow = "#7dcfff"       # Cyan for collapsed arrows
+tree_link_text = "#7dcfff"             # Cyan for wiki-style links
 
 # Editor colors
 editor_text = "#c0caf5"             # Light gray-blue for editor text

@@ -14,6 +14,7 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/config"
 	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/history"
+	"github.com/pstuifzand/tui-outliner/internal/links"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	search "github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
@@ -37,14 +38,15 @@ type App struct {
 	tree               *ui.TreeView
 	editor             *ui.MultiLineEditor
 	search             *ui.Search
-	help               *ui.HelpScreen
-	splash             *ui.SplashScreen
-	command            *ui.CommandMode
-	attributeEditor    *ui.AttributeEditor // Attribute editing modal
-	nodeSearchWidget   *ui.NodeSearchWidget
-	calendarWidget     *ui.CalendarWidget // Calendar date picker widget
-	historyManager     *history.Manager   // Manager for persisting command and search history
-	cfg                *config.Config     // Application configuration
+	help                    *ui.HelpScreen
+	splash                  *ui.SplashScreen
+	command                 *ui.CommandMode
+	attributeEditor         *ui.AttributeEditor // Attribute editing modal
+	nodeSearchWidget        *ui.NodeSearchWidget
+	linkAutocompleteWidget  *ui.LinkAutocompleteWidget // Wiki-style link autocomplete
+	calendarWidget          *ui.CalendarWidget // Calendar date picker widget
+	historyManager          *history.Manager   // Manager for persisting command and search history
+	cfg                     *config.Config     // Application configuration
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -100,6 +102,7 @@ func NewApp(filePath string) (*App, error) {
 	splash := ui.NewSplashScreen()
 	attributeEditor := ui.NewAttributeEditor()
 	nodeSearchWidget := ui.NewNodeSearchWidget()
+	linkAutocompleteWidget := ui.NewLinkAutocompleteWidget()
 	calendarWidget := ui.NewCalendarWidget()
 
 	// Connect calendar widget to attribute editor
@@ -150,20 +153,21 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	app := &App{
-		screen:           screen,
-		outline:          outline,
-		store:            store,
-		tree:             tree,
-		editor:           nil,
-		search:           searchMode,
-		help:             help,
-		splash:           splash,
-		command:          command,
-		attributeEditor:  attributeEditor,
-		nodeSearchWidget: nodeSearchWidget,
-		calendarWidget:   calendarWidget,
-		historyManager:   historyManager,
-		cfg:              cfg,
+		screen:                  screen,
+		outline:                 outline,
+		store:                   store,
+		tree:                    tree,
+		editor:                  nil,
+		search:                  searchMode,
+		help:                    help,
+		splash:                  splash,
+		command:                 command,
+		attributeEditor:         attributeEditor,
+		nodeSearchWidget:        nodeSearchWidget,
+		linkAutocompleteWidget:  linkAutocompleteWidget,
+		calendarWidget:          calendarWidget,
+		historyManager:          historyManager,
+		cfg:                     cfg,
 		statusMsg:        "Ready",
 		statusTime:       time.Now(),
 		dirty:            false,
@@ -218,6 +222,15 @@ func NewApp(filePath string) (*App, error) {
 			}
 		} else {
 			app.SetStatus("Item not found in tree")
+		}
+	})
+
+	// Set callback for link autocomplete widget
+	linkAutocompleteWidget.SetOnSelect(func(item *model.Item) {
+		// Insert the link into the editor
+		if app.editor != nil && app.editor.IsActive() {
+			app.editor.InsertLink(item.ID, item.Text)
+			app.dirty = true
 		}
 	})
 
@@ -543,6 +556,9 @@ func (a *App) render() {
 	// Draw node search widget if visible
 	a.nodeSearchWidget.Render(a.screen)
 
+	// Draw link autocomplete widget if visible
+	a.linkAutocompleteWidget.Render(a.screen)
+
 	// Draw calendar widget if visible
 	a.calendarWidget.Render(a.screen)
 
@@ -591,6 +607,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 			if mouseEv.Buttons()&tcell.Button1 != 0 {
 				a.attributeEditor.HandleMouseEvent(x, y)
 			}
+		}
+		return
+	}
+
+	// Handle link autocomplete widget input
+	if a.linkAutocompleteWidget.IsVisible() {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			a.linkAutocompleteWidget.HandleKeyEvent(keyEv)
 		}
 		return
 	}
@@ -662,6 +686,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if !a.editor.HandleKey(keyEv) {
+				// Check if link autocomplete was triggered ([[ was typed)
+				if a.editor.WasLinkAutocompleteTriggered() {
+					// Show link autocomplete widget
+					a.linkAutocompleteWidget.SetItems(a.outline.GetAllItems())
+					a.linkAutocompleteWidget.Show()
+					return
+				}
+
 				// Check if Enter, Escape, Backspace on empty, or indent/outdent was pressed
 				enterPressed := a.editor.WasEnterPressed()
 				escapePressed := a.editor.WasEscapePressed()
@@ -1134,6 +1166,8 @@ func (a *App) handleCommand(cmd string) {
 		a.handleSearchCommand(parts)
 	case "calendar":
 		a.handleCalendarCommand(parts)
+	case "links":
+		a.handleLinksCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -1663,6 +1697,82 @@ func (a *App) handleGoReferencedCommand() {
 
 	// If we couldn't find it after expanding parents, something went wrong
 	a.SetStatus("Could not navigate to referenced item")
+}
+
+// handleFollowLinkCommand follows a wiki-style link [[id]] in the current item
+func (a *App) handleFollowLinkCommand() {
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Parse links from the selected item's text
+	itemLinks := links.ParseLinks(selected.Text)
+	if len(itemLinks) == 0 {
+		a.SetStatus("No links found in current item")
+		return
+	}
+
+	// For now, navigate to the first link
+	// TODO: If multiple links, could show a selection menu
+	link := itemLinks[0]
+
+	// Find the target item by ID
+	targetItem := a.outline.FindItemByID(link.ID)
+	if targetItem == nil {
+		a.SetStatus(fmt.Sprintf("Broken link: target item not found (%s)", link.ID))
+		return
+	}
+
+	// Expand parents to make the target item visible
+	a.tree.ExpandParents(targetItem)
+
+	// Find and select the target item in the display items
+	displayItems := a.tree.GetDisplayItems()
+	for idx, dispItem := range displayItems {
+		if dispItem.Item.ID == targetItem.ID {
+			a.tree.SelectItem(idx)
+			displayText := link.GetDisplayText()
+			a.SetStatus(fmt.Sprintf("Followed link to: %s", displayText))
+			return
+		}
+	}
+
+	// If we couldn't find it after expanding parents, something went wrong
+	a.SetStatus("Could not navigate to linked item")
+}
+
+// handleLinksCommand displays all links in the current item
+func (a *App) handleLinksCommand(parts []string) {
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Parse links from the selected item's text
+	itemLinks := links.ParseLinks(selected.Text)
+	if len(itemLinks) == 0 {
+		a.SetStatus("No links found in current item")
+		return
+	}
+
+	// Build a list of link descriptions
+	var linkDescs []string
+	for i, link := range itemLinks {
+		displayText := link.GetDisplayText()
+		linkDescs = append(linkDescs, fmt.Sprintf("%d. %s -> %s", i+1, displayText, link.ID))
+	}
+
+	// Show the first few links in status (for longer lists, show just count)
+	if len(linkDescs) == 1 {
+		a.SetStatus("Found 1 link: " + linkDescs[0])
+	} else if len(linkDescs) <= 3 {
+		a.SetStatus(fmt.Sprintf("Found %d links: %s", len(linkDescs), strings.Join(linkDescs, " | ")))
+	} else {
+		a.SetStatus(fmt.Sprintf("Found %d links (use gf to follow first one)", len(linkDescs)))
+	}
 }
 
 // handlePasteAsChildCommand pastes the clipboard item as a child of the selected item

@@ -219,6 +219,11 @@ func (s *Screen) TreeAttributeStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeAttributeValue)
 }
 
+// TreeLinkStyle returns the style for wiki-style links
+func (s *Screen) TreeLinkStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeLinkText)
+}
+
 // EditorStyle returns the style for editor text
 func (s *Screen) EditorStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.EditorText)
