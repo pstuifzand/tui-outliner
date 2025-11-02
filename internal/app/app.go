@@ -272,7 +272,6 @@ func NewApp(filePath string) (*App, error) {
 					// Create new daily notes container if it doesn't exist
 					newItem := model.NewItem("Daily Notes")
 					newItem.Metadata.Attributes["type"] = "dailynotes"
-					newItem.IsNew = false
 					app.tree.AddItemAfter(newItem)
 					matchingItem = newItem
 				} else {
@@ -284,7 +283,6 @@ func NewApp(filePath string) (*App, error) {
 				newItem := model.NewItem(formattedDate)
 				newItem.Metadata.Attributes["type"] = "day"
 				newItem.Metadata.Attributes["date"] = dateStr
-				newItem.IsNew = false
 
 				app.tree.AddItemAsChild(newItem)
 
@@ -1101,9 +1099,7 @@ func (a *App) handleCommand(cmd string) {
 					break
 				}
 			}
-			// Clear the IsNew flag since this item has meaningful content (date)
 			if foundItem != nil {
-				foundItem.IsNew = false
 				// Add type and date attributes to the daily note
 				if foundItem.Metadata == nil {
 					foundItem.Metadata = &model.Metadata{
@@ -1795,7 +1791,6 @@ func (a *App) handleSearchCommand(parts []string) {
 	searchNode := model.NewItem("[Search] " + query)
 	searchNode.Metadata.Attributes["type"] = "search"
 	searchNode.Metadata.Attributes["query"] = query
-	searchNode.IsNew = false
 
 	a.tree.AddItemAfter(searchNode)
 	a.refreshSearchNodes()

@@ -16,21 +16,21 @@ type editorState struct {
 
 // MultiLineEditor manages multi-line text editing with word wrapping
 type MultiLineEditor struct {
-	item              *model.Item
-	text              string
-	cursorPos         int // Absolute position in text
-	active            bool
-	enterPressed      bool // Plain Enter - create new node
-	escapePressed     bool
-	backspaceOnEmpty  bool
-	indentPressed     bool
-	outdentPressed    bool
-	maxWidth          int // Maximum width for text wrapping
-	wrappedLines      []string
-	lineStartOffsets  []int // Starting text offset for each wrapped line
-	undoStack         []editorState
-	redoStack         []editorState
-	maxUndoLevels     int // Maximum undo history levels
+	item             *model.Item
+	text             string
+	cursorPos        int // Absolute position in text
+	active           bool
+	enterPressed     bool // Plain Enter - create new node
+	escapePressed    bool
+	backspaceOnEmpty bool
+	indentPressed    bool
+	outdentPressed   bool
+	maxWidth         int // Maximum width for text wrapping
+	wrappedLines     []string
+	lineStartOffsets []int // Starting text offset for each wrapped line
+	undoStack        []editorState
+	redoStack        []editorState
+	maxUndoLevels    int // Maximum undo history levels
 }
 
 // NewMultiLineEditor creates a new MultiLineEditor
@@ -181,10 +181,6 @@ func (mle *MultiLineEditor) Start() {
 func (mle *MultiLineEditor) Stop() string {
 	mle.active = false
 	mle.item.Text = mle.text
-	// Mark item as no longer new if it has content
-	if mle.item.IsNew && mle.text != "" && mle.text != "Type here..." {
-		mle.item.IsNew = false
-	}
 	return mle.text
 }
 
@@ -357,14 +353,8 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 		// Regular character input
 		if ch > 0 && ch < 127 { // Printable ASCII
 			mle.saveUndoState()
-			if mle.item.IsNew && mle.text == "Type here..." {
-				mle.text = string(ch)
-				mle.cursorPos = 1
-				mle.item.IsNew = false
-			} else {
-				mle.text = mle.text[:mle.cursorPos] + string(ch) + mle.text[mle.cursorPos:]
-				mle.cursorPos++
-			}
+			mle.text = mle.text[:mle.cursorPos] + string(ch) + mle.text[mle.cursorPos:]
+			mle.cursorPos++
 			mle.calculateWrappedLines()
 		}
 		return true

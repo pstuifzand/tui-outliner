@@ -40,10 +40,6 @@ func (e *Editor) Start() {
 func (e *Editor) Stop() string {
 	e.active = false
 	e.item.Text = e.text
-	// Mark item as no longer new if it has content
-	if e.item.IsNew && e.text != "" && e.text != "Type here..." {
-		e.item.IsNew = false
-	}
 	return e.text
 }
 
@@ -141,15 +137,8 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 	default:
 		// Regular character input
 		if ch > 0 && ch < 127 { // Printable ASCII
-			// If this is a new item with placeholder text, clear it on first character
-			if e.item.IsNew && e.text == "Type here..." {
-				e.text = string(ch)
-				e.cursorPos = 1
-				e.item.IsNew = false
-			} else {
-				e.text = e.text[:e.cursorPos] + string(ch) + e.text[e.cursorPos:]
-				e.cursorPos++
-			}
+			e.text = e.text[:e.cursorPos] + string(ch) + e.text[e.cursorPos:]
+			e.cursorPos++
 		}
 	}
 

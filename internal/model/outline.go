@@ -17,7 +17,6 @@ type Item struct {
 	Metadata         *Metadata `json:"metadata,omitempty"`
 	Parent           *Item     `json:"-"` // Not persisted
 	Expanded         bool      `json:"-"` // UI state, not persisted
-	IsNew            bool      `json:"-"` // UI state: true for newly created placeholder items
 	virtualChildren  []*Item   `json:"-"` // Resolved virtual child pointers (runtime only)
 	// CollapsedVirtualChildren tracks which virtual children are collapsed (for display-only)
 	// Maps virtual child item ID -> true if collapsed. Only used for search nodes to avoid
@@ -50,14 +49,12 @@ func NewItem(text string) *Item {
 			Modified:   time.Now(),
 		},
 		Expanded:                 true,
-		IsNew:                    true,
 		CollapsedVirtualChildren: make(map[string]bool),
 	}
 }
 
 func NewItemFrom(item *Item) *Item {
 	yanked := NewItem(item.Text)
-	yanked.IsNew = false
 	yanked.Metadata.Attributes = maps.Clone(yanked.Metadata.Attributes)
 	for _, c := range item.Children {
 		yc := NewItemFrom(c)

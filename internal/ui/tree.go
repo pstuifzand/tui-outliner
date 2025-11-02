@@ -163,8 +163,8 @@ type TreeView struct {
 	filterText     string
 	filteredView   []*displayItem
 	displayLines   []*DisplayLine // Multi-line aware display for rendering
-	viewportOffset int // Index of first visible display line in the viewport
-	maxWidth       int // Maximum width for text wrapping (0 = no wrapping)
+	viewportOffset int            // Index of first visible display line in the viewport
+	maxWidth       int            // Maximum width for text wrapping (0 = no wrapping)
 
 	// Hoisting state
 	hoistedItem   *model.Item   // Current hoisted node (nil if not hoisted)
@@ -1300,10 +1300,6 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
-		if displayLine.Item.IsNew && !isLinePartOfSelected && (!hasVisualSelection || i < visualStart || i > visualEnd) {
-			// Use new item style for new items (dim) when not selected and not in visual range
-			style = newItemStyle
-		}
 
 		// Prepare arrow style with background color
 		leafArrowStyle := screen.TreeLeafArrowStyle().Background(bgColor)
@@ -1382,7 +1378,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			}
 
 			// Text starts at fixed position
-			textX := prefixX + 3 // Position after the arrow, indicator, and space
+			textX := prefixX + 3                     // Position after the arrow, indicator, and space
 			screen.SetCell(prefixX+2, y, ' ', style) // Space after indicator
 
 			// Calculate max width available for text with truncation
