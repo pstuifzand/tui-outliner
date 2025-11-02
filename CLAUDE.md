@@ -612,6 +612,61 @@ ls -la /home/peter/work/tui-outliner/
      - Undo/Redo behavior section
      - Word navigation and deletion section
 
+26. **External Editor Integration (e keybinding)**:
+   - Open current item in external editor ($EDITOR or configurable) with TOML frontmatter
+   - Keybinding: `e` - Opens item text and metadata in external editor
+   - Features:
+     - TOML frontmatter for metadata (tags and attributes)
+     - Configurable editor via `:set editor <command>`
+     - Fallback chain: configured editor → $EDITOR env var → vi
+     - Changes only applied if file is modified and saved
+     - Graceful handling of unchanged files (no changes applied)
+     - Parse errors preserved with error message, original unchanged
+   - TOML Frontmatter Format:
+     ```
+     +++
+     tags = ["todo", "urgent"]
+
+     [attributes]
+     date = "2025-11-02"
+     status = "done"
+     +++
+
+     Item text goes here
+     ```
+   - Implementation:
+     - New file: `internal/ui/external_editor.go` (~185 lines)
+     - `EditItemInExternalEditor()` - Main entry point
+     - `serializeItemToFile()` - Writes item with TOML frontmatter to temp file
+     - `deserializeItemFromFile()` - Parses edited file content
+     - `resolveEditor()` - Determines which editor to use
+     - Integration in `internal/app/app.go` with `handleExternalEdit()` method
+     - Terminal control management:
+       - `screen.Suspend()` - Releases tcell control, terminal restored to normal mode
+       - Editor runs with full interactive terminal control
+       - `screen.Resume()` - Restores tcell control after editor closes
+       - Automatic full screen redraw on return
+     - Uses existing `github.com/pelletier/go-toml/v2` dependency
+   - Metadata Changes:
+     - Removed `Notes` field from `Metadata` struct (use attributes instead)
+     - Updated search debug output to remove Notes references
+   - Usage:
+     - Press `e` to open current item in external editor
+     - Edit text and metadata as needed
+     - Save file and exit editor
+     - Screen is redrawn to handle terminal state changes
+     - Changes are applied to the item and marked as modified
+     - Auto-save will persist changes to disk (5 second delay)
+   - Editor Configuration:
+     - Default: Uses $EDITOR environment variable, fallback to `vi`
+     - Session: `:set editor nano` - Sets editor for current session
+     - Session with args: `:set editor "vim --clean"` - Supports editor with flags
+     - Persist: Configure in startup commands or shell profile
+   - Editor Command Handling:
+     - Editor commands are executed via shell, allowing complex commands with arguments
+     - Examples: `vim --clean`, `nano -w`, `emacs -nw`, `code --wait`
+     - The temp file path is automatically appended as the final argument
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

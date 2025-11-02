@@ -27,7 +27,6 @@ type Item struct {
 // Metadata holds rich information about an item
 type Metadata struct {
 	Tags       []string          `json:"tags,omitempty"`
-	Notes      string            `json:"notes,omitempty"`
 	Attributes map[string]string `json:"attributes,omitempty"`
 	Created    time.Time         `json:"created"`
 	Modified   time.Time         `json:"modified"`

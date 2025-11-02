@@ -58,6 +58,20 @@ func (s *Screen) Close() error {
 	return nil
 }
 
+// Suspend releases terminal control temporarily
+func (s *Screen) Suspend() error {
+	// Use tcell's built-in Suspend which properly handles the terminal state
+	// without breaking the event polling loop
+	return s.tcellScreen.Suspend()
+}
+
+// Resume restores terminal control after suspension
+func (s *Screen) Resume() error {
+	// Use tcell's built-in Resume which restores proper operation
+	// The event polling loop remains intact
+	return s.tcellScreen.Resume()
+}
+
 // Clear clears the entire screen
 func (s *Screen) Clear() {
 	s.tcellScreen.Clear()

@@ -507,6 +507,13 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				app.SetStatus("Already at root")
 			},
 		},
+		{
+			Key:         'e',
+			Description: "Edit item in external editor",
+			Handler: func(app *App) {
+				app.handleExternalEdit()
+			},
+		},
 	}
 }
 

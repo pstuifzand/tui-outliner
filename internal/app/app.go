@@ -1664,6 +1664,41 @@ func (a *App) handleGoReferencedCommand() {
 	a.SetStatus("Could not navigate to referenced item")
 }
 
+// handleExternalEdit opens the current item in an external editor
+func (a *App) handleExternalEdit() {
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Suspend tcell to release terminal control for the editor
+	a.screen.Suspend()
+
+	// Edit the item in external editor (editor now has full terminal control)
+	err := ui.EditItemInExternalEditor(selected, a.cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Editor error: %v\n", err)
+	}
+
+	// Resume tcell and restore terminal control
+	if err := a.screen.Resume(); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to resume terminal: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Rebuild the tree view to show updated item text
+	a.tree.RebuildView()
+
+	// Force a complete redraw
+	a.screen.Clear()
+	a.screen.Show()
+
+	// Mark as modified and update status
+	a.dirty = true
+	a.SetStatus("Item updated from external editor")
+}
+
 // handleSetCommand processes :set configuration commands
 // Examples:
 //

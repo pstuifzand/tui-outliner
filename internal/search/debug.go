@@ -192,10 +192,6 @@ func addItemDetails(item *model.Item, debug *DebugInfo) {
 			}
 			debug.Details["attributes"] = strings.Join(attrs, ", ")
 		}
-
-		if item.Metadata.Notes != "" {
-			debug.Details["notes"] = item.Metadata.Notes
-		}
 	}
 }
 
