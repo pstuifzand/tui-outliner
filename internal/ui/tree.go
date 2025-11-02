@@ -526,6 +526,25 @@ func (tv *TreeView) CollapseSiblings() {
 	tv.RebuildView()
 }
 
+// findPreviousSiblingForIndent finds an item at the same depth as the given index
+// This is the appropriate target for indenting (will become the parent)
+func (tv *TreeView) findPreviousSiblingForIndent(currentIdx int) *model.Item {
+	if currentIdx < 1 {
+		return nil
+	}
+
+	currentDepth := tv.filteredView[currentIdx].Depth
+
+	// Search backward for an item at the same depth
+	for i := currentIdx - 1; i >= 0; i-- {
+		if tv.filteredView[i].Depth == currentDepth {
+			return tv.filteredView[i].Item
+		}
+	}
+
+	return nil
+}
+
 // Indent indents the selected item (increases nesting level)
 func (tv *TreeView) Indent() bool {
 	if tv.selectedIdx < 1 || tv.selectedIdx >= len(tv.filteredView) {
@@ -534,8 +553,11 @@ func (tv *TreeView) Indent() bool {
 
 	current := tv.filteredView[tv.selectedIdx].Item
 
-	// Get previous item - it becomes the parent
-	prevItem := tv.filteredView[tv.selectedIdx-1].Item
+	// Find appropriate parent at the same depth (will become the parent after indenting)
+	newParent := tv.findPreviousSiblingForIndent(tv.selectedIdx)
+	if newParent == nil {
+		return false // Can't indent if no sibling at same depth found
+	}
 
 	// Remove from current parent
 	if current.Parent != nil {
@@ -550,11 +572,11 @@ func (tv *TreeView) Indent() bool {
 		}
 	}
 
-	// Add to previous item as child
-	prevItem.AddChild(current)
+	// Add to new parent as child
+	newParent.AddChild(current)
 
-	// Expand previous item to show the moved item
-	prevItem.Expanded = true
+	// Expand new parent to show the moved item
+	newParent.Expanded = true
 
 	tv.RebuildView()
 	return true
@@ -1278,7 +1300,7 @@ func (tv *TreeView) GetItemsInRange(start, end int) []*model.Item {
 	return items
 }
 
-// IndentItem indents a specific item (makes it a child of previous item)
+// IndentItem indents a specific item (makes it a child of sibling at same depth)
 func (tv *TreeView) IndentItem(item *model.Item) bool {
 	if item == nil {
 		return false
@@ -1297,8 +1319,11 @@ func (tv *TreeView) IndentItem(item *model.Item) bool {
 		return false // Must have a previous item to indent into
 	}
 
-	// Get previous item - it becomes the parent
-	prevItem := tv.filteredView[itemIdx-1].Item
+	// Find appropriate parent at the same depth (will become the parent after indenting)
+	newParent := tv.findPreviousSiblingForIndent(itemIdx)
+	if newParent == nil {
+		return false // Can't indent if no sibling at same depth found
+	}
 
 	// Remove from current parent
 	if item.Parent != nil {
@@ -1313,11 +1338,11 @@ func (tv *TreeView) IndentItem(item *model.Item) bool {
 		}
 	}
 
-	// Add to previous item as child
-	prevItem.AddChild(item)
+	// Add to new parent as child
+	newParent.AddChild(item)
 
-	// Expand previous item to show the moved item
-	prevItem.Expanded = true
+	// Expand new parent to show the moved item
+	newParent.Expanded = true
 
 	tv.RebuildView()
 	return true
