@@ -1076,7 +1076,7 @@ func (a *App) handleCommand(cmd string) {
 	case "dailynote":
 		// Create or navigate to today's daily note
 		now := time.Now()
-		today := now.Format("2006-01-02") // ISO format for attribute storage
+		today := now.Format("2006-01-02")               // ISO format for attribute storage
 		formattedDate := now.Format("Mon, Jan 2, 2006") // Short day name format for display
 
 		// Look for existing daily note with today's date (search by date attribute)
@@ -1676,9 +1676,11 @@ func (a *App) handlePasteAsChildCommand() {
 		return
 	}
 
-	a.tree.AddItemAsChild(a.clipboard)
+	newItem := model.NewItemFrom(a.clipboard)
+
+	a.tree.AddItemAsChild(newItem)
 	a.dirty = true
-	a.SetStatus(fmt.Sprintf("Pasted as child: %s", a.clipboard.Text))
+	a.SetStatus(fmt.Sprintf("Pasted as child: %s", newItem.Text))
 }
 
 // handleExternalEdit opens the current item in an external editor

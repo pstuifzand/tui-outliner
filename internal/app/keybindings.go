@@ -229,7 +229,8 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Handler: func(app *App) {
 				selected := app.tree.GetSelected()
 				if selected != nil {
-					app.clipboard = selected
+					yanked := model.NewItemFrom(selected)
+					app.clipboard = yanked
 					app.SetStatus("Yanked item")
 				}
 			},
@@ -239,13 +240,12 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Paste item below",
 			Handler: func(app *App) {
 				if app.clipboard != nil {
-					pastedItem := app.tree.PasteAfter(app.clipboard)
+					newItem := model.NewItemFrom(app.clipboard)
+					pastedItem := app.tree.PasteAfter(newItem)
 					if pastedItem != nil {
 						app.SetStatus("Pasted item")
 						app.dirty = true
-						app.clipboard = nil
 						app.refreshSearchNodes()
-						// Select the pasted item
 						app.tree.SelectItemByID(pastedItem.ID)
 					}
 				}
@@ -256,13 +256,12 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Paste item above",
 			Handler: func(app *App) {
 				if app.clipboard != nil {
-					pastedItem := app.tree.PasteBefore(app.clipboard)
+					newItem := model.NewItemFrom(app.clipboard)
+					pastedItem := app.tree.PasteBefore(newItem)
 					if pastedItem != nil {
 						app.SetStatus("Pasted item")
 						app.dirty = true
-						app.clipboard = nil
 						app.refreshSearchNodes()
-						// Select the pasted item
 						app.tree.SelectItemByID(pastedItem.ID)
 					}
 				}

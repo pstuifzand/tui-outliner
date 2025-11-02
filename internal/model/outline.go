@@ -3,6 +3,7 @@ package model
 
 import (
 	"crypto/rand"
+	"maps"
 	"slices"
 	"time"
 )
@@ -52,6 +53,18 @@ func NewItem(text string) *Item {
 		IsNew:                    true,
 		CollapsedVirtualChildren: make(map[string]bool),
 	}
+}
+
+func NewItemFrom(item *Item) *Item {
+	yanked := NewItem(item.Text)
+	yanked.IsNew = false
+	yanked.Metadata.Attributes = maps.Clone(yanked.Metadata.Attributes)
+	for _, c := range item.Children {
+		yc := NewItemFrom(c)
+		yanked.Children = append(yanked.Children, yc)
+		yc.Parent = yanked
+	}
+	return yanked
 }
 
 // NewOutline creates a new outline with the given title
