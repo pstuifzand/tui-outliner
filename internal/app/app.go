@@ -1669,6 +1669,18 @@ func (a *App) handleGoReferencedCommand() {
 	a.SetStatus("Could not navigate to referenced item")
 }
 
+// handlePasteAsChildCommand pastes the clipboard item as a child of the selected item
+func (a *App) handlePasteAsChildCommand() {
+	if a.clipboard == nil {
+		a.SetStatus("Nothing to paste (clipboard is empty)")
+		return
+	}
+
+	a.tree.AddItemAsChild(a.clipboard)
+	a.dirty = true
+	a.SetStatus(fmt.Sprintf("Pasted as child: %s", a.clipboard.Text))
+}
+
 // handleExternalEdit opens the current item in an external editor
 func (a *App) handleExternalEdit() {
 	selected := a.tree.GetSelected()

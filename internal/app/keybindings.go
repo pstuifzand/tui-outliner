@@ -239,11 +239,14 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Paste item below",
 			Handler: func(app *App) {
 				if app.clipboard != nil {
-					if app.tree.PasteAfter(app.clipboard) {
+					pastedItem := app.tree.PasteAfter(app.clipboard)
+					if pastedItem != nil {
 						app.SetStatus("Pasted item")
 						app.dirty = true
 						app.clipboard = nil
 						app.refreshSearchNodes()
+						// Select the pasted item
+						app.tree.SelectItemByID(pastedItem.ID)
 					}
 				}
 			},
@@ -253,11 +256,14 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Description: "Paste item above",
 			Handler: func(app *App) {
 				if app.clipboard != nil {
-					if app.tree.PasteBefore(app.clipboard) {
+					pastedItem := app.tree.PasteBefore(app.clipboard)
+					if pastedItem != nil {
 						app.SetStatus("Pasted item")
 						app.dirty = true
 						app.clipboard = nil
 						app.refreshSearchNodes()
+						// Select the pasted item
+						app.tree.SelectItemByID(pastedItem.ID)
 					}
 				}
 			},
@@ -551,6 +557,13 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 					Handler: func(app *App) {
 						app.calendarWidget.Show()
 						app.SetStatus("Calendar opened - select a date to search")
+					},
+				},
+				'p': {
+					Key:         'p',
+					Description: "Paste as child of selected item",
+					Handler: func(app *App) {
+						app.handlePasteAsChildCommand()
 					},
 				},
 			},

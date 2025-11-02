@@ -1055,10 +1055,10 @@ func (tv *TreeView) DeleteItem(item *model.Item) bool {
 	return true
 }
 
-// PasteAfter pastes an item after the selected item
-func (tv *TreeView) PasteAfter(item *model.Item) bool {
+// PasteAfter pastes an item after the selected item and returns the pasted item (or nil on failure)
+func (tv *TreeView) PasteAfter(item *model.Item) *model.Item {
 	if item == nil || len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
-		return false
+		return nil
 	}
 
 	selected := tv.filteredView[tv.selectedIdx].Item
@@ -1080,7 +1080,7 @@ func (tv *TreeView) PasteAfter(item *model.Item) bool {
 					tv.items = newChildren
 				}
 				tv.RebuildView()
-				return true
+				return item
 			}
 		}
 	} else {
@@ -1094,17 +1094,17 @@ func (tv *TreeView) PasteAfter(item *model.Item) bool {
 				newItems = append(newItems, tv.items[idx+1:]...)
 				tv.items = newItems
 				tv.RebuildView()
-				return true
+				return item
 			}
 		}
 	}
-	return false
+	return nil
 }
 
-// PasteBefore pastes an item before the selected item
-func (tv *TreeView) PasteBefore(item *model.Item) bool {
+// PasteBefore pastes an item before the selected item and returns the pasted item (or nil on failure)
+func (tv *TreeView) PasteBefore(item *model.Item) *model.Item {
 	if item == nil || len(tv.filteredView) == 0 || tv.selectedIdx >= len(tv.filteredView) {
-		return false
+		return nil
 	}
 
 	selected := tv.filteredView[tv.selectedIdx].Item
@@ -1126,7 +1126,7 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 					tv.items = newChildren
 				}
 				tv.RebuildView()
-				return true
+				return item
 			}
 		}
 	} else {
@@ -1140,11 +1140,11 @@ func (tv *TreeView) PasteBefore(item *model.Item) bool {
 				newItems = append(newItems, tv.items[idx:]...)
 				tv.items = newItems
 				tv.RebuildView()
-				return true
+				return item
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 // GetSelected returns the currently selected item
