@@ -719,6 +719,11 @@ func (tv *TreeView) DeleteSelected() bool {
 		return false
 	}
 
+	displayItem := tv.filteredView[tv.selectedIdx]
+	if displayItem.IsVirtual {
+		return false
+	}
+
 	item := tv.filteredView[tv.selectedIdx].Item
 	if item.Parent != nil {
 		item.Parent.RemoveChild(item)
