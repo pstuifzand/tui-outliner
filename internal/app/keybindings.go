@@ -340,10 +340,13 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				// Initialize metadata if needed
 				if selected.Metadata == nil {
 					selected.Metadata = &model.Metadata{
-						Attributes: make(map[string]string),
+						Attributes: nil,
 						Created:    time.Now(),
 						Modified:   time.Now(),
 					}
+				}
+				if selected.Metadata.Attributes == nil {
+					selected.Metadata.Attributes = make(map[string]string)
 				}
 
 				// Initialize type if not already set
