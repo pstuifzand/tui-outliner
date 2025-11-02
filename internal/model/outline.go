@@ -18,6 +18,10 @@ type Item struct {
 	Expanded         bool      `json:"-"` // UI state, not persisted
 	IsNew            bool      `json:"-"` // UI state: true for newly created placeholder items
 	virtualChildren  []*Item   `json:"-"` // Resolved virtual child pointers (runtime only)
+	// CollapsedVirtualChildren tracks which virtual children are collapsed (for display-only)
+	// Maps virtual child item ID -> true if collapsed. Only used for search nodes to avoid
+	// collapsing the original items. This is session-only state.
+	CollapsedVirtualChildren map[string]bool `json:"-"`
 }
 
 // Metadata holds rich information about an item
@@ -45,8 +49,9 @@ func NewItem(text string) *Item {
 			Created:    time.Now(),
 			Modified:   time.Now(),
 		},
-		Expanded: true,
-		IsNew:    true,
+		Expanded:                 true,
+		IsNew:                    true,
+		CollapsedVirtualChildren: make(map[string]bool),
 	}
 }
 
@@ -160,6 +165,26 @@ func (i *Item) GetVirtualChildren() []*Item {
 		return make([]*Item, 0)
 	}
 	return i.virtualChildren
+}
+
+// IsVirtualChildCollapsed checks if a virtual child is collapsed in the search node's display
+func (i *Item) IsVirtualChildCollapsed(virtualChildID string) bool {
+	if i.CollapsedVirtualChildren == nil {
+		return false
+	}
+	return i.CollapsedVirtualChildren[virtualChildID]
+}
+
+// SetVirtualChildCollapsed marks a virtual child as collapsed in the search node's display
+func (i *Item) SetVirtualChildCollapsed(virtualChildID string, collapsed bool) {
+	if i.CollapsedVirtualChildren == nil {
+		i.CollapsedVirtualChildren = make(map[string]bool)
+	}
+	if collapsed {
+		i.CollapsedVirtualChildren[virtualChildID] = true
+	} else {
+		delete(i.CollapsedVirtualChildren, virtualChildID)
+	}
 }
 
 // AddVirtualChild adds a virtual child reference by ID

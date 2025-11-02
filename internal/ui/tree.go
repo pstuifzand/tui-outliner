@@ -170,10 +170,12 @@ type TreeView struct {
 }
 
 type displayItem struct {
-	Item         *model.Item
-	Depth        int
-	IsVirtual    bool        // True if this is a virtual child reference
-	OriginalItem *model.Item // Points to the original if IsVirtual (for virtual references)
+	Item              *model.Item
+	Depth             int
+	IsVirtual         bool        // True if this is a virtual child reference
+	OriginalItem      *model.Item // Points to the original if IsVirtual (for virtual references)
+	SearchNodeParent  *model.Item // If IsVirtual, points to the search node that owns this virtual reference
+	VirtualAncestors  []*model.Item // Chain of virtual ancestors for nested virtual items
 }
 
 // NewTreeView creates a new TreeView
@@ -195,10 +197,10 @@ func (tv *TreeView) RebuildView() {
 }
 
 func (tv *TreeView) buildDisplayItems(items []*model.Item, depth int) []*displayItem {
-	return tv.buildDisplayItemsInternal(items, depth, false)
+	return tv.buildDisplayItemsInternal(items, depth, false, nil, nil, nil)
 }
 
-func (tv *TreeView) buildDisplayItemsInternal(items []*model.Item, depth int, parentIsVirtual bool) []*displayItem {
+func (tv *TreeView) buildDisplayItemsInternal(items []*model.Item, depth int, parentIsVirtual bool, searchNodeParent *model.Item, virtualAncestors []*model.Item, directVirtualParent *model.Item) []*displayItem {
 	var result []*displayItem
 	for _, item := range items {
 		// Check if item should be displayed
@@ -215,23 +217,50 @@ func (tv *TreeView) buildDisplayItemsInternal(items []*model.Item, depth int, pa
 
 		if shouldDisplay {
 			// If parent was virtual, this item is also shown as virtual
+			ancestors := virtualAncestors
+			if parentIsVirtual && directVirtualParent != nil {
+				// Build the ancestor chain for this virtual item
+				ancestors = append([]*model.Item{}, virtualAncestors...)
+				ancestors = append(ancestors, directVirtualParent)
+			}
+
 			result = append(result, &displayItem{
-				Item:         item,
-				Depth:        depth,
-				IsVirtual:    parentIsVirtual,
-				OriginalItem: item,
+				Item:              item,
+				Depth:             depth,
+				IsVirtual:         parentIsVirtual,
+				OriginalItem:      item,
+				SearchNodeParent:  searchNodeParent,
+				VirtualAncestors:  ancestors,
 			})
-			if item.Expanded {
+
+			// Determine if this item should show its children
+			var shouldShowChildren bool
+			if parentIsVirtual && searchNodeParent != nil {
+				// For virtual children, ONLY check if it's collapsed in the search node's display
+				// Do NOT check the original item's Expanded state
+				shouldShowChildren = !searchNodeParent.IsVirtualChildCollapsed(item.ID)
+			} else {
+				// For real children (not virtual), use the original item's Expanded state
+				shouldShowChildren = item.Expanded
+			}
+
+			if shouldShowChildren {
 				// Add real children
 				if len(item.Children) > 0 {
-					result = append(result, tv.buildDisplayItemsInternal(item.Children, depth+1, parentIsVirtual)...)
+					result = append(result, tv.buildDisplayItemsInternal(item.Children, depth+1, parentIsVirtual, searchNodeParent, ancestors, item)...)
 				}
 				// Add virtual children (only if this item is not already virtual)
 				if !parentIsVirtual {
 					virtualChildren := item.GetVirtualChildren()
 					if len(virtualChildren) > 0 {
+						// Update searchNodeParent if this is a search node
+						currentSearchNode := searchNodeParent
+						if item.IsSearchNode() {
+							currentSearchNode = item
+						}
+
 						for _, virtualChild := range virtualChildren {
-							result = append(result, tv.buildDisplayItemsInternal([]*model.Item{virtualChild}, depth+1, true)...)
+							result = append(result, tv.buildDisplayItemsInternal([]*model.Item{virtualChild}, depth+1, true, currentSearchNode, nil, virtualChild)...)
 						}
 					}
 				}
@@ -300,9 +329,27 @@ func (tv *TreeView) ensureVisible() {
 }
 
 // Expand expands the selected item and moves to the first child
+// For virtual children, clears the collapsed flag in the search node without affecting the original item
+// Never modifies the actual item's Expanded state for virtual items
 func (tv *TreeView) Expand(move bool) {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		item := tv.filteredView[tv.selectedIdx].Item
+		dispItem := tv.filteredView[tv.selectedIdx]
+		item := dispItem.Item
+
+		// Special handling for virtual children: expand only in the search node's view
+		// Do NOT modify the actual item's Expanded state
+		if dispItem.IsVirtual && dispItem.SearchNodeParent != nil {
+			// Clear the collapsed flag for this virtual item in the search node's display
+			dispItem.SearchNodeParent.SetVirtualChildCollapsed(item.ID, false)
+			tv.RebuildView()
+			// Move to first child if requested
+			if move && (len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0) && tv.selectedIdx < len(tv.filteredView)-1 {
+				tv.selectedIdx++
+			}
+			return
+		}
+
+		// For non-virtual items, expand normally
 		hasChildren := len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0
 		if !item.Expanded && hasChildren {
 			item.Expanded = true
@@ -317,12 +364,52 @@ func (tv *TreeView) Expand(move bool) {
 
 // Collapse collapses the selected item
 // Smart behavior: if item has no children, collapses parent instead and moves selection to parent
+// For virtual children (search results), marks them as collapsed in the search node without
+// affecting the original item's expand state
 func (tv *TreeView) Collapse() {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
-		item := tv.filteredView[tv.selectedIdx].Item
+		dispItem := tv.filteredView[tv.selectedIdx]
+		item := dispItem.Item
+
+		// Check if this item has children
+		hasChildren := len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0
+
+		// Special handling for virtual children: collapse only in the search node's view
+		if dispItem.IsVirtual && dispItem.SearchNodeParent != nil {
+			// If virtual item has children, collapse it in the search node
+			if hasChildren {
+				dispItem.SearchNodeParent.SetVirtualChildCollapsed(item.ID, true)
+				tv.RebuildView()
+				return
+			}
+			// If virtual item has no children, try to collapse its virtual parent instead
+			// Find the virtual parent by looking at VirtualAncestors
+			if len(dispItem.VirtualAncestors) > 0 {
+				// There's a virtual parent, collapse it in the search node
+				virtualParent := dispItem.VirtualAncestors[len(dispItem.VirtualAncestors)-1]
+				dispItem.SearchNodeParent.SetVirtualChildCollapsed(virtualParent.ID, true)
+				tv.RebuildView()
+
+				// Move selection to the virtual parent
+				virtualParentID := virtualParent.ID
+				for idx, dItem := range tv.filteredView {
+					if dItem.Item.ID == virtualParentID {
+						tv.selectedIdx = idx
+						break
+					}
+				}
+				return
+			}
+			// If no virtual parent, this is a direct virtual child with no children
+			// Collapse its parent (the search node's parent in the real tree)
+			if item.Parent != nil && item.Parent.Expanded {
+				item.Parent.Expanded = false
+				tv.RebuildView()
+				return
+			}
+		}
 
 		// If item has children and is expanded, collapse it
-		hasChildren := len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0
 		if item.Expanded && hasChildren {
 			item.Expanded = false
 			tv.RebuildView()
@@ -1001,11 +1088,22 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			arrowStyle = selectedStyle // Use selected style if item is selected
 		}
 
-		// For virtual children, always use the arrow indicator instead of expand/collapse
+		// Determine which arrow to show
 		arrow := "▶"
 		if dispItem.IsVirtual {
-			arrow = "→"
+			// For virtual children, check if it's collapsed in the search node
+			if dispItem.SearchNodeParent != nil && dispItem.SearchNodeParent.IsVirtualChildCollapsed(dispItem.Item.ID) {
+				// Collapsed virtual item: show right arrow
+				arrow = "→"
+			} else if hasChildren {
+				// Expanded virtual item: show down arrow
+				arrow = "↓"
+			} else {
+				// Virtual leaf with no children
+				arrow = "→"
+			}
 		} else if hasChildren && dispItem.Item.Expanded {
+			// Real items: show down arrow if expanded and has children
 			arrow = "▼"
 		}
 
@@ -1730,3 +1828,4 @@ func (tv *TreeView) drawTextWithHighlight(screen *Screen, x int, y int, text str
 		lastIdx = matchIdx + len(searchQuery)
 	}
 }
+
