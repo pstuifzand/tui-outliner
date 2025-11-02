@@ -436,3 +436,40 @@ func parseDate(value string) time.Time {
 	}
 	return t
 }
+
+// GetMatchingItems returns all items that match the given filter expression
+func GetMatchingItems(outline *model.Outline, filterExpr FilterExpr) []*model.Item {
+	var matches []*model.Item
+	for _, item := range outline.GetAllItems() {
+		if filterExpr.Matches(item) {
+			matches = append(matches, item)
+		}
+	}
+	return matches
+}
+
+// GetFirstMatchingItem returns the first item that matches the given filter expression, or nil if none match
+func GetFirstMatchingItem(outline *model.Outline, filterExpr FilterExpr) *model.Item {
+	for _, item := range outline.GetAllItems() {
+		if filterExpr.Matches(item) {
+			return item
+		}
+	}
+	return nil
+}
+
+func GetFirstByQuery(outline *model.Outline, query string) (*model.Item, error) {
+	filterExpr, err := ParseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	return GetFirstMatchingItem(outline, filterExpr), nil
+}
+
+func GetAlllByQuery(outline *model.Outline, query string) ([]*model.Item, error) {
+	filterExpr, err := ParseQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	return GetMatchingItems(outline, filterExpr), nil
+}
