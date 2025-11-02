@@ -1522,6 +1522,35 @@ func (a *App) handleSearchCommand(parts []string) {
 	a.dirty = true
 }
 
+// populateSearchNode updates a single search node with current matching results
+// Returns the count of matches found, or 0 if query is empty/invalid
+func (a *App) populateSearchNode(item *model.Item) int {
+	queryStr := item.GetSearchQuery()
+	if queryStr == "" {
+		return 0
+	}
+
+	// Parse and execute the query
+	filterExpr, err := search.ParseQuery(queryStr)
+	if err != nil {
+		return 0
+	}
+
+	// Find matching items
+	var matchingIDs []string
+	for _, candidate := range a.outline.GetAllItems() {
+		// Don't include the search node itself
+		if candidate.ID == item.ID {
+			continue
+		}
+		if filterExpr.Matches(candidate) {
+			matchingIDs = append(matchingIDs, candidate.ID)
+		}
+	}
+
+	return a.outline.PopulateSearchNode(item, matchingIDs)
+}
+
 // refreshSearchNodes refreshes all expanded search nodes with current results
 func (a *App) refreshSearchNodes() {
 	// Sync outline with tree before searching
@@ -1531,24 +1560,7 @@ func (a *App) refreshSearchNodes() {
 	// Find all search nodes and refresh them
 	for _, item := range a.outline.GetAllItems() {
 		if item.IsSearchNode() && item.Expanded {
-			queryStr := item.GetSearchQuery()
-			if queryStr != "" {
-				// Parse and execute the query
-				filterExpr, err := search.ParseQuery(queryStr)
-				if err == nil {
-					// Find matching items
-					var matchingIDs []string
-					for _, candidate := range a.outline.GetAllItems() {
-						if candidate.ID == item.ID {
-							continue
-						}
-						if filterExpr.Matches(candidate) {
-							matchingIDs = append(matchingIDs, candidate.ID)
-						}
-					}
-					a.outline.PopulateSearchNode(item, matchingIDs)
-				}
-			}
+			a.populateSearchNode(item)
 		}
 	}
 

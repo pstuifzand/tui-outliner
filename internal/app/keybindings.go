@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pstuifzand/tui-outliner/internal/model"
-	"github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
@@ -88,31 +87,11 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 					app.outline.Items = app.tree.GetItems()
 					app.outline.BuildIndex()
 
-					queryStr := selected.GetSearchQuery()
-					if queryStr != "" {
-						// Parse the search query
-						filterExpr, err := search.ParseQuery(queryStr)
-						if err != nil {
-							app.SetStatus(fmt.Sprintf("Invalid search query: %v", err))
-						} else {
-							// Find matching items
-							var matchingIDs []string
-							for _, candidate := range app.outline.GetAllItems() {
-								// Don't include the search node itself
-								if candidate.ID == selected.ID {
-									continue
-								}
-								if filterExpr.Matches(candidate) {
-									matchingIDs = append(matchingIDs, candidate.ID)
-								}
-							}
-							count := app.outline.PopulateSearchNode(selected, matchingIDs)
-							if count == 0 {
-								app.SetStatus(fmt.Sprintf("Search query returned no results"))
-							} else {
-								app.SetStatus(fmt.Sprintf("Found %d results for search query", count))
-							}
-						}
+					count := app.populateSearchNode(selected)
+					if count == 0 {
+						app.SetStatus("Search query returned no results")
+					} else {
+						app.SetStatus(fmt.Sprintf("Found %d results for search query", count))
 					}
 				}
 				app.tree.Expand(true)
@@ -129,31 +108,13 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 					app.outline.Items = app.tree.GetItems()
 					app.outline.BuildIndex()
 
-					queryStr := selected.GetSearchQuery()
-					if queryStr != "" {
-						// Parse the search query
-						filterExpr, err := search.ParseQuery(queryStr)
-						if err != nil {
-							app.SetStatus(fmt.Sprintf("Invalid search query: %v", err))
-						} else {
-							// Find matching items
-							var matchingIDs []string
-							for _, candidate := range app.outline.GetAllItems() {
-								// Don't include the search node itself
-								if candidate.ID == selected.ID {
-									continue
-								}
-								if filterExpr.Matches(candidate) {
-									matchingIDs = append(matchingIDs, candidate.ID)
-								}
-							}
-							count := app.outline.PopulateSearchNode(selected, matchingIDs)
-							app.SetStatus(fmt.Sprintf("Refreshed: %d results for search query", count))
-							app.tree.RebuildView()
-						}
+					count := app.populateSearchNode(selected)
+					if count == 0 {
+						app.SetStatus("Search query returned no results")
 					} else {
-						app.SetStatus("No search query defined")
+						app.SetStatus(fmt.Sprintf("Refreshed: %d results for search query", count))
 					}
+					app.tree.RebuildView()
 				} else {
 					app.SetStatus("Not a search node")
 				}
