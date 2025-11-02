@@ -35,7 +35,7 @@ type App struct {
 	outline            *model.Outline
 	store              *storage.JSONStore
 	tree               *ui.TreeView
-	editor             *ui.Editor
+	editor             *ui.MultiLineEditor
 	search             *ui.Search
 	help               *ui.HelpScreen
 	splash             *ui.SplashScreen
@@ -425,21 +425,35 @@ func (a *App) render() {
 
 	// Render editor inline if active
 	if a.editor != nil && a.editor.IsActive() {
-		selectedIdx := a.tree.GetSelectedIndex()
-		if selectedIdx >= 0 {
-			// Calculate the Y position of the selected item on screen
-			itemY := treeStartY + selectedIdx
-			if itemY < treeEndY {
-				// Calculate X position after the tree prefix (indentation + arrow + space)
-				selected := a.tree.GetSelected()
-				if selected != nil {
-					// Get depth from tree view (need to find it)
+		selected := a.tree.GetSelected()
+		if selected != nil {
+			// Get the first display line for the selected item
+			displayLines := a.tree.GetDisplayLines()
+			displayLineIdx := -1
+			for idx, line := range displayLines {
+				if line.Item.ID == selected.ID && line.ItemStartLine {
+					displayLineIdx = idx
+					break
+				}
+			}
+
+			if displayLineIdx >= 0 {
+				// Calculate the Y position based on display line (accounting for viewport offset)
+				viewportOffset := a.tree.GetViewportOffset()
+				screenIdx := displayLineIdx - viewportOffset
+				if screenIdx >= 0 && screenIdx < treeEndY-treeStartY {
+					itemY := treeStartY + screenIdx
+					// Calculate X position after the tree prefix (indentation + arrow + space)
 					depth := a.tree.GetSelectedDepth()
-					editorX := depth*3 + 3 // indentation + arrow + attribute + space
-					maxWidth := width - editorX
-					if maxWidth > 0 {
-						a.editor.Render(a.screen, editorX, itemY, maxWidth)
+					editorX := depth*3 + 3 // indentation + arrow + attribute indicator + space
+					// Use same max width calculation as tree view for consistent wrapping
+					maxWidth := width - 21 // 6 levels * 3 + 3 for arrow area
+					if maxWidth < 20 {
+						maxWidth = 20 // Minimum wrap width
 					}
+					// Render editor (may span multiple lines)
+					// Render call will call SetMaxWidth internally
+					a.editor.Render(a.screen, editorX, itemY, maxWidth)
 				}
 			}
 		}
@@ -682,7 +696,7 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 						// Enter insert mode on previous item with cursor at end
 						prevItem := a.tree.GetSelected()
 						if prevItem != nil {
-							a.editor = ui.NewEditor(prevItem)
+							a.editor = ui.NewMultiLineEditor(prevItem)
 							a.editor.Start()
 							a.mode = InsertMode
 						}
@@ -696,7 +710,7 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 						a.SetStatus("Cannot indent (no previous item)")
 					}
 					// Re-enter insert mode on the same item
-					a.editor = ui.NewEditor(editedItem)
+					a.editor = ui.NewMultiLineEditor(editedItem)
 					a.editor.Start()
 					a.mode = InsertMode
 				} else if outdentPressed {
@@ -708,7 +722,7 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 						a.SetStatus("Cannot outdent (already at root level)")
 					}
 					// Re-enter insert mode on the same item
-					a.editor = ui.NewEditor(editedItem)
+					a.editor = ui.NewMultiLineEditor(editedItem)
 					a.editor.Start()
 					a.mode = InsertMode
 				} else if enterPressed {
@@ -720,7 +734,7 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					// Enter insert mode for the new item
 					selected := a.tree.GetSelected()
 					if selected != nil {
-						a.editor = ui.NewEditor(selected)
+						a.editor = ui.NewMultiLineEditor(selected)
 						a.editor.Start()
 						a.mode = InsertMode
 					}
@@ -1362,17 +1376,17 @@ func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
 		return
 	}
 
-	// Calculate which tree item was clicked
-	itemIdx := y - treeStartY
+	// Calculate which display line was clicked
+	displayLineIdx := y - treeStartY
 
 	// Check if we're in search mode
 	if a.search.IsActive() {
 		// For search results, just select the item
 		results := a.search.GetResults()
-		if itemIdx >= 0 && itemIdx < len(results) {
+		if displayLineIdx >= 0 && displayLineIdx < len(results) {
 			a.tree = ui.NewTreeView(results)
-			if itemIdx < len(a.tree.GetDisplayItems()) {
-				for i := 0; i < itemIdx; i++ {
+			if displayLineIdx < len(a.tree.GetDisplayItems()) {
+				for i := 0; i < displayLineIdx; i++ {
 					a.tree.SelectNext()
 				}
 			}
@@ -1380,25 +1394,35 @@ func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
 		return
 	}
 
+	// Convert display line index to item index in filtered view
+	itemIdx := a.tree.GetItemFromDisplayLine(displayLineIdx)
+	if itemIdx < 0 {
+		return
+	}
+
 	displayItems := a.tree.GetDisplayItems()
-	if itemIdx < 0 || itemIdx >= len(displayItems) {
+	if itemIdx >= len(displayItems) {
 		return
 	}
 
 	// Check if click was on the arrow (expand/collapse)
-	dispItem := displayItems[itemIdx]
-	arrowX := dispItem.Depth * 3
+	// Only process arrow clicks on the first line of the item
+	displayLine := a.tree.GetDisplayLines()[displayLineIdx]
+	if displayLine.ItemStartLine {
+		dispItem := displayItems[itemIdx]
+		arrowX := dispItem.Depth * 3
 
-	// Arrow is at position arrowX, click is on it if within those bounds
-	if x >= arrowX && x < arrowX+1 && len(dispItem.Item.Children) > 0 {
-		// Click was on the arrow
-		a.tree.SelectItem(itemIdx)
-		if dispItem.Item.Expanded {
-			a.tree.Collapse()
-		} else {
-			a.tree.Expand(false)
+		// Arrow is at position arrowX, click is on it if within those bounds
+		if x >= arrowX && x < arrowX+1 && len(dispItem.Item.Children) > 0 {
+			// Click was on the arrow
+			a.tree.SelectItem(itemIdx)
+			if dispItem.Item.Expanded {
+				a.tree.Collapse()
+			} else {
+				a.tree.Expand(false)
+			}
+			return
 		}
-		return
 	}
 
 	// Otherwise, just select the item

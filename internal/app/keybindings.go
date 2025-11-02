@@ -146,7 +146,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Handler: func(app *App) {
 				selected := app.tree.GetSelected()
 				if selected != nil {
-					app.editor = ui.NewEditor(selected)
+					app.editor = ui.NewMultiLineEditor(selected)
 					app.editor.Start()
 					app.editor.SetCursorToStart()
 					app.mode = InsertMode
@@ -159,7 +159,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Handler: func(app *App) {
 				selected := app.tree.GetSelected()
 				if selected != nil {
-					app.editor = ui.NewEditor(selected)
+					app.editor = ui.NewMultiLineEditor(selected)
 					app.editor.SetText("")
 					app.editor.Start()
 					app.mode = InsertMode
@@ -172,7 +172,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Handler: func(app *App) {
 				selected := app.tree.GetSelected()
 				if selected != nil {
-					app.editor = ui.NewEditor(selected)
+					app.editor = ui.NewMultiLineEditor(selected)
 					app.editor.Start()
 					app.mode = InsertMode
 				}
@@ -188,7 +188,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				// Enter insert mode for the new item
 				selected := app.tree.GetSelected()
 				if selected != nil {
-					app.editor = ui.NewEditor(selected)
+					app.editor = ui.NewMultiLineEditor(selected)
 					app.editor.Start()
 					app.mode = InsertMode
 				}
@@ -205,7 +205,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 				// Enter insert mode for the new item
 				selected := app.tree.GetSelected()
 				if selected != nil {
-					app.editor = ui.NewEditor(selected)
+					app.editor = ui.NewMultiLineEditor(selected)
 					app.editor.Start()
 					app.mode = InsertMode
 				}

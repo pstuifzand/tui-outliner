@@ -84,6 +84,14 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		e.escapePressed = true
 		return false // Signal to exit edit mode
 	case tcell.KeyEnter:
+		// Check if Shift is held (Shift+Enter = newline, plain Enter = new node)
+		if ev.Modifiers()&tcell.ModShift != 0 {
+			// Shift+Enter - insert newline for multi-line text
+			e.text = e.text[:e.cursorPos] + "\n" + e.text[e.cursorPos:]
+			e.cursorPos++
+			return true
+		}
+		// Plain Enter - exit edit mode and create new node
 		e.enterPressed = true
 		return false // Signal to exit edit mode and create new node
 	case tcell.KeyTab:

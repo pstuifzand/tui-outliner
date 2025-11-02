@@ -159,10 +159,12 @@ func UpdateParentStatusIfTodo(item *model.Item, todoStatuses []string) {
 // TreeView manages the display and navigation of the outline tree
 type TreeView struct {
 	items          []*model.Item
-	selectedIdx    int
+	selectedIdx    int // Index of currently selected item (in terms of items, not display lines)
 	filterText     string
 	filteredView   []*displayItem
-	viewportOffset int // Index of first visible item in the viewport
+	displayLines   []*DisplayLine // Multi-line aware display for rendering
+	viewportOffset int // Index of first visible display line in the viewport
+	maxWidth       int // Maximum width for text wrapping (0 = no wrapping)
 
 	// Hoisting state
 	hoistedItem   *model.Item   // Current hoisted node (nil if not hoisted)
@@ -178,6 +180,21 @@ type displayItem struct {
 	VirtualAncestors []*model.Item // Chain of virtual ancestors for nested virtual items
 }
 
+// DisplayLine represents a single visual line in the tree view
+// Multiple DisplayLines can belong to the same Item if it has multiple lines of text
+type DisplayLine struct {
+	Item             *model.Item // The underlying item
+	TextLineIndex    int         // Which line within the item's text (0-based, split by \n)
+	TextLine         string      // The actual text to display for this line
+	ItemStartLine    bool        // True if this is the first line of the item (shows indent/arrow/metadata)
+	IsWrapped        bool        // True if this is a wrapped continuation of a long line
+	Depth            int
+	IsVirtual        bool
+	OriginalItem     *model.Item
+	SearchNodeParent *model.Item
+	VirtualAncestors []*model.Item
+}
+
 // NewTreeView creates a new TreeView
 func NewTreeView(items []*model.Item) *TreeView {
 	tv := &TreeView{
@@ -188,11 +205,157 @@ func NewTreeView(items []*model.Item) *TreeView {
 	return tv
 }
 
+// wrapTextAtWidth wraps a single text line to the specified width
+// Returns a slice of wrapped text portions
+func wrapTextAtWidth(text string, maxWidth int) []string {
+	if maxWidth <= 0 {
+		return []string{text}
+	}
+
+	if len(text) <= maxWidth {
+		return []string{text}
+	}
+
+	var result []string
+	remaining := text
+
+	for len(remaining) > maxWidth {
+		// Try to find a word boundary within maxWidth
+		// Look for the last space before maxWidth
+		lastSpace := -1
+		for i := 0; i < maxWidth && i < len(remaining); i++ {
+			if remaining[i] == ' ' {
+				lastSpace = i
+			}
+		}
+
+		// If we found a space, wrap at it (excluding the space)
+		if lastSpace > 0 && lastSpace < maxWidth {
+			result = append(result, remaining[:lastSpace])
+			// Skip the space when continuing
+			remaining = strings.TrimPrefix(remaining[lastSpace:], " ")
+		} else {
+			// No good word boundary, wrap at character boundary
+			result = append(result, remaining[:maxWidth])
+			remaining = remaining[maxWidth:]
+		}
+	}
+
+	// Add any remaining text
+	if len(remaining) > 0 {
+		result = append(result, remaining)
+	}
+
+	return result
+}
+
+// buildDisplayLines converts a list of displayItems into display lines,
+// expanding multi-line items into multiple DisplayLine entries with word wrapping
+// maxWidth specifies the maximum width for text wrapping (0 = no wrapping)
+func (tv *TreeView) buildDisplayLines(displayItems []*displayItem, maxWidth int) []*DisplayLine {
+	var lines []*DisplayLine
+	for _, dispItem := range displayItems {
+		// Split item text by hard newlines first
+		textLines := strings.Split(dispItem.Item.Text, "\n")
+		for lineIdx, textLine := range textLines {
+			// Apply word wrapping if maxWidth is specified
+			var wrappedLines []string
+			if maxWidth > 0 {
+				wrappedLines = wrapTextAtWidth(textLine, maxWidth)
+			} else {
+				wrappedLines = []string{textLine}
+			}
+
+			// Create display lines for each wrapped portion
+			for wrapIdx, wrappedText := range wrappedLines {
+				isFirstLine := lineIdx == 0 && wrapIdx == 0
+				isWrapped := wrapIdx > 0 // True if this is a wrapped continuation
+
+				line := &DisplayLine{
+					Item:             dispItem.Item,
+					TextLineIndex:    lineIdx,
+					TextLine:         wrappedText,
+					ItemStartLine:    isFirstLine,
+					IsWrapped:        isWrapped,
+					Depth:            dispItem.Depth,
+					IsVirtual:        dispItem.IsVirtual,
+					OriginalItem:     dispItem.OriginalItem,
+					SearchNodeParent: dispItem.SearchNodeParent,
+					VirtualAncestors: dispItem.VirtualAncestors,
+				}
+				lines = append(lines, line)
+			}
+		}
+	}
+	return lines
+}
+
+// getFirstDisplayLineForItem returns the index of the first display line for a given item
+// Returns -1 if item not found
+func (tv *TreeView) getFirstDisplayLineForItem(item *model.Item) int {
+	if item == nil {
+		return -1
+	}
+	for idx, line := range tv.displayLines {
+		if line.Item.ID == item.ID && line.ItemStartLine {
+			return idx
+		}
+	}
+	return -1
+}
+
+// getLastDisplayLineForItem returns the index of the last display line for a given item
+// Returns -1 if item not found
+func (tv *TreeView) getLastDisplayLineForItem(item *model.Item) int {
+	if item == nil {
+		return -1
+	}
+	lastIdx := -1
+	for idx, line := range tv.displayLines {
+		if line.Item.ID == item.ID {
+			lastIdx = idx
+		} else if lastIdx >= 0 {
+			// We've moved past this item's lines
+			break
+		}
+	}
+	return lastIdx
+}
+
+// GetItemFromDisplayLine returns the item index in filteredView for a given display line
+// Used for converting display line clicks to item selection
+func (tv *TreeView) GetItemFromDisplayLine(displayLineIdx int) int {
+	if displayLineIdx < 0 || displayLineIdx >= len(tv.displayLines) {
+		return -1
+	}
+	item := tv.displayLines[displayLineIdx].Item
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.Item.ID == item.ID {
+			return idx
+		}
+	}
+	return -1
+}
+
 // RebuildView rebuilds the filtered/display view
 func (tv *TreeView) RebuildView() {
 	tv.filteredView = tv.buildDisplayItems(tv.items, 0)
+	tv.displayLines = tv.buildDisplayLines(tv.filteredView, tv.maxWidth)
 	if tv.selectedIdx >= len(tv.filteredView) && len(tv.filteredView) > 0 {
 		tv.selectedIdx = len(tv.filteredView) - 1
+	}
+	tv.viewportOffset = 0 // Reset viewport when rebuilding
+}
+
+// SetMaxWidth sets the maximum width for text wrapping and rebuilds the view
+// Pass 0 to disable wrapping (use truncation instead)
+func (tv *TreeView) SetMaxWidth(width int) {
+	if width < 0 {
+		width = 0
+	}
+	if tv.maxWidth != width {
+		tv.maxWidth = width
+		tv.RebuildView()
 	}
 }
 
@@ -289,13 +452,19 @@ func (tv *TreeView) ScrollPageUp(pageSize int) {
 	if pageSize <= 0 {
 		pageSize = 1
 	}
-	// Move selection up by pageSize
+	// Move selection up by pageSize items
 	tv.selectedIdx -= pageSize
 	if tv.selectedIdx < 0 {
 		tv.selectedIdx = 0
 	}
-	// Adjust viewport offset to show the selected item at the top
-	tv.viewportOffset = tv.selectedIdx
+	// Adjust viewport offset to show the selected item's first line at the top
+	selectedItem := tv.GetSelected()
+	if selectedItem != nil {
+		firstLineIdx := tv.getFirstDisplayLineForItem(selectedItem)
+		if firstLineIdx >= 0 {
+			tv.viewportOffset = firstLineIdx
+		}
+	}
 }
 
 // ScrollPageDown scrolls the viewport down by pageSize items and moves selection
@@ -303,16 +472,22 @@ func (tv *TreeView) ScrollPageDown(pageSize int) {
 	if pageSize <= 0 {
 		pageSize = 1
 	}
-	// Move selection down by pageSize
+	// Move selection down by pageSize items
 	tv.selectedIdx += pageSize
 	maxIdx := len(tv.filteredView) - 1
 	if tv.selectedIdx > maxIdx {
 		tv.selectedIdx = maxIdx
 	}
-	// Adjust viewport offset to show the selected item at the bottom of viewport
-	tv.viewportOffset = tv.selectedIdx - pageSize + 1
-	if tv.viewportOffset < 0 {
-		tv.viewportOffset = 0
+	// Adjust viewport offset to show the selected item's last line at the bottom of viewport
+	selectedItem := tv.GetSelected()
+	if selectedItem != nil {
+		lastLineIdx := tv.getLastDisplayLineForItem(selectedItem)
+		if lastLineIdx >= 0 {
+			tv.viewportOffset = lastLineIdx - pageSize + 1
+			if tv.viewportOffset < 0 {
+				tv.viewportOffset = 0
+			}
+		}
 	}
 }
 
@@ -1018,6 +1193,16 @@ func (tv *TreeView) GetDisplayItems() []*displayItem {
 	return tv.filteredView
 }
 
+// GetDisplayLines returns the current display lines (multi-line aware)
+func (tv *TreeView) GetDisplayLines() []*DisplayLine {
+	return tv.displayLines
+}
+
+// GetViewportOffset returns the index of the first visible display line in the viewport
+func (tv *TreeView) GetViewportOffset() int {
+	return tv.viewportOffset
+}
+
 // Render renders the tree to the screen
 func (tv *TreeView) Render(screen *Screen, startY, endY int, visualAnchor int, cfg *config.Config) {
 	tv.RenderWithSearchQuery(screen, startY, endY, visualAnchor, "", nil, cfg)
@@ -1025,33 +1210,54 @@ func (tv *TreeView) Render(screen *Screen, startY, endY int, visualAnchor int, c
 
 // RenderWithSearchQuery renders the tree with optional search query highlighting
 func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visualAnchor int, searchQuery string, currentMatchItem *model.Item, cfg *config.Config) {
+	screenWidth := screen.GetWidth()
+	screenHeight := screen.GetHeight()
+
+	// Calculate max width for text wrapping
+	// Reserve space for indentation (max 6 levels * 3 chars) and arrow/indicator/space (3 chars)
+	// This ensures we have at least some reasonable width for text
+	maxTextWidth := screenWidth - 21 // 6 levels * 3 + 3 for arrow area
+	if maxTextWidth < 20 {
+		maxTextWidth = 20 // Minimum wrap width
+	}
+
+	// Update max width if it changed
+	tv.SetMaxWidth(maxTextWidth)
+
 	defaultStyle := screen.TreeNormalStyle()
 	selectedStyle := screen.TreeSelectedStyle()
 	visualStyle := screen.TreeVisualSelectionStyle()
 	visualCursorStyle := screen.TreeVisualCursorStyle()
 	newItemStyle := screen.TreeNewItemStyle()
 	highlightStyle := screen.SearchHighlightStyle()
-	screenWidth := screen.GetWidth()
-	screenHeight := screen.GetHeight()
 
 	// Add background to non-selected styles
 	bgColor := screen.Theme.Colors.Background
 	defaultStyle = defaultStyle.Background(bgColor)
 	newItemStyle = newItemStyle.Background(bgColor)
 
-	// Calculate available viewport height Reserve 1 line for status bar
-	// viewportHeight := max(screenHeight-startY-1, 1)
+	// Calculate available viewport height
 	viewportHeight := endY
 
-	// Ensure viewport offset keeps selected item visible
-	if tv.selectedIdx < tv.viewportOffset {
-		tv.viewportOffset = tv.selectedIdx
-	} else if tv.selectedIdx >= tv.viewportOffset+viewportHeight {
-		tv.viewportOffset = tv.selectedIdx - viewportHeight + 1
+	// Get the display line range for the selected item
+	selectedItem := tv.GetSelected()
+	var firstLineOfSelected, lastLineOfSelected int
+	if selectedItem != nil {
+		firstLineOfSelected = tv.getFirstDisplayLineForItem(selectedItem)
+		lastLineOfSelected = tv.getLastDisplayLineForItem(selectedItem)
+	}
+
+	// Ensure viewport offset keeps selected item visible (show first line)
+	if firstLineOfSelected >= 0 {
+		if firstLineOfSelected < tv.viewportOffset {
+			tv.viewportOffset = firstLineOfSelected
+		} else if lastLineOfSelected >= tv.viewportOffset+viewportHeight {
+			tv.viewportOffset = lastLineOfSelected - viewportHeight + 1
+		}
 	}
 
 	// Clamp viewport offset
-	maxOffset := max(len(tv.filteredView)-viewportHeight, 0)
+	maxOffset := max(len(tv.displayLines)-viewportHeight, 0)
 	if tv.viewportOffset > maxOffset {
 		tv.viewportOffset = maxOffset
 	}
@@ -1059,26 +1265,42 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		tv.viewportOffset = 0
 	}
 
-	// Determine visual selection range (adjust for viewport offset)
-	visualStart, visualEnd := -1, -1
+	// For visual selection, convert item indices to display line ranges
+	var visualStart, visualEnd int
+	var hasVisualSelection bool
 	if visualAnchor >= 0 {
-		visualStart = visualAnchor
-		visualEnd = tv.selectedIdx
-		if visualStart > visualEnd {
-			visualStart, visualEnd = visualEnd, visualStart
+		hasVisualSelection = true
+		// Get the display line ranges for both anchor and selected items
+		anchorItem := tv.filteredView[visualAnchor].Item
+		selectedItemObj := tv.filteredView[tv.selectedIdx].Item
+
+		anchorFirst := tv.getFirstDisplayLineForItem(anchorItem)
+		selectedFirst := tv.getFirstDisplayLineForItem(selectedItemObj)
+		selectedLast := tv.getLastDisplayLineForItem(selectedItemObj)
+
+		if anchorFirst >= 0 && selectedFirst >= 0 {
+			visualStart = anchorFirst
+			visualEnd = selectedLast
+			if visualStart > visualEnd {
+				visualStart, visualEnd = visualEnd, visualStart
+			}
+		} else {
+			hasVisualSelection = false
 		}
 	}
 
-	// Render items starting from viewportOffset
+	// Render display lines starting from viewportOffset
 	screenY := startY
-	for i := tv.viewportOffset; i < len(tv.filteredView) && screenY < screenHeight-1; i++ {
-		dispItem := tv.filteredView[i]
-		idx := i // Keep track of actual index in filteredView for selection/visual comparisons
+	for i := tv.viewportOffset; i < len(tv.displayLines) && screenY < screenHeight-1; i++ {
+		displayLine := tv.displayLines[i]
 		y := screenY
+
+		// Determine if this line's item is selected
+		isLinePartOfSelected := selectedItem != nil && displayLine.Item.ID == selectedItem.ID
 
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
-		if dispItem.Item.IsNew && idx != tv.selectedIdx && (visualStart < 0 || idx < visualStart || idx > visualEnd) {
+		if displayLine.Item.IsNew && !isLinePartOfSelected && (!hasVisualSelection || i < visualStart || i > visualEnd) {
 			// Use new item style for new items (dim) when not selected and not in visual range
 			style = newItemStyle
 		}
@@ -1088,192 +1310,232 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		expandableArrowStyle := screen.TreeExpandableArrowStyle().Background(bgColor)
 
 		// Check if in visual selection range
-		inVisualRange := visualStart >= 0 && idx >= visualStart && idx <= visualEnd
+		inVisualRange := hasVisualSelection && i >= visualStart && i <= visualEnd
 
 		if inVisualRange {
 			leafArrowStyle = visualCursorStyle
 			expandableArrowStyle = visualCursorStyle
-			if idx == tv.selectedIdx {
+			if isLinePartOfSelected {
 				style = visualCursorStyle
 			} else {
 				style = visualStyle
 			}
-		} else if idx == tv.selectedIdx {
+		} else if isLinePartOfSelected {
 			style = selectedStyle
 		}
 
-		// Add indentation for parent levels (3 spaces per level)
-		prefix := strings.Repeat("   ", dispItem.Depth)
+		// Only render item metadata (indent, arrow, attributes, progress) on the first line
+		if displayLine.ItemStartLine {
+			// Add indentation for parent levels (3 spaces per level)
+			prefix := strings.Repeat("   ", displayLine.Depth)
 
-		// Draw indentation
-		if dispItem.Depth > 0 {
-			screen.DrawString(0, y, prefix, style)
-		}
+			// Draw indentation
+			if displayLine.Depth > 0 {
+				screen.DrawString(0, y, prefix, style)
+			}
 
-		// Always draw an arrow
-		// Use different colors for leaf vs expandable nodes
-		arrowStyle := leafArrowStyle // Default to leaf (dimmer)
-		hasChildren := len(dispItem.Item.Children) > 0 || len(dispItem.Item.GetVirtualChildren()) > 0
-		if hasChildren {
-			// For nodes with children, use brighter expandable arrow style
-			arrowStyle = expandableArrowStyle
-		}
-		if !inVisualRange && idx == tv.selectedIdx {
-			arrowStyle = selectedStyle // Use selected style if item is selected
-		}
+			// Always draw an arrow
+			// Use different colors for leaf vs expandable nodes
+			arrowStyle := leafArrowStyle // Default to leaf (dimmer)
+			hasChildren := len(displayLine.Item.Children) > 0 || len(displayLine.Item.GetVirtualChildren()) > 0
+			if hasChildren {
+				// For nodes with children, use brighter expandable arrow style
+				arrowStyle = expandableArrowStyle
+			}
+			if !inVisualRange && isLinePartOfSelected {
+				arrowStyle = selectedStyle // Use selected style if item is selected
+			}
 
-		// Determine which arrow to show
-		arrow := "▶"
-		if dispItem.IsVirtual {
-			// For virtual children, check if it's collapsed in the search node
-			if dispItem.SearchNodeParent != nil && dispItem.SearchNodeParent.IsVirtualChildCollapsed(dispItem.Item.ID) {
-				// Collapsed virtual item: show right arrow
-				arrow = "→"
-			} else if hasChildren {
-				// Expanded virtual item: show down arrow
-				arrow = "↓"
+			// Determine which arrow to show
+			arrow := "▶"
+			if displayLine.IsVirtual {
+				// For virtual children, check if it's collapsed in the search node
+				if displayLine.SearchNodeParent != nil && displayLine.SearchNodeParent.IsVirtualChildCollapsed(displayLine.Item.ID) {
+					// Collapsed virtual item: show right arrow
+					arrow = "→"
+				} else if hasChildren {
+					// Expanded virtual item: show down arrow
+					arrow = "↓"
+				} else {
+					// Virtual leaf with no children
+					arrow = "→"
+				}
+			} else if hasChildren && displayLine.Item.Expanded {
+				// Real items: show down arrow if expanded and has children
+				arrow = "▼"
+			}
+
+			prefixX := displayLine.Depth * 3
+			screen.DrawString(prefixX, y, arrow, arrowStyle)
+
+			// Draw attribute indicator or space to maintain alignment
+			indicatorStyle := screen.TreeAttributeIndicatorStyle()
+			if isLinePartOfSelected {
+				indicatorStyle = selectedStyle // Use selected style if item is selected
+			}
+
+			hasAttributes := displayLine.Item.Metadata != nil && len(displayLine.Item.Metadata.Attributes) > 0
+			if hasAttributes {
+				screen.SetCell(prefixX+1, y, '●', indicatorStyle) // Filled circle for items with attributes
 			} else {
-				// Virtual leaf with no children
-				arrow = "→"
+				screen.SetCell(prefixX+1, y, ' ', style) // Space for items without attributes
 			}
-		} else if hasChildren && dispItem.Item.Expanded {
-			// Real items: show down arrow if expanded and has children
-			arrow = "▼"
-		}
 
-		prefixX := dispItem.Depth * 3
-		screen.DrawString(prefixX, y, arrow, arrowStyle)
+			// Text starts at fixed position
+			textX := prefixX + 3 // Position after the arrow, indicator, and space
+			screen.SetCell(prefixX+2, y, ' ', style) // Space after indicator
 
-		// Draw attribute indicator or space to maintain alignment
-		indicatorStyle := screen.TreeAttributeIndicatorStyle()
-		if idx == tv.selectedIdx {
-			indicatorStyle = selectedStyle // Use selected style if item is selected
-		}
+			// Calculate max width available for text with truncation
+			maxTextWidth := screenWidth - textX
+			if maxTextWidth < 0 {
+				maxTextWidth = 0
+			}
 
-		hasAttributes := dispItem.Item.Metadata != nil && len(dispItem.Item.Metadata.Attributes) > 0
-		if hasAttributes {
-			screen.SetCell(prefixX+1, y, '●', indicatorStyle) // Filled circle for items with attributes
+			// Truncate with ellipsis if text exceeds max width
+			text := displayLine.TextLine
+			if len(text) > maxTextWidth {
+				if maxTextWidth > 1 {
+					text = text[:maxTextWidth-1] + "…"
+				} else {
+					text = "…"
+				}
+			}
+
+			// Draw the text
+			// Highlight search matches in the text only if this is the current match
+			if searchQuery != "" && currentMatchItem != nil && displayLine.Item == currentMatchItem {
+				tv.drawTextWithSearchHighlight(screen, textX, y, text, style, highlightStyle, searchQuery)
+			} else {
+				screen.DrawString(textX, y, text, style)
+			}
+
+			// Draw visible attributes if configured (only on item start line)
+			totalLen := textX + len(text)
+			if cfg != nil {
+				visattrConfig := cfg.Get("visattr")
+				if visattrConfig != "" {
+					// Parse comma-separated attribute names
+					attrNames := strings.Split(visattrConfig, ",")
+					var visibleAttrs []string
+
+					if displayLine.Item.Metadata != nil && len(displayLine.Item.Metadata.Attributes) > 0 {
+						for _, attrName := range attrNames {
+							attrName = strings.TrimSpace(attrName)
+							if value, exists := displayLine.Item.Metadata.Attributes[attrName]; exists && value != "" {
+								visibleAttrs = append(visibleAttrs, attrName+":"+value)
+							}
+						}
+					}
+
+					// Draw attributes in gray if any are found
+					if len(visibleAttrs) > 0 {
+						attrStr := "  [" + strings.Join(visibleAttrs, ", ") + "]"
+						attrStyle := screen.TreeAttributeStyle().Background(bgColor) // Gray/dim style with background color
+						if isLinePartOfSelected {
+							attrStyle = selectedStyle // Use selected style if item is selected
+						}
+
+						// Draw the attribute string if it fits on screen
+						attrX := totalLen
+						if attrX+len(attrStr) <= screenWidth {
+							screen.DrawString(attrX, y, attrStr, attrStyle)
+							totalLen = attrX + len(attrStr)
+						}
+					}
+				}
+			}
+
+			// Draw progress bar if configured and if item has todo children (only on item start line)
+			if cfg != nil && cfg.Get("showprogress") != "false" {
+				statusesStr := cfg.Get("todostatuses")
+				if statusesStr == "" {
+					statusesStr = "todo,doing,done"
+				}
+				statuses := strings.Split(statusesStr, ",")
+
+				blocks := RenderProgressBar(displayLine.Item, statuses)
+				if len(blocks) > 0 {
+					// Add spacing before progress bar
+					barStartX := totalLen + 2
+					if barStartX < screenWidth {
+						screen.SetCell(barStartX-2, y, ' ', style)
+						screen.SetCell(barStartX-1, y, ' ', style)
+
+						// Draw each block with appropriate color
+						firstStatus := statuses[0]
+						lastStatus := statuses[len(statuses)-1]
+
+						for j, block := range blocks {
+							blockX := barStartX + j
+							if blockX >= screenWidth {
+								break
+							}
+
+							blockStyle := screen.GrayStyle().Background(bgColor) // Default to gray for todo
+							switch block.Status {
+							case lastStatus:
+								blockStyle = screen.GreenStyle().Background(bgColor) // Green for done
+							case firstStatus:
+								blockStyle = screen.GrayStyle().Background(bgColor) // Gray for todo
+							default:
+								blockStyle = screen.OrangeStyle().Background(bgColor) // Orange for doing/in-progress
+							}
+
+							// When selected, use selected background but keep status color
+							if isLinePartOfSelected {
+								blockStyle = blockStyle.Background(screen.Theme.Colors.TreeSelectedBg)
+							}
+
+							screen.SetCell(blockX, y, '■', blockStyle)
+						}
+						totalLen = barStartX + len(blocks)
+					}
+				}
+			}
+
+			// Pad to screen width with background color on first line only
+			bgStyle := screen.BackgroundStyle()
+			for x := totalLen; x < screenWidth; x++ {
+				padStyle := bgStyle
+				if isLinePartOfSelected && x == totalLen {
+					// One space with selected background after content
+					padStyle = selectedStyle
+				}
+				screen.SetCell(x, y, ' ', padStyle)
+			}
 		} else {
-			screen.SetCell(prefixX+1, y, ' ', style) // Space for items without attributes
-		}
+			// For continuation lines, align with first line's text position
+			textX := displayLine.Depth*3 + 3
 
-		// Build the full line
-		arrowAndIndent := prefix + arrow
-		maxWidth := screenWidth - len(arrowAndIndent)
-		if maxWidth < 0 {
-			maxWidth = 0
-		}
+			// Render continuation line text with full width available
+			maxTextWidth := screenWidth - textX
+			if maxTextWidth < 0 {
+				maxTextWidth = 0
+			}
 
-		text := dispItem.Item.Text
-		if len(text) > maxWidth {
-			text = text[:maxWidth]
-		}
+			// Truncate with ellipsis if text exceeds max width
+			text := displayLine.TextLine
+			if len(text) > maxTextWidth {
+				if maxTextWidth > 1 {
+					text = text[:maxTextWidth-1] + "…"
+				} else {
+					text = "…"
+				}
+			}
 
-		// Draw the text
-		textX := prefixX + 3                     // Position after the arrow, indicator, and space
-		screen.SetCell(prefixX+2, y, ' ', style) // Space after indicator
-
-		// Highlight search matches in the text only if this is the current match
-		if searchQuery != "" && currentMatchItem != nil && dispItem.Item == currentMatchItem {
-			tv.drawTextWithSearchHighlight(screen, textX, y, text, style, highlightStyle, searchQuery)
-		} else {
+			// Draw continuation line text
 			screen.DrawString(textX, y, text, style)
-		}
 
-		// Draw visible attributes if configured
-		totalLen := textX + len(text)
-		if cfg != nil {
-			visattrConfig := cfg.Get("visattr")
-			if visattrConfig != "" {
-				// Parse comma-separated attribute names
-				attrNames := strings.Split(visattrConfig, ",")
-				var visibleAttrs []string
-
-				if dispItem.Item.Metadata != nil && len(dispItem.Item.Metadata.Attributes) > 0 {
-					for _, attrName := range attrNames {
-						attrName = strings.TrimSpace(attrName)
-						if value, exists := dispItem.Item.Metadata.Attributes[attrName]; exists && value != "" {
-							visibleAttrs = append(visibleAttrs, attrName+":"+value)
-						}
-					}
+			// Pad to screen width
+			totalLen := textX + len(text)
+			bgStyle := screen.BackgroundStyle()
+			for x := totalLen; x < screenWidth; x++ {
+				padStyle := bgStyle
+				if isLinePartOfSelected && x == totalLen {
+					padStyle = selectedStyle
 				}
-
-				// Draw attributes in gray if any are found
-				if len(visibleAttrs) > 0 {
-					attrStr := "  [" + strings.Join(visibleAttrs, ", ") + "]"
-					attrStyle := screen.TreeAttributeStyle().Background(bgColor) // Gray/dim style with background color
-					if idx == tv.selectedIdx {
-						attrStyle = selectedStyle // Use selected style if item is selected
-					}
-
-					// Draw the attribute string if it fits on screen
-					attrX := totalLen
-					if attrX+len(attrStr) <= screenWidth {
-						screen.DrawString(attrX, y, attrStr, attrStyle)
-						totalLen = attrX + len(attrStr)
-					}
-				}
+				screen.SetCell(x, y, ' ', padStyle)
 			}
-		}
-
-		// Draw progress bar if configured and if item has todo children
-		if cfg != nil && cfg.Get("showprogress") != "false" {
-			statusesStr := cfg.Get("todostatuses")
-			if statusesStr == "" {
-				statusesStr = "todo,doing,done"
-			}
-			statuses := strings.Split(statusesStr, ",")
-
-			blocks := RenderProgressBar(dispItem.Item, statuses)
-			if len(blocks) > 0 {
-				// Add spacing before progress bar
-				barStartX := totalLen + 2
-				if barStartX < screenWidth {
-					screen.SetCell(barStartX-2, y, ' ', style)
-					screen.SetCell(barStartX-1, y, ' ', style)
-
-					// Draw each block with appropriate color
-					firstStatus := statuses[0]
-					lastStatus := statuses[len(statuses)-1]
-
-					for j, block := range blocks {
-						blockX := barStartX + j
-						if blockX >= screenWidth {
-							break
-						}
-
-						blockStyle := screen.GrayStyle().Background(bgColor) // Default to gray for todo
-						switch block.Status {
-						case lastStatus:
-							blockStyle = screen.GreenStyle().Background(bgColor) // Green for done
-						case firstStatus:
-							blockStyle = screen.GrayStyle().Background(bgColor) // Gray for todo
-						default:
-							blockStyle = screen.OrangeStyle().Background(bgColor) // Orange for doing/in-progress
-						}
-
-						// When selected, use selected background but keep status color
-						if idx == tv.selectedIdx {
-							blockStyle = blockStyle.Background(screen.Theme.Colors.TreeSelectedBg)
-						}
-
-						screen.SetCell(blockX, y, '■', blockStyle)
-					}
-					totalLen = barStartX + len(blocks)
-				}
-			}
-		}
-
-		// Pad to screen width with background color
-		// Extend selected background one space past content
-		bgStyle := screen.BackgroundStyle()
-		for x := totalLen; x < screenWidth; x++ {
-			padStyle := bgStyle
-			if idx == tv.selectedIdx && x == totalLen {
-				// One space with selected background after content
-				padStyle = selectedStyle
-			}
-			screen.SetCell(x, y, ' ', padStyle)
 		}
 
 		screenY++ // Move to next screen line

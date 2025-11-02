@@ -512,6 +512,106 @@ ls -la /home/peter/work/tui-outliner/
    - Documentation: `docs/calendar-widget.md` with complete usage guide
    - Example: `examples/calendar_demo.json` with various dated items and events
 
+22. **Multi-line Text Support in Tree Display**:
+   - Items can now contain newline characters (`\n`) that are displayed as separate visual lines
+   - Rendering supports both explicit newlines and automatic word wrapping
+   - Features:
+     - Multiple text lines per item displayed naturally in tree
+     - All lines of a multi-line item highlighted together when selected
+     - Only first line shows metadata (arrow, attributes, progress bar)
+     - Continuation lines start at column 0 with no indentation
+     - Mouse clicks on any line selects the entire item
+     - Keyboard navigation treats multi-line items as atomic units
+   - Implementation:
+     - New `DisplayLine` struct in `internal/ui/tree.go` for visual lines
+     - `buildDisplayLines()` function converts items to wrapped display lines
+     - `getFirstDisplayLineForItem()` and `getLastDisplayLineForItem()` for selection mapping
+     - Line mapping in viewport for proper rendering and interaction
+   - Data format: Text stored as single string with `\n` for line breaks
+   - Example: `examples/multiline_demo.json` demonstrates multi-line items
+
+23. **Text Wrapping in Tree Display**:
+   - Automatic word wrapping of long item text to fit terminal width
+   - Features:
+     - Word-boundary aware wrapping (prefers spaces over character boundaries)
+     - Character-boundary fallback for unbreakable words
+     - Dynamic width calculation: `terminal_width - 21` (accounting for indentation)
+     - Minimum wrap width of 20 characters for narrow terminals
+     - Wrapping recalculates on render (accounts for terminal resize)
+     - Distinguishes wrapped continuations from hard-break continuations
+   - Implementation:
+     - `wrapTextAtWidth()` function implements word-wrapping algorithm
+     - `IsWrapped` flag in DisplayLine to mark wrapped vs hard-break lines
+     - `SetMaxWidth()` method in TreeView for dynamic width management
+   - Visual distinction:
+     - Hard-break continuations (after `\n`): Indented to match hierarchy
+     - Wrapped continuations: Start at column 0 for full-width text flow
+   - Example: `examples/text-wrapping-demo.json` shows wrapping with various content
+
+24. **MultiLineEditor for All Tree Node Editing**:
+   - Replaced single-line Editor with new MultiLineEditor throughout application
+   - All edit keybindings now use MultiLineEditor: `i`, `c`, `A`, `o`, `O`
+   - Features:
+     - Multi-line text editing with automatic word wrapping
+     - Shift+Enter to insert newlines within item text
+     - Up/Down navigation moves between wrapped lines (same column)
+     - Home/End work per wrapped-line (Ctrl+A/E go to start/end of all text)
+     - Left/Right move through text with automatic wrapping
+     - Cached wrapped lines recalculated only when text changes
+     - Bidirectional cursor position mapping (text offset ↔ visual row/col)
+   - Implementation:
+     - New file: `internal/ui/multiline_editor.go` (~450 lines)
+     - Integrated in all keybinding handlers and edit operations
+     - Updated rendering in `internal/app/app.go` to call `SetMaxWidth()`
+     - Supports all Editor operations: Start(), Stop(), HandleKey(), Render()
+     - Additional methods: SetCursorToStart(), SetCursorToEnd(), GetWrappedLineCount()
+   - Rendering:
+     - Editor can span multiple screen rows during editing
+     - Text wraps at word boundaries
+     - Cursor shows as visual block on character
+     - Full-width utilization with proper cleanup
+   - Benefits:
+     - Natural editing experience for long descriptions
+     - Seamless transition from viewing to editing multi-line items
+     - Support for explicit newlines and automatic wrapping
+   - Documentation: `docs/multiline-editor.md` - complete API and integration guide
+
+25. **Enhanced MultiLineEditor with Word Navigation and Undo/Redo**:
+   - Added powerful editing features to improve text editing efficiency
+   - Features:
+     - Word navigation: Ctrl+Left/Right to jump between words
+     - Word deletion: Ctrl+Delete to delete word forward (complement to Ctrl+W)
+     - Undo/Redo: Ctrl+Z for undo, Ctrl+Y for redo
+   - Implementation:
+     - New helper methods in MultiLineEditor:
+       - `jumpWordBackward()` - Move to start of previous word
+       - `jumpWordForward()` - Move to start of next word
+       - `deleteWordForward()` - Delete next word
+       - `saveUndoState()` - Save state for undo history
+       - `undo()` - Revert to previous state
+       - `redo()` - Restore undone state
+     - Undo/Redo support:
+       - `editorState` struct with text and cursor position
+       - `undoStack` and `redoStack` for history tracking
+       - Limited to 50 undo levels per editor session
+       - Undo/Redo history cleared when exiting editor
+       - New edits after undo clear the redo stack
+     - Updated `HandleKey()` to:
+       - Check for Ctrl modifier on Left/Right keys for word jumping
+       - Check for Ctrl modifier on Delete for word forward deletion
+       - Add Ctrl+Z and Ctrl+Y handlers
+       - Call `saveUndoState()` before all edit operations
+     - Word boundaries defined as spaces and newlines
+   - Benefits:
+     - Efficient text editing with word-level operations
+     - Safety net for editing mistakes within a session
+     - Familiar keybindings (readline/emacs conventions)
+     - Non-intrusive: Limited undo levels prevent excessive memory usage
+   - Documentation: Updated `docs/multiline-editor.md` with:
+     - New keyboard shortcuts table entries
+     - Undo/Redo behavior section
+     - Word navigation and deletion section
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI
