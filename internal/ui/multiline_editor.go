@@ -2,6 +2,7 @@ package ui
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
@@ -209,7 +210,8 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 
 	// Check for Ctrl+; using key code 256
 	if key == 256 && ch == ';' {
-		// Ctrl+; - Insert current time (future enhancement)
+		// Ctrl+; - Insert current time
+		mle.InsertCurrentTime()
 		return true
 	}
 
@@ -670,5 +672,36 @@ func (mle *MultiLineEditor) redo() {
 	// Restore state
 	mle.text = nextState.text
 	mle.cursorPos = nextState.cursorPos
+	mle.calculateWrappedLines()
+}
+
+// InsertCurrentDate inserts the current date at the cursor position (YYYY-MM-DD format)
+func (mle *MultiLineEditor) InsertCurrentDate() {
+	mle.saveUndoState()
+	now := time.Now()
+	dateStr := now.Format("2006-01-02")
+	mle.text = mle.text[:mle.cursorPos] + dateStr + mle.text[mle.cursorPos:]
+	mle.cursorPos += len(dateStr)
+	mle.calculateWrappedLines()
+}
+
+// InsertCurrentTime inserts the current time at the beginning with a space (HH:MM format)
+func (mle *MultiLineEditor) InsertCurrentTime() {
+	mle.saveUndoState()
+	now := time.Now()
+	timeStr := now.Format("15:04 ") // Add space after time
+	// Always insert at the beginning
+	mle.text = timeStr + mle.text
+	mle.cursorPos += len(timeStr)
+	mle.calculateWrappedLines()
+}
+
+// InsertCurrentDateTime inserts the current date and time at the cursor position (YYYY-MM-DD HH:MM:SS format)
+func (mle *MultiLineEditor) InsertCurrentDateTime() {
+	mle.saveUndoState()
+	now := time.Now()
+	dateTimeStr := now.Format("2006-01-02 15:04:05")
+	mle.text = mle.text[:mle.cursorPos] + dateTimeStr + mle.text[mle.cursorPos:]
+	mle.cursorPos += len(dateTimeStr)
 	mle.calculateWrappedLines()
 }
