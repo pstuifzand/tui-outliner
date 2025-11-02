@@ -338,6 +338,9 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 
 				app.dirty = true
 				app.SetStatus(fmt.Sprintf("Status: %s", newStatus))
+
+				// Refresh search nodes since status change may affect search results
+				app.refreshSearchNodes()
 			},
 		},
 		{
