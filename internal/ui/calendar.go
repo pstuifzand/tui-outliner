@@ -202,15 +202,19 @@ func (w *CalendarWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 		return true
 	case 'H': // Shift+h - Previous year
 		w.currentMonth = w.currentMonth.AddDate(-1, 0, 0)
+		w.selectedDate = time.Date(w.currentMonth.Year(), w.currentMonth.Month(), w.selectedDate.Day(), 0, 0, 0, 0, time.Local)
 		return true
 	case 'L': // Shift+l - Next year
 		w.currentMonth = w.currentMonth.AddDate(1, 0, 0)
+		w.selectedDate = time.Date(w.currentMonth.Year(), w.currentMonth.Month(), w.selectedDate.Day(), 0, 0, 0, 0, time.Local)
 		return true
 	case 'J': // Shift+j - Next month
 		w.currentMonth = w.currentMonth.AddDate(0, 1, 0)
+		w.selectedDate = time.Date(w.currentMonth.Year(), w.currentMonth.Month(), w.selectedDate.Day(), 0, 0, 0, 0, time.Local)
 		return true
 	case 'K': // Shift+k - Previous month
 		w.currentMonth = w.currentMonth.AddDate(0, -1, 0)
+		w.selectedDate = time.Date(w.currentMonth.Year(), w.currentMonth.Month(), w.selectedDate.Day(), 0, 0, 0, 0, time.Local)
 		return true
 	case 't':
 		w.selectedDate = time.Now()
@@ -398,17 +402,7 @@ func (w *CalendarWidget) drawTitle(screen *Screen, style tcell.Style, maxX, maxY
 	navStart := w.boxStartX + 2
 
 	// Previous year
-	if navStart < maxX {
-		screen.SetCell(navStart, y, '<', style)
-	}
-	if navStart+1 <= maxX {
-		screen.SetCell(navStart+1, y, '<', style)
-	}
-
-	// Previous month
-	if navStart+3 <= maxX {
-		screen.SetCell(navStart+3, y, '<', style)
-	}
+	screen.DrawStringLimited(navStart+1, y, "<< <", maxY, style)
 
 	// Title
 	title := w.currentMonth.Format("January 2006")
@@ -417,20 +411,7 @@ func (w *CalendarWidget) drawTitle(screen *Screen, style tcell.Style, maxX, maxY
 
 	// Next month
 	nextMonthX := w.boxStartX + w.boxWidth - 6
-	if nextMonthX <= maxX {
-		screen.SetCell(nextMonthX, y, '>', style)
-	}
-
-	// Next year
-	if nextMonthX+1 <= maxX {
-		screen.SetCell(nextMonthX+1, y, '>', style)
-	}
-	if nextMonthX+2 <= maxX {
-		screen.SetCell(nextMonthX+2, y, '>', style)
-	}
-	if nextMonthX+3 <= maxX {
-		screen.SetCell(nextMonthX+3, y, '>', style)
-	}
+	screen.DrawStringLimited(nextMonthX-1, y, "> >>", maxY, style)
 }
 
 func (w *CalendarWidget) drawWeekdayHeaders(screen *Screen, style tcell.Style, maxX, maxY int) {
@@ -444,7 +425,7 @@ func (w *CalendarWidget) drawWeekdayHeaders(screen *Screen, style tcell.Style, m
 
 	// Rotate weekdays based on weekStart
 	weekdays := make([]string, 7)
-	for i := 0; i < 7; i++ {
+	for i := range 7 {
 		weekdays[i] = allWeekdays[(i+w.weekStart)%7]
 	}
 
@@ -476,8 +457,8 @@ func (w *CalendarWidget) drawCalendarGrid(screen *Screen, borderStyle, selectedS
 	today := time.Now()
 
 	// First, fill all 42 cells (6 weeks × 7 days) with appropriate style
-	for cellRow := 0; cellRow < 6; cellRow++ {
-		for cellCol := 0; cellCol < 7; cellCol++ {
+	for cellRow := range 6 {
+		for cellCol := range 7 {
 			x := startX + cellCol*8
 			y := startY + cellRow*2
 
@@ -496,7 +477,7 @@ func (w *CalendarWidget) drawCalendarGrid(screen *Screen, borderStyle, selectedS
 			}
 
 			// Draw 6 spaces as background for each cell (leaving 2 for separator)
-			for dx := 0; dx < 6; dx++ {
+			for dx := range 6 {
 				if x+dx <= maxX {
 					screen.SetCell(x+dx, y, ' ', cellStyle)
 				}
@@ -506,24 +487,23 @@ func (w *CalendarWidget) drawCalendarGrid(screen *Screen, borderStyle, selectedS
 
 	// Second pass: highlight selected dates with selected style background
 	for day := 1; day <= lastDay.Day(); day++ {
-		currentDate := time.Date(w.currentMonth.Year(), w.currentMonth.Month(), day, 0, 0, 0, 0, time.Local)
-
-		col := (startCol + day - 1) % 7
-		row := (startCol + day - 1) / 7
-
-		x := startX + col*8
-		y := startY + row*2
-
-		if y > maxY {
-			break
-		}
-
 		// Check if this date is selected
-		if w.selectedDate.Year() == currentDate.Year() &&
-			w.selectedDate.Month() == currentDate.Month() &&
-			w.selectedDate.Day() == currentDate.Day() {
+		if w.selectedDate.Year() == w.currentMonth.Year() &&
+			w.selectedDate.Month() == w.currentMonth.Month() &&
+			w.selectedDate.Day() == day {
+
+			col := (startCol + day - 1) % 7
+			row := (startCol + day - 1) / 7
+
+			x := startX + col*8
+			y := startY + row*2
+
+			if y > maxY {
+				break
+			}
+
 			// Fill all 6 spaces with selected style
-			for dx := 0; dx < 6; dx++ {
+			for dx := range 6 {
 				if x+dx <= maxX {
 					screen.SetCell(x+dx, y, ' ', selectedStyle)
 				}
