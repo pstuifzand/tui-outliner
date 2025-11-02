@@ -664,7 +664,7 @@ func (a *App) handleKeypress(ev *tcell.EventKey) {
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyRight:
-		a.tree.Expand()
+		a.tree.Expand(true)
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyCtrlI:
@@ -1054,7 +1054,7 @@ func (a *App) handleVisualMode(ev *tcell.EventKey) {
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyRight:
-		a.tree.Expand()
+		a.tree.Expand(true)
 		a.pendingKeySeq = 0
 		return
 	case tcell.KeyEscape:
@@ -1276,7 +1276,7 @@ func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
 		if dispItem.Item.Expanded {
 			a.tree.Collapse()
 		} else {
-			a.tree.Expand()
+			a.tree.Expand(false)
 		}
 		return
 	}

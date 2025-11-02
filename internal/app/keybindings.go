@@ -115,7 +115,7 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 						}
 					}
 				}
-				app.tree.Expand()
+				app.tree.Expand(true)
 			},
 		},
 		{
@@ -825,7 +825,7 @@ func (a *App) InitializeVisualKeybindings() []KeyBinding {
 			Key:         'l',
 			Description: "Expand item",
 			Handler: func(app *App) {
-				app.tree.Expand()
+				app.tree.Expand(true)
 			},
 		},
 		{

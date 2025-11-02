@@ -300,7 +300,7 @@ func (tv *TreeView) ensureVisible() {
 }
 
 // Expand expands the selected item and moves to the first child
-func (tv *TreeView) Expand() {
+func (tv *TreeView) Expand(move bool) {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
 		item := tv.filteredView[tv.selectedIdx].Item
 		hasChildren := len(item.Children) > 0 || len(item.GetVirtualChildren()) > 0
@@ -309,7 +309,7 @@ func (tv *TreeView) Expand() {
 			tv.RebuildView()
 		}
 		// Always move to the first child if the item has children
-		if hasChildren && tv.selectedIdx < len(tv.filteredView)-1 {
+		if move && hasChildren && tv.selectedIdx < len(tv.filteredView)-1 {
 			tv.selectedIdx++
 		}
 	}
