@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
@@ -10,18 +11,20 @@ import (
 
 // AttributeEditor manages the attribute editing modal
 type AttributeEditor struct {
-	visible       bool
-	item          *model.Item
-	attributes    []string // Sorted list of attribute keys
-	selectedIdx   int
-	editingIdx    int       // -1 if not editing, >= 0 if editing key, -2 if editing value
-	editingKey    string    // Current key being edited
-	editingValue  string    // Current value being edited
-	mode          string    // "view", "edit", "add_key", "add_value"
-	statusMessage string
-	keyEditor     *Editor   // Editor for key input
-	valueEditor   *Editor   // Editor for value input
-	onModified    func()    // Callback when attributes are modified
+	visible         bool
+	item            *model.Item
+	attributes      []string // Sorted list of attribute keys
+	selectedIdx     int
+	editingIdx      int    // -1 if not editing, >= 0 if editing key, -2 if editing value
+	editingKey      string // Current key being edited
+	editingValue    string // Current value being edited
+	mode            string // "view", "edit", "add_key", "add_value"
+	statusMessage   string
+	keyEditor       *Editor         // Editor for key input
+	valueEditor     *Editor         // Editor for value input
+	onModified      func()          // Callback when attributes are modified
+	calendarWidget  *CalendarWidget // Calendar for date selection
+	calendarVisible bool            // Whether calendar is open
 }
 
 // NewAttributeEditor creates a new AttributeEditor
@@ -43,6 +46,26 @@ func NewAttributeEditor() *AttributeEditor {
 // SetOnModified sets a callback to be called when attributes are modified
 func (ae *AttributeEditor) SetOnModified(callback func()) {
 	ae.onModified = callback
+}
+
+// SetCalendarWidget sets the calendar widget for date selection
+func (ae *AttributeEditor) SetCalendarWidget(calendar *CalendarWidget) {
+	ae.calendarWidget = calendar
+	if ae.calendarWidget != nil {
+		// Set up callback for when a date is selected from the calendar
+		ae.calendarWidget.SetOnDateSelected(func(selectedDate time.Time) {
+			// Format the date as YYYY-MM-DD
+			dateStr := selectedDate.Format("2006-01-02")
+			// Update the value editor with the selected date
+			ae.valueEditor.SetText(dateStr)
+			// Reset the cursor position to the end of the new text
+			ae.valueEditor.Stop()
+			ae.valueEditor.SetText(dateStr)
+			ae.valueEditor.Start()
+			ae.editingValue = dateStr
+			ae.calendarVisible = false
+		})
+	}
 }
 
 // Show shows the attribute editor for an item
@@ -94,7 +117,17 @@ func (ae *AttributeEditor) HandleKeyEvent(ev *tcell.EventKey) bool {
 		return false
 	}
 
-	ch := ev.Rune()
+	// Handle calendar input if calendar is visible
+	if ae.calendarVisible && ae.calendarWidget != nil {
+		if ae.calendarWidget.HandleKeyEvent(ev) {
+			// Calendar closed or date selected
+			if !ae.calendarWidget.IsVisible() {
+				ae.calendarVisible = false
+			}
+			return true
+		}
+	}
+
 	key := ev.Key()
 
 	// Escape to close in view mode
@@ -105,7 +138,7 @@ func (ae *AttributeEditor) HandleKeyEvent(ev *tcell.EventKey) bool {
 
 	switch ae.mode {
 	case "view":
-		return ae.handleViewMode(ch)
+		return ae.handleViewMode(ev)
 	case "edit":
 		return ae.handleEditMode(ev)
 	case "add_key":
@@ -117,8 +150,24 @@ func (ae *AttributeEditor) HandleKeyEvent(ev *tcell.EventKey) bool {
 	return false
 }
 
+// HandleMouseEvent processes mouse input in the attribute editor
+func (ae *AttributeEditor) HandleMouseEvent(x, y int) bool {
+	if !ae.visible || !ae.calendarVisible || ae.calendarWidget == nil {
+		return false
+	}
+
+	// Route mouse events to the calendar widget
+	return ae.calendarWidget.HandleMouseEvent(x, y)
+}
+
 // handleViewMode handles keys in view mode
-func (ae *AttributeEditor) handleViewMode(ch rune) bool {
+func (ae *AttributeEditor) handleViewMode(ev *tcell.EventKey) bool {
+	if ev.Key() == tcell.KeyCtrlD && ae.calendarWidget != nil {
+		ae.openCalendarForEdit()
+		return true
+	}
+
+	ch := ev.Rune()
 	switch ch {
 	case 'j':
 		// Move down
@@ -268,6 +317,20 @@ func (ae *AttributeEditor) handleAddValueMode(ev *tcell.EventKey) bool {
 	return true
 }
 
+// openCalendarForEdit opens the calendar widget for editing the current attribute value
+func (ae *AttributeEditor) openCalendarForEdit() {
+	if ae.calendarWidget == nil {
+		ae.statusMessage = "Calendar not available"
+		return
+	}
+	key := ae.attributes[ae.selectedIdx]
+	value := ae.item.Metadata.Attributes[key]
+
+	ae.calendarWidget.ShowForAttributeWithValue(key, value)
+	ae.calendarVisible = true
+	ae.statusMessage = "Opening calendar..."
+}
+
 // Render renders the attribute editor modal
 func (ae *AttributeEditor) Render(screen *Screen) {
 	if !ae.visible {
@@ -344,6 +407,11 @@ func (ae *AttributeEditor) Render(screen *Screen) {
 		screen.SetCell(startX+i, startY+height, '─', borderStyle)
 	}
 	screen.SetCell(startX+boxWidth-1, startY+height, '┘', borderStyle)
+
+	// Render calendar if visible
+	if ae.calendarVisible && ae.calendarWidget != nil {
+		ae.calendarWidget.Render(screen)
+	}
 }
 
 // renderViewMode renders the view mode content
@@ -441,7 +509,11 @@ func (ae *AttributeEditor) renderEditMode(screen *Screen, startX, startY, boxWid
 	}
 
 	// Update status message with help text
-	ae.statusMessage = "[Enter]Save [Escape]Cancel"
+	if ae.calendarWidget != nil {
+		ae.statusMessage = "[Enter]Save [Escape]Cancel [Ctrl+D]Calendar"
+	} else {
+		ae.statusMessage = "[Enter]Save [Escape]Cancel"
+	}
 }
 
 // renderAddMode renders the add mode content
