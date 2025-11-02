@@ -125,11 +125,15 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		if s.cursorPos > 0 {
 			s.query = s.query[:s.cursorPos-1] + s.query[s.cursorPos:]
 			s.cursorPos--
+			// Update results immediately as user deletes characters (incremental search)
+			s.updateResults()
 		}
 		return false
 	case tcell.KeyDelete:
 		if s.cursorPos < len(s.query) {
 			s.query = s.query[:s.cursorPos] + s.query[s.cursorPos+1:]
+			// Update results immediately as user deletes characters (incremental search)
+			s.updateResults()
 		}
 		return false
 	case tcell.KeyLeft:
@@ -163,6 +167,8 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		if ch > 0 && ch < 127 {
 			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
 			s.cursorPos++
+			// Update results immediately as user types (incremental search)
+			s.updateResults()
 		}
 		return false
 	}

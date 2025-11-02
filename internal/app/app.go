@@ -586,23 +586,29 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			if keyEv.Key() == tcell.KeyEscape {
 				a.search.Stop()
-			} else if a.search.HandleKey(keyEv) {
-				// Navigation command (n/N/Enter) - navigate to the current match in the main tree
-				currentMatch := a.search.GetCurrentMatch()
-				if currentMatch != nil {
-					// Expand all parent nodes of the match so it becomes visible
-					a.tree.ExpandParents(currentMatch)
-					// Find and select this item in the main tree
-					items := a.tree.GetDisplayItems()
-					for idx, dispItem := range items {
-						if dispItem.Item.ID == currentMatch.ID {
-							a.tree.SelectItem(idx)
-							break
+			} else {
+				a.search.HandleKey(keyEv)
+				// After handling any search key, navigate to first match if there are results
+				if a.search.HasResults() {
+					currentMatch := a.search.GetCurrentMatch()
+					if currentMatch != nil {
+						// Expand all parent nodes of the match so it becomes visible
+						a.tree.ExpandParents(currentMatch)
+						// Find and select this item in the main tree
+						items := a.tree.GetDisplayItems()
+						for idx, dispItem := range items {
+							if dispItem.Item.ID == currentMatch.ID {
+								a.tree.SelectItem(idx)
+								break
+							}
 						}
+						matchNum := a.search.GetCurrentMatchNumber()
+						totalMatches := a.search.GetMatchCount()
+						a.SetStatus(fmt.Sprintf("Match %d of %d", matchNum, totalMatches))
 					}
-					matchNum := a.search.GetCurrentMatchNumber()
-					totalMatches := a.search.GetMatchCount()
-					a.SetStatus(fmt.Sprintf("Match %d of %d", matchNum, totalMatches))
+				} else if a.search.GetQuery() != "" {
+					// Query is not empty but no matches
+					a.SetStatus("No matches")
 				}
 			}
 		}

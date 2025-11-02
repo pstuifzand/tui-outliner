@@ -1,0 +1,42 @@
+{
+  "title": "Untitled",
+  "items": [
+    {
+      "id": "item_20251030090524_riiimdsq",
+      "text": "hello world hello",
+      "children": [
+        {
+          "id": "item_20251030090531_9nre2pj6",
+          "text": "test 2",
+          "metadata": {
+            "attributes": {
+              "url": "https://www.github.com/pstuifzand"
+            },
+            "created": "2025-10-30T09:05:31.192211024+01:00",
+            "modified": "2025-10-30T16:57:10.80336072+01:00"
+          }
+        },
+        {
+          "id": "item_20251030090534_glorrssv",
+          "text": "test 3",
+          "metadata": {
+            "created": "2025-10-30T09:05:34.643429341+01:00",
+            "modified": "2025-10-30T09:05:34.643429495+01:00"
+          }
+        },
+        {
+          "id": "item_20251030090535_4ce0xxqd",
+          "text": "test 4",
+          "metadata": {
+            "created": "2025-10-30T09:05:35.812777573+01:00",
+            "modified": "2025-10-30T09:05:35.812777775+01:00"
+          }
+        }
+      ],
+      "metadata": {
+        "created": "2025-10-30T09:05:24.353085465+01:00",
+        "modified": "2025-10-30T09:05:24.35308567+01:00"
+      }
+    }
+  ]
+}

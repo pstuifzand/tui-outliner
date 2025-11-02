@@ -1175,7 +1175,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 
 		// Highlight search matches in the text only if this is the current match
 		if searchQuery != "" && currentMatchItem != nil && dispItem.Item == currentMatchItem {
-			tv.drawTextWithHighlight(screen, textX, y, text, style, highlightStyle, searchQuery)
+			tv.drawTextWithSearchHighlight(screen, textX, y, text, style, highlightStyle, searchQuery)
 		} else {
 			screen.DrawString(textX, y, text, style)
 		}
@@ -1817,6 +1817,74 @@ func (tv *TreeView) GetHoistBreadcrumbs() string {
 	}
 
 	return result
+}
+
+// drawTextWithSearchHighlight draws text with highlighted search matches
+// It intelligently detects if the search is fuzzy or text-based and highlights accordingly
+func (tv *TreeView) drawTextWithSearchHighlight(screen *Screen, x int, y int, text string, defaultStyle tcell.Style, highlightStyle tcell.Style, searchQuery string) {
+	if searchQuery == "" {
+		screen.DrawString(x, y, text, defaultStyle)
+		return
+	}
+
+	// Check if this is a fuzzy search (starts with ~)
+	if strings.HasPrefix(searchQuery, "~") {
+		fuzzyTerm := strings.TrimPrefix(searchQuery, "~")
+		tv.drawTextWithFuzzyHighlight(screen, x, y, text, defaultStyle, highlightStyle, fuzzyTerm)
+	} else {
+		// Regular text search highlighting
+		tv.drawTextWithHighlight(screen, x, y, text, defaultStyle, highlightStyle, searchQuery)
+	}
+}
+
+// drawTextWithFuzzyHighlight draws text with fuzzy match highlighting
+// It highlights individual characters that match the fuzzy query in order
+func (tv *TreeView) drawTextWithFuzzyHighlight(screen *Screen, x int, y int, text string, defaultStyle tcell.Style, highlightStyle tcell.Style, fuzzyTerm string) {
+	if fuzzyTerm == "" {
+		screen.DrawString(x, y, text, defaultStyle)
+		return
+	}
+
+	// Find positions of fuzzy matches
+	lowerText := strings.ToLower(text)
+	lowerTerm := strings.ToLower(fuzzyTerm)
+	var matchPositions []int
+	textIdx := 0
+
+	// For each character in the search term, find it in the text
+	for _, termChar := range lowerTerm {
+		found := false
+		for i := textIdx; i < len(lowerText); i++ {
+			if rune(lowerText[i]) == termChar {
+				matchPositions = append(matchPositions, i)
+				textIdx = i + 1
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Shouldn't happen if the match is valid, but fall back to normal text display
+			screen.DrawString(x, y, text, defaultStyle)
+			return
+		}
+	}
+
+	// Create a set of matched positions for quick lookup
+	matchSet := make(map[int]bool)
+	for _, pos := range matchPositions {
+		matchSet[pos] = true
+	}
+
+	// Draw the text, highlighting matched characters
+	currentX := x
+	for i, r := range text {
+		if matchSet[i] {
+			screen.SetCell(currentX, y, r, highlightStyle)
+		} else {
+			screen.SetCell(currentX, y, r, defaultStyle)
+		}
+		currentX++
+	}
 }
 
 // drawTextWithHighlight draws text with highlighted search matches

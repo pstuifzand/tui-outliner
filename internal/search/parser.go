@@ -101,6 +101,8 @@ func (t *Tokenizer) NextToken() Token {
 		return t.readQuotedText()
 	case '@':
 		return t.readAttrFilter()
+	case '~':
+		return t.readFuzzyFilter()
 	default:
 		if isFilterStart(ch) {
 			return t.readFilter()
@@ -232,6 +234,29 @@ func (t *Tokenizer) readAttrFilter() Token {
 
 	// Just @key with no criteria
 	value := "@" + key
+	return Token{Type: TokenFilter, Value: value}
+}
+
+func (t *Tokenizer) readFuzzyFilter() Token {
+	t.pos++ // Skip ~
+
+	// Read the fuzzy search term (everything until whitespace, operators, or special chars)
+	start := t.pos
+	for t.pos < len(t.input) {
+		ch := t.input[t.pos]
+		if ch == ' ' || ch == '\t' || ch == '|' || ch == '+' || ch == ')' || ch == '(' || ch == '-' {
+			break
+		}
+		t.pos++
+	}
+
+	term := t.input[start:t.pos]
+	if term == "" {
+		// Empty fuzzy search, treat as just ~
+		return Token{Type: TokenText, Value: "~"}
+	}
+
+	value := "~" + term
 	return Token{Type: TokenFilter, Value: value}
 }
 
@@ -402,6 +427,16 @@ func parseFilterValue(value string) (FilterExpr, error) {
 
 	var expr FilterExpr
 	var err error
+
+	// Check for ~ prefix (fuzzy search)
+	if strings.HasPrefix(value, "~") {
+		term := value[1:] // Strip ~ and get the search term
+		expr = NewFuzzyExpr(term)
+		if isNot {
+			expr = NewNotExpr(expr)
+		}
+		return expr, nil
+	}
 
 	// Check for @ prefix (attribute filter - no colon separator)
 	if strings.HasPrefix(value, "@") {

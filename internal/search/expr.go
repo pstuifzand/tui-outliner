@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -29,6 +30,54 @@ func (e *TextExpr) Matches(item *model.Item) bool {
 
 func (e *TextExpr) String() string {
 	return fmt.Sprintf("text(%q)", e.term)
+}
+
+// FuzzyExpr matches items whose text fuzzy-matches the search term (case-insensitive)
+type FuzzyExpr struct {
+	term string
+}
+
+func NewFuzzyExpr(term string) *FuzzyExpr {
+	return &FuzzyExpr{term: strings.ToLower(term)}
+}
+
+func (e *FuzzyExpr) Matches(item *model.Item) bool {
+	return fuzzy.MatchFold(e.term, strings.ToLower(item.Text))
+}
+
+func (e *FuzzyExpr) String() string {
+	return fmt.Sprintf("fuzzy(%q)", e.term)
+}
+
+// GetMatchPositions returns the positions of characters that match the fuzzy query
+// Returns a list of indices in the text that correspond to matched characters
+func (e *FuzzyExpr) GetMatchPositions(text string) []int {
+	if e.term == "" {
+		return nil
+	}
+
+	lowerText := strings.ToLower(text)
+	var positions []int
+	textIdx := 0
+
+	// For each character in the search term, find it in the text starting from textIdx
+	for _, termChar := range e.term {
+		found := false
+		for i := textIdx; i < len(lowerText); i++ {
+			if rune(lowerText[i]) == termChar {
+				positions = append(positions, i)
+				textIdx = i + 1
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Character not found - this shouldn't happen if Matches() returned true
+			break
+		}
+	}
+
+	return positions
 }
 
 // AlwaysMatchExpr matches all items (for empty queries)

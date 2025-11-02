@@ -57,6 +57,14 @@ func TestTokenizer(t *testing.T) {
 			input:  "@date>-7d",
 			tokens: []TokenType{TokenFilter, TokenEOF},
 		},
+		{
+			input:  "~task",
+			tokens: []TokenType{TokenFilter, TokenEOF},
+		},
+		{
+			input:  "~task ~project",
+			tokens: []TokenType{TokenFilter, TokenFilter, TokenEOF},
+		},
 	}
 
 	for _, tt := range tests {
@@ -130,6 +138,18 @@ func TestParser(t *testing.T) {
 		{
 			query:       "d:>",
 			shouldError: true,
+		},
+		{
+			query:    "~task",
+			exprType: "*search.FuzzyExpr",
+		},
+		{
+			query:    "~task ~project",
+			exprType: "*search.AndExpr",
+		},
+		{
+			query:    "-~task",
+			exprType: "*search.NotExpr",
 		},
 	}
 
@@ -421,6 +441,104 @@ func createModelItemWithText(text string, depth int) *model.Item {
 	}
 
 	return item
+}
+
+func TestFuzzyFilter(t *testing.T) {
+	tests := []struct {
+		query   string
+		text    string
+		matches bool
+	}{
+		// Exact matches
+		{"~task", "task", true},
+		{"~task", "Task", true}, // Case-insensitive
+		// Fuzzy matches (letters in order, not necessarily consecutive)
+		{"~tsk", "task", true},
+		{"~tst", "test", true},
+		{"~abc", "a b c", true},
+		{"~hlo", "hello", true},
+		// Non-matches
+		{"~task", "project", false},
+		{"~xyz", "abc", false},
+		{"~aaa", "ab", false},
+		// Partial fuzzy matching
+		{"~write", "rewrite", true},
+		{"~doc", "documentation", true},
+		// Case insensitive fuzzy
+		{"~TsK", "task", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s_matches_%s", tt.query, tt.text), func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createModelItemWithText(tt.text, 0)
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("query %s with text %q: expected %v, got %v", tt.query, tt.text, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestFuzzyHighlightPositions(t *testing.T) {
+	tests := []struct {
+		text     string
+		query    string
+		expected []int
+	}{
+		{
+			text:     "task",
+			query:    "task",
+			expected: []int{0, 1, 2, 3},
+		},
+		{
+			text:     "task",
+			query:    "tsk",
+			expected: []int{0, 2, 3},
+		},
+		{
+			text:     "documentation",
+			query:    "doc",
+			expected: []int{0, 1, 2},
+		},
+		{
+			text:     "documentation",
+			query:    "dcm",
+			expected: []int{0, 2, 4}, // d, c, m (first occurrence of each)
+		},
+		{
+			text:     "hello world",
+			query:    "hw",
+			expected: []int{0, 6},
+		},
+		{
+			text:     "programming",
+			query:    "png",
+			expected: []int{0, 9, 10}, // p, n, g (first occurrence of each)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s_%s", tt.text, tt.query), func(t *testing.T) {
+			expr := NewFuzzyExpr(tt.query)
+			positions := expr.GetMatchPositions(tt.text)
+
+			if len(positions) != len(tt.expected) {
+				t.Errorf("expected %d positions, got %d", len(tt.expected), len(positions))
+			}
+
+			for i, pos := range positions {
+				if i < len(tt.expected) && pos != tt.expected[i] {
+					t.Errorf("position %d: expected %d, got %d", i, tt.expected[i], pos)
+				}
+			}
+		})
+	}
 }
 
 func typeOf(v interface{}) string {
