@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/config"
 	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/history"
 	"github.com/pstuifzand/tui-outliner/internal/model"
-	"github.com/pstuifzand/tui-outliner/internal/search"
+	search "github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
@@ -101,6 +102,9 @@ func NewApp(filePath string) (*App, error) {
 	nodeSearchWidget := ui.NewNodeSearchWidget()
 	calendarWidget := ui.NewCalendarWidget()
 
+	// Connect calendar widget to attribute editor
+	attributeEditor.SetCalendarWidget(calendarWidget)
+
 	// Apply weekstart config if set (0=Sunday, 1=Monday, etc.)
 	if weekstartStr := cfg.Get("weekstart"); weekstartStr != "" {
 		if weekstart, err := strconv.Atoi(weekstartStr); err == nil && weekstart >= 0 && weekstart <= 6 {
@@ -128,15 +132,15 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	// Initialize search with history persistence
-	var search *ui.Search
+	var searchMode *ui.Search
 	if historyManager != nil {
-		search, err = ui.NewSearchWithHistory(outline.GetAllItems(), historyManager)
+		searchMode, err = ui.NewSearchWithHistory(outline.GetAllItems(), historyManager)
 		if err != nil {
 			log.Printf("Warning: Failed to load search history: %v\n", err)
-			search = ui.NewSearch(outline.GetAllItems())
+			searchMode = ui.NewSearch(outline.GetAllItems())
 		}
 	} else {
-		search = ui.NewSearch(outline.GetAllItems())
+		searchMode = ui.NewSearch(outline.GetAllItems())
 	}
 
 	// Show splash screen if no file was provided
@@ -151,7 +155,7 @@ func NewApp(filePath string) (*App, error) {
 		store:            store,
 		tree:             tree,
 		editor:           nil,
-		search:           search,
+		search:           searchMode,
 		help:             help,
 		splash:           splash,
 		command:          command,
@@ -237,48 +241,13 @@ func NewApp(filePath string) (*App, error) {
 			}
 		} else {
 			// Search mode: look for daily note (type=day) with matching date
-			allItems := app.outline.GetAllItems()
-			var matchingItem *model.Item
-
-			// First priority: Look for items with type=day attribute and matching date
-			for _, item := range allItems {
-				if item.Metadata != nil && item.Metadata.Attributes != nil {
-					// Check if this is a daily note (type=day)
-					if typeVal, ok := item.Metadata.Attributes["type"]; ok && typeVal == "day" {
-						// Check if date matches
-						if itemDate, ok := item.Metadata.Attributes["date"]; ok && itemDate == dateStr {
-							matchingItem = item
-							break
-						}
-					}
-				}
+			query := fmt.Sprintf("@type=day @date=%s", dateStr)
+			matchingItem, err := search.GetFirstByQuery(app.outline, query)
+			if err != nil {
+				app.SetStatus(fmt.Sprintf("Error while searching: %v", err))
+				log.Println(err)
+				return
 			}
-
-			// Second priority: Look for items with matching date (or matching text)
-			// if matchingItem == nil {
-			// 	for _, item := range allItems {
-			// 		itemMatches := false
-			//
-			// 		// Check date attribute
-			// 		if item.Metadata != nil && item.Metadata.Attributes != nil {
-			// 			if itemDate, ok := item.Metadata.Attributes["date"]; ok {
-			// 				if itemDate == dateStr {
-			// 					itemMatches = true
-			// 				}
-			// 			}
-			// 		}
-			//
-			// 		// Check item text
-			// 		if item.Text == dateStr {
-			// 			itemMatches = true
-			// 		}
-			//
-			// 		if itemMatches {
-			// 			matchingItem = item
-			// 			break
-			// 		}
-			// 	}
-			// }
 
 			if matchingItem != nil {
 				// Navigate to existing item
@@ -292,20 +261,31 @@ func NewApp(filePath string) (*App, error) {
 					}
 				}
 			} else {
+				matchingItem, err := search.GetFirstByQuery(app.outline, "@type=dailynotes")
+				if err != nil {
+					app.SetStatus(fmt.Sprintf("Error while searching: %v", err))
+					log.Println(err)
+					return
+				}
+				if matchingItem == nil {
+					// Create new daily note if it doesn't exist
+					newItem := model.NewItem(dateStr)
+					newItem.Metadata.Attributes["type"] = "dailynotes"
+					newItem.IsNew = false
+					app.tree.AddItemAfter(newItem)
+					matchingItem = newItem
+				} else {
+					spew.Fdump(log.Default().Writer(), matchingItem)
+					app.tree.SelectItemByID(matchingItem.ID)
+				}
+
 				// Create new daily note if it doesn't exist
 				newItem := model.NewItem(dateStr)
 				newItem.Metadata.Attributes["type"] = "day"
 				newItem.Metadata.Attributes["date"] = dateStr
 				newItem.IsNew = false
 
-				// Add after current selected item
-				selected := app.tree.GetSelected()
-				if selected != nil {
-					app.tree.AddItemAfter(newItem)
-				} else {
-					// Add to root if nothing selected
-					app.outline.Items = append(app.outline.Items, newItem)
-				}
+				app.tree.AddItemAsChild(newItem)
 
 				app.dirty = true
 				app.SetStatus(fmt.Sprintf("Created: %s", dateStr))
@@ -567,6 +547,13 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 	if a.attributeEditor.IsVisible() {
 		if keyEv, ok := ev.(*tcell.EventKey); ok {
 			a.attributeEditor.HandleKeyEvent(keyEv)
+		}
+		if mouseEv, ok := ev.(*tcell.EventMouse); ok {
+			x, y := mouseEv.Position()
+			// Only handle left mouse button clicks
+			if mouseEv.Buttons()&tcell.Button1 != 0 {
+				a.attributeEditor.HandleMouseEvent(x, y)
+			}
 		}
 		return
 	}

@@ -170,12 +170,12 @@ type TreeView struct {
 }
 
 type displayItem struct {
-	Item              *model.Item
-	Depth             int
-	IsVirtual         bool        // True if this is a virtual child reference
-	OriginalItem      *model.Item // Points to the original if IsVirtual (for virtual references)
-	SearchNodeParent  *model.Item // If IsVirtual, points to the search node that owns this virtual reference
-	VirtualAncestors  []*model.Item // Chain of virtual ancestors for nested virtual items
+	Item             *model.Item
+	Depth            int
+	IsVirtual        bool          // True if this is a virtual child reference
+	OriginalItem     *model.Item   // Points to the original if IsVirtual (for virtual references)
+	SearchNodeParent *model.Item   // If IsVirtual, points to the search node that owns this virtual reference
+	VirtualAncestors []*model.Item // Chain of virtual ancestors for nested virtual items
 }
 
 // NewTreeView creates a new TreeView
@@ -225,12 +225,12 @@ func (tv *TreeView) buildDisplayItemsInternal(items []*model.Item, depth int, pa
 			}
 
 			result = append(result, &displayItem{
-				Item:              item,
-				Depth:             depth,
-				IsVirtual:         parentIsVirtual,
-				OriginalItem:      item,
-				SearchNodeParent:  searchNodeParent,
-				VirtualAncestors:  ancestors,
+				Item:             item,
+				Depth:            depth,
+				IsVirtual:        parentIsVirtual,
+				OriginalItem:     item,
+				SearchNodeParent: searchNodeParent,
+				VirtualAncestors: ancestors,
 			})
 
 			// Determine if this item should show its children
@@ -760,8 +760,7 @@ func (tv *TreeView) AddItemAfter(newItem *model.Item) {
 }
 
 // AddItemAsChild adds a new item as a child of the selected item
-func (tv *TreeView) AddItemAsChild(text string) {
-	newItem := model.NewItem(text)
+func (tv *TreeView) AddItemAsChild(newItem *model.Item) {
 	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
 		selected := tv.filteredView[tv.selectedIdx].Item
 		selected.AddChild(newItem)
@@ -990,6 +989,19 @@ func (tv *TreeView) GetSelectedIndex() int {
 func (tv *TreeView) SelectItem(idx int) {
 	if idx >= 0 && idx < len(tv.filteredView) {
 		tv.selectedIdx = idx
+	}
+}
+
+func (tv *TreeView) SelectItemByID(id string) {
+	idx := -1
+	for itemIdx, item := range tv.filteredView {
+		if item.Item.ID == id {
+			idx = itemIdx
+			break
+		}
+	}
+	if idx >= 0 {
+		tv.SelectItem(idx)
 	}
 }
 
@@ -1853,4 +1865,3 @@ func (tv *TreeView) drawTextWithHighlight(screen *Screen, x int, y int, text str
 		lastIdx = matchIdx + len(searchQuery)
 	}
 }
-
