@@ -36,8 +36,8 @@ func NewJSONStore(filePath string) *JSONStore {
 	}
 }
 
-// isBackupFile checks if the given file path is a backup file
-func isBackupFile(filePath string) bool {
+// IsBackupFile checks if the given file path is a backup file
+func IsBackupFile(filePath string) bool {
 	if filePath == "" {
 		return false
 	}
@@ -54,6 +54,11 @@ func isBackupFile(filePath string) bool {
 	}
 	// Check if file is in backup directory
 	return filepath.HasPrefix(absFilePath, absBackupDir)
+}
+
+// isBackupFile is an internal alias for backward compatibility
+func isBackupFile(filePath string) bool {
+	return IsBackupFile(filePath)
 }
 
 // SetSessionID sets the session ID for backup naming

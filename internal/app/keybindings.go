@@ -747,6 +747,20 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						}
 					},
 				},
+				'b': {
+					Key:         'b',
+					Description: "Go to previous backup (same session)",
+					Handler: func(app *App) {
+						app.handlePreviousBackupSameSession()
+					},
+				},
+				'B': {
+					Key:         'B',
+					Description: "Go to previous backup (any session)",
+					Handler: func(app *App) {
+						app.handlePreviousBackupAnySession()
+					},
+				},
 			},
 		},
 		{
@@ -804,6 +818,20 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						} else {
 							app.SetStatus("Found item this year")
 						}
+					},
+				},
+				'b': {
+					Key:         'b',
+					Description: "Go to next backup (same session)",
+					Handler: func(app *App) {
+						app.handleNextBackupSameSession()
+					},
+				},
+				'B': {
+					Key:         'B',
+					Description: "Go to next backup (any session)",
+					Handler: func(app *App) {
+						app.handleNextBackupAnySession()
 					},
 				},
 			},

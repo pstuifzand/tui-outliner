@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,8 @@ type App struct {
 	cfg                     *config.Config     // Application configuration
 	sessionID          string                // 8-character session ID for backups
 	readOnly           bool                  // Whether the file is readonly (e.g., backup file)
+	originalFilePath   string                // Original file path for backup filtering
+	currentBackupPath  string                // Current backup file path if viewing a backup
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -158,6 +161,22 @@ func NewApp(filePath string) (*App, error) {
 		splash.Show()
 	}
 
+	// Determine if loading a backup file and extract original filename
+	isBackup := store.ReadOnly
+	var originalFilePath string
+	var currentBackupPath string
+	if isBackup {
+		currentBackupPath = filePath
+		originalFilePath = outline.OriginalFilename
+	} else if filePath != "" {
+		// Convert to absolute path for consistent backup searching
+		absPath, err := filepath.Abs(filePath)
+		if err != nil {
+			absPath = filePath
+		}
+		originalFilePath = absPath
+	}
+
 	app := &App{
 		screen:                  screen,
 		outline:                 outline,
@@ -176,6 +195,8 @@ func NewApp(filePath string) (*App, error) {
 		cfg:                     cfg,
 		sessionID:               sessionID,
 		readOnly:                store.ReadOnly,
+		originalFilePath:        originalFilePath,
+		currentBackupPath:       currentBackupPath,
 		statusMsg:        "Ready",
 		statusTime:       time.Now(),
 		dirty:            false,
@@ -1207,6 +1228,8 @@ func (a *App) Save() error {
 
 func (a *App) Load(filename string) error {
 	a.store.FilePath = filename
+	// Re-check if the file is readonly (e.g., a backup file)
+	a.store.ReadOnly = storage.IsBackupFile(filename)
 	outline, err := a.store.Load()
 	if err != nil {
 		return err
@@ -1216,6 +1239,8 @@ func (a *App) Load(filename string) error {
 	a.tree = ui.NewTreeView(outline.Items)
 	a.dirty = false
 	a.autoSaveTime = time.Now()
+	// Update the app's readonly flag based on the store's status
+	a.readOnly = a.store.ReadOnly
 	return nil
 }
 
@@ -2016,6 +2041,223 @@ func (a *App) handleCalendarCommand(parts []string) {
 	}
 
 	a.SetStatus("Usage: :calendar or :calendar attr <name>")
+}
+
+// handlePreviousBackupSameSession loads the previous backup with the same session ID
+func (a *App) handlePreviousBackupSameSession() bool {
+	if a.originalFilePath == "" {
+		a.SetStatus("No file to find backups for")
+		return false
+	}
+
+	backupMgr, err := storage.NewBackupManager()
+	if err != nil {
+		a.SetStatus("Failed to access backups")
+		return false
+	}
+
+	backups, err := backupMgr.FindBackupsForFile(a.originalFilePath)
+	if err != nil || len(backups) == 0 {
+		a.SetStatus("No backups found")
+		return false
+	}
+
+	// Find current backup position in the list
+	currentIdx := -1
+	for i, b := range backups {
+		if b.FilePath == a.currentBackupPath {
+			currentIdx = i
+			break
+		}
+	}
+
+	// If not viewing a backup, go to the most recent one
+	if currentIdx == -1 {
+		// Find backups with same session ID
+		for i := len(backups) - 1; i >= 0; i-- {
+			if backups[i].SessionID == a.sessionID {
+				if a.loadBackupFile(backups[i]) {
+					a.SetStatus(fmt.Sprintf("Backup: %s (%s)", backups[i].Timestamp.Format("2006-01-02 15:04:05"), backups[i].SessionID))
+					return true
+				}
+			}
+		}
+		a.SetStatus("No backups with current session ID")
+		return false
+	}
+
+	// Find previous backup with same session ID
+	for i := currentIdx - 1; i >= 0; i-- {
+		if backups[i].SessionID == a.sessionID {
+			if a.loadBackupFile(backups[i]) {
+				a.SetStatus(fmt.Sprintf("Backup: %s (%s)", backups[i].Timestamp.Format("2006-01-02 15:04:05"), backups[i].SessionID))
+				return true
+			}
+		}
+	}
+
+	a.SetStatus("No older backups with same session ID")
+	return false
+}
+
+// handleNextBackupSameSession loads the next backup with the same session ID
+func (a *App) handleNextBackupSameSession() bool {
+	if a.originalFilePath == "" {
+		a.SetStatus("No file to find backups for")
+		return false
+	}
+
+	backupMgr, err := storage.NewBackupManager()
+	if err != nil {
+		a.SetStatus("Failed to access backups")
+		return false
+	}
+
+	backups, err := backupMgr.FindBackupsForFile(a.originalFilePath)
+	if err != nil || len(backups) == 0 {
+		a.SetStatus("No backups found")
+		return false
+	}
+
+	// Find current backup position
+	currentIdx := -1
+	for i, b := range backups {
+		if b.FilePath == a.currentBackupPath {
+			currentIdx = i
+			break
+		}
+	}
+
+	// Must be viewing a backup to go to next one
+	if currentIdx == -1 {
+		a.SetStatus("Not viewing a backup")
+		return false
+	}
+
+	// Find next backup with same session ID
+	for i := currentIdx + 1; i < len(backups); i++ {
+		if backups[i].SessionID == a.sessionID {
+			if a.loadBackupFile(backups[i]) {
+				a.SetStatus(fmt.Sprintf("Backup: %s (%s)", backups[i].Timestamp.Format("2006-01-02 15:04:05"), backups[i].SessionID))
+				return true
+			}
+		}
+	}
+
+	a.SetStatus("No newer backups with same session ID")
+	return false
+}
+
+// handlePreviousBackupAnySession loads the previous backup regardless of session ID
+func (a *App) handlePreviousBackupAnySession() bool {
+	if a.originalFilePath == "" {
+		a.SetStatus("No file to find backups for")
+		return false
+	}
+
+	backupMgr, err := storage.NewBackupManager()
+	if err != nil {
+		a.SetStatus("Failed to access backups")
+		return false
+	}
+
+	backups, err := backupMgr.FindBackupsForFile(a.originalFilePath)
+	if err != nil || len(backups) == 0 {
+		a.SetStatus("No backups found")
+		return false
+	}
+
+	// Find current backup position
+	currentIdx := -1
+	for i, b := range backups {
+		if b.FilePath == a.currentBackupPath {
+			currentIdx = i
+			break
+		}
+	}
+
+	// If not viewing a backup, go to most recent
+	if currentIdx == -1 {
+		if a.loadBackupFile(backups[len(backups)-1]) {
+			b := backups[len(backups)-1]
+			a.SetStatus(fmt.Sprintf("Backup: %s (%s)", b.Timestamp.Format("2006-01-02 15:04:05"), b.SessionID))
+			return true
+		}
+		return false
+	}
+
+	// Find previous backup
+	if currentIdx > 0 {
+		if a.loadBackupFile(backups[currentIdx-1]) {
+			b := backups[currentIdx-1]
+			a.SetStatus(fmt.Sprintf("Backup: %s (%s)", b.Timestamp.Format("2006-01-02 15:04:05"), b.SessionID))
+			return true
+		}
+	}
+
+	a.SetStatus("No older backups")
+	return false
+}
+
+// handleNextBackupAnySession loads the next backup regardless of session ID
+func (a *App) handleNextBackupAnySession() bool {
+	if a.originalFilePath == "" {
+		a.SetStatus("No file to find backups for")
+		return false
+	}
+
+	backupMgr, err := storage.NewBackupManager()
+	if err != nil {
+		a.SetStatus("Failed to access backups")
+		return false
+	}
+
+	backups, err := backupMgr.FindBackupsForFile(a.originalFilePath)
+	if err != nil || len(backups) == 0 {
+		a.SetStatus("No backups found")
+		return false
+	}
+
+	// Find current backup position
+	currentIdx := -1
+	for i, b := range backups {
+		if b.FilePath == a.currentBackupPath {
+			currentIdx = i
+			break
+		}
+	}
+
+	// Must be viewing a backup to go to next one
+	if currentIdx == -1 {
+		a.SetStatus("Not viewing a backup")
+		return false
+	}
+
+	// Find next backup
+	if currentIdx < len(backups)-1 {
+		if a.loadBackupFile(backups[currentIdx+1]) {
+			b := backups[currentIdx+1]
+			a.SetStatus(fmt.Sprintf("Backup: %s (%s)", b.Timestamp.Format("2006-01-02 15:04:05"), b.SessionID))
+			return true
+		}
+	}
+
+	a.SetStatus("No newer backups")
+	return false
+}
+
+// loadBackupFile loads a backup file and updates the app state
+func (a *App) loadBackupFile(backup storage.BackupMetadata) bool {
+	if err := a.Load(backup.FilePath); err != nil {
+		a.SetStatus(fmt.Sprintf("Failed to load backup: %s", err.Error()))
+		return false
+	}
+
+	a.currentBackupPath = backup.FilePath
+	a.originalFilePath = backup.OriginalFile
+	a.sessionID = backup.SessionID
+
+	return true
 }
 
 // generateSessionID creates a random 8-character session ID for backup naming

@@ -57,9 +57,10 @@ func TestBackupManagerCreateBackup(t *testing.T) {
 		t.Fatalf("Failed to unmarshal backup: %v", err)
 	}
 
-	// Verify original filename is stored
-	if backupOutline.OriginalFilename != originalPath {
-		t.Fatalf("Expected original filename '%s', got '%s'", originalPath, backupOutline.OriginalFilename)
+	// Verify original filename is stored as absolute path
+	absPath, _ := filepath.Abs(originalPath)
+	if backupOutline.OriginalFilename != absPath {
+		t.Fatalf("Expected original filename '%s', got '%s'", absPath, backupOutline.OriginalFilename)
 	}
 
 	// Verify items are preserved
@@ -144,6 +145,126 @@ func TestSessionIDGeneration(t *testing.T) {
 		if !found {
 			t.Fatalf("Session ID contains invalid character: %c", ch)
 		}
+	}
+}
+
+func TestBackupStoresAbsolutePath(t *testing.T) {
+	// Create backup manager
+	bm, err := NewBackupManager()
+	if err != nil {
+		t.Fatalf("Failed to create backup manager: %v", err)
+	}
+
+	// Create a simple outline
+	outline := model.NewOutline()
+	item := model.NewItem("Test item")
+	outline.Items = append(outline.Items, item)
+
+	// Test with relative path
+	originalPath := "test_outline.json"
+	sessionID := "testabs1"
+	err = bm.CreateBackup(outline, originalPath, sessionID)
+	if err != nil {
+		t.Fatalf("Failed to create backup: %v", err)
+	}
+
+	// Read the backup file
+	backupDir := getBackupDir()
+	files, err := os.ReadDir(backupDir)
+	if err != nil {
+		t.Fatalf("Failed to read backup directory: %v", err)
+	}
+
+	// Find the backup we just created
+	var backupPath string
+	for i := len(files) - 1; i >= 0; i-- {
+		if files[i].Name() != "" {
+			backupPath = filepath.Join(backupDir, files[i].Name())
+			// Check if this is our backup (has testabs1 in name)
+			if filepath.Base(backupPath) == files[i].Name() {
+				break
+			}
+		}
+	}
+
+	data, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("Failed to read backup file: %v", err)
+	}
+
+	var backupOutline model.Outline
+	err = json.Unmarshal(data, &backupOutline)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal backup: %v", err)
+	}
+
+	// Verify original filename is stored as absolute path
+	absPath, _ := filepath.Abs(originalPath)
+	if backupOutline.OriginalFilename != absPath {
+		t.Errorf("Expected absolute path '%s', got '%s'", absPath, backupOutline.OriginalFilename)
+	}
+
+	// Verify it's an absolute path
+	if !filepath.IsAbs(backupOutline.OriginalFilename) {
+		t.Errorf("Original filename is not absolute: %s", backupOutline.OriginalFilename)
+	}
+
+	// Cleanup
+	os.Remove(backupPath)
+}
+
+func TestFindBackupsWithAbsolutePath(t *testing.T) {
+	// Create backup manager
+	bm, err := NewBackupManager()
+	if err != nil {
+		t.Fatalf("Failed to create backup manager: %v", err)
+	}
+
+	// Create a simple outline
+	outline := model.NewOutline()
+	item := model.NewItem("Test item")
+	outline.Items = append(outline.Items, item)
+
+	// Create backup with relative path
+	relativePath := "my_test.json"
+	sessionID := "testfind1"
+	err = bm.CreateBackup(outline, relativePath, sessionID)
+	if err != nil {
+		t.Fatalf("Failed to create backup: %v", err)
+	}
+
+	// Convert relative path to absolute for comparison
+	absPath, _ := filepath.Abs(relativePath)
+
+	// Test 1: Find backups using relative path
+	backups, err := bm.FindBackupsForFile(relativePath)
+	if err != nil {
+		t.Fatalf("Failed to find backups with relative path: %v", err)
+	}
+	if len(backups) == 0 {
+		t.Error("Expected to find backups using relative path")
+	}
+
+	// Test 2: Find backups using absolute path
+	backups, err = bm.FindBackupsForFile(absPath)
+	if err != nil {
+		t.Fatalf("Failed to find backups with absolute path: %v", err)
+	}
+	if len(backups) == 0 {
+		t.Error("Expected to find backups using absolute path")
+	}
+
+	// Test 3: Both should find the same backups
+	backupsRel, _ := bm.FindBackupsForFile(relativePath)
+	backupsAbs, _ := bm.FindBackupsForFile(absPath)
+	if len(backupsRel) != len(backupsAbs) {
+		t.Errorf("Different number of backups found: relative=%d, absolute=%d",
+			len(backupsRel), len(backupsAbs))
+	}
+
+	// Cleanup
+	for _, backup := range backups {
+		os.Remove(backup.FilePath)
 	}
 }
 
