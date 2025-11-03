@@ -12,14 +12,28 @@ import (
 
 // JSONStore handles JSON file persistence
 type JSONStore struct {
-	FilePath string
+	FilePath       string
+	backupManager  *BackupManager
+	sessionID      string
 }
 
 // NewJSONStore creates a new JSON store for the given file path
 func NewJSONStore(filePath string) *JSONStore {
-	return &JSONStore{
-		FilePath: filePath,
+	backupManager, err := NewBackupManager()
+	if err != nil {
+		log.Printf("Warning: Failed to initialize backup manager: %v\n", err)
 	}
+
+	return &JSONStore{
+		FilePath:      filePath,
+		backupManager: backupManager,
+		sessionID:     "",
+	}
+}
+
+// SetSessionID sets the session ID for backup naming
+func (s *JSONStore) SetSessionID(sessionID string) {
+	s.sessionID = sessionID
 }
 
 // Load loads an outline from a JSON file
@@ -65,6 +79,20 @@ func (s *JSONStore) Save(outline *model.Outline) error {
 
 // SaveToFile saves an outline to a specified file path
 func (s *JSONStore) SaveToFile(outline *model.Outline, filePath string) error {
+	// Create backup before saving (fail gracefully if backup fails)
+	if s.backupManager != nil && s.sessionID != "" {
+		originalPath := filePath
+		// For buffer mode, use a placeholder name
+		if originalPath == "" {
+			originalPath = "unsaved_buffer"
+		}
+
+		if err := s.backupManager.CreateBackup(outline, originalPath, s.sessionID); err != nil {
+			log.Printf("Warning: Failed to create backup: %v\n", err)
+			// Don't return error - backup failure shouldn't prevent saving
+		}
+	}
+
 	// Ensure directory exists
 	dir := filepath.Dir(filePath)
 	if dir != "." && dir != "" {

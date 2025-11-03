@@ -93,7 +93,8 @@ tui-outliner/
 │   │   ├── search.go                # Search functionality
 │   │   └── help.go                  # Help screen
 │   ├── storage/
-│   │   └── json.go                  # File I/O
+│   │   ├── json.go                  # File I/O
+│   │   └── backup.go                # Automatic backup creation
 │   ├── export/
 │   │   └── markdown.go              # Markdown export functionality
 │   ├── theme/
@@ -666,6 +667,33 @@ ls -la /home/peter/work/tui-outliner/
      - Editor commands are executed via shell, allowing complex commands with arguments
      - Examples: `vim --clean`, `nano -w`, `emacs -nw`, `code --wait`
      - The temp file path is automatically appended as the final argument
+
+27. **Automatic Backup System**:
+   - Automatic backup creation before every file save with timestamp and session ID
+   - Features:
+     - Backup filename format: `YYYYMMDD_HHMMSS_<sessionID>.tuo`
+     - Session ID: Random 8-character alphanumeric string, changes on app start or file reload
+     - Centralized storage: `~/.local/share/tui-outliner/backups/`
+     - Original filename preserved: Stored in backup JSON as `original_filename` field
+     - Buffer mode support: Backups created with placeholder name `unsaved_buffer`
+     - Graceful failure: Backup failures don't prevent saving
+   - Backup structure:
+     - Location: `~/.local/share/tui-outliner/backups/<timestamp>_<sessionID>.tuo`
+     - Format: Standard JSON (same as regular outline files)
+     - Content: Complete outline including original filename in `original_filename` field
+   - Implementation:
+     - New module: `internal/storage/backup.go` with `BackupManager` struct
+     - Backup creation triggered in `JSONStore.SaveToFile()` before main file write
+     - Session ID generated in `App.NewApp()` and passed to JSONStore
+     - All backups retained (manual deletion if needed)
+   - Restoration:
+     - Backups can be opened like any other outline file: `./tuo ~/.local/share/tui-outliner/backups/20251103_150405_abc12345.tuo`
+     - Once opened, edit and use `:w <filename>` to save as regular file
+     - Original filename available in `original_filename` field (visible in JSON or can be used in commands)
+   - Use cases:
+     - Crash recovery: If app crashes, latest backup available in backup directory
+     - Version history: Multiple backups kept per session ID for comparison
+     - Accidental changes: Restore previous state by opening backup file
 
 ## Notes
 

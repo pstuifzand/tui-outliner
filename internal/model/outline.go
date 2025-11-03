@@ -34,8 +34,9 @@ type Metadata struct {
 
 // Outline represents the entire outline document
 type Outline struct {
-	Items     []*Item          `json:"items"`
-	itemIndex map[string]*Item `json:"-"` // Fast O(1) ID lookup cache
+	Items                 []*Item          `json:"items"`
+	OriginalFilename      string           `json:"original_filename,omitempty"`
+	itemIndex             map[string]*Item `json:"-"` // Fast O(1) ID lookup cache
 }
 
 // NewItem creates a new outline item with a generated ID

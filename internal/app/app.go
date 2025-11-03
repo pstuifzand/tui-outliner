@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strconv"
@@ -47,6 +48,7 @@ type App struct {
 	calendarWidget          *ui.CalendarWidget // Calendar date picker widget
 	historyManager          *history.Manager   // Manager for persisting command and search history
 	cfg                     *config.Config     // Application configuration
+	sessionID          string                // 8-character session ID for backups
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -91,6 +93,9 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	store := storage.NewJSONStore(filePath)
+	sessionID := generateSessionID()
+	store.SetSessionID(sessionID)
+
 	outline, err := store.Load()
 	if err != nil {
 		screen.Close()
@@ -168,6 +173,7 @@ func NewApp(filePath string) (*App, error) {
 		calendarWidget:          calendarWidget,
 		historyManager:          historyManager,
 		cfg:                     cfg,
+		sessionID:               sessionID,
 		statusMsg:        "Ready",
 		statusTime:       time.Now(),
 		dirty:            false,
@@ -1989,4 +1995,14 @@ func (a *App) handleCalendarCommand(parts []string) {
 	}
 
 	a.SetStatus("Usage: :calendar or :calendar attr <name>")
+}
+
+// generateSessionID creates a random 8-character session ID for backup naming
+func generateSessionID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 8)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }
