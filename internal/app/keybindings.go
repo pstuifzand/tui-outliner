@@ -124,6 +124,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'J',
 			Description: "Move node down",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				if app.tree.MoveItemDown() {
 					app.SetStatus("Moved item down")
 					app.dirty = true
@@ -134,6 +138,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'K',
 			Description: "Move node up",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				if app.tree.MoveItemUp() {
 					app.SetStatus("Moved item up")
 					app.dirty = true
@@ -144,6 +152,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'i',
 			Description: "Edit item (cursor at start)",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				selected := app.tree.GetSelected()
 				if selected != nil {
 					app.editor = ui.NewMultiLineEditor(selected)
@@ -157,6 +169,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'c',
 			Description: "Change (replace) item text",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				selected := app.tree.GetSelected()
 				if selected != nil {
 					app.editor = ui.NewMultiLineEditor(selected)
@@ -170,6 +186,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'A',
 			Description: "Append (edit at end of text)",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				selected := app.tree.GetSelected()
 				if selected != nil {
 					app.editor = ui.NewMultiLineEditor(selected)
@@ -182,6 +202,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'O',
 			Description: "Insert new item before",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				app.tree.AddItemBefore("")
 				app.SetStatus("Created new item before")
 				app.dirty = true
@@ -198,6 +222,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'o',
 			Description: "Insert new item after",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				item := model.NewItem("")
 				app.tree.AddItemAfter(item)
 				app.SetStatus("Created new item after")
@@ -215,6 +243,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'd',
 			Description: "Delete item",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				selected := app.tree.GetSelected()
 				app.clipboard = selected
 				if app.tree.DeleteSelected() {
@@ -239,6 +271,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'p',
 			Description: "Paste item below",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				if app.clipboard != nil {
 					newItem := model.NewItemFrom(app.clipboard)
 					pastedItem := app.tree.PasteAfter(newItem)
@@ -255,6 +291,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'P',
 			Description: "Paste item above",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				if app.clipboard != nil {
 					newItem := model.NewItemFrom(app.clipboard)
 					pastedItem := app.tree.PasteBefore(newItem)
@@ -271,6 +311,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         '>',
 			Description: "Indent item",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				if app.tree.Indent() {
 					app.SetStatus("Indented")
 					app.dirty = true
@@ -281,6 +325,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         '<',
 			Description: "Outdent item",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				if app.tree.Outdent() {
 					app.SetStatus("Outdented")
 					app.dirty = true
@@ -291,6 +339,10 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 			Key:         'x',
 			Description: "Rotate todo status",
 			Handler: func(app *App) {
+				if app.readOnly {
+					app.SetStatus("File is readonly")
+					return
+				}
 				selected := app.tree.GetSelected()
 				if selected == nil {
 					return

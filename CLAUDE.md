@@ -695,6 +695,44 @@ ls -la /home/peter/work/tui-outliner/
      - Version history: Multiple backups kept per session ID for comparison
      - Accidental changes: Restore previous state by opening backup file
 
+28. **Readonly Mode for Backup Files**:
+   - Automatic readonly protection for backup files
+   - Features:
+     - Automatic Detection: Files in `~/.local/share/tui-outliner/backups/` are auto-detected as readonly
+     - Blocks All Edits: All editing operations return "File is readonly" message
+     - Status Indicator: `[READONLY]` appears in status bar when viewing readonly files
+     - Graceful Error Handling: Save operations return error message instead of executing
+     - Edit Prevention: Blocks all modification operations:
+       - Edit keybindings: `i`, `c`, `A`, `o`, `O` (insert/edit operations)
+       - Delete keybindings: `d`, `x` (delete/rotate status)
+       - Move keybindings: `J`, `K` (move item up/down)
+       - Indent/Outdent: `>`, `<` (indentation changes)
+       - Paste operations: `p`, `P` (paste below/above)
+       - Command operations: `:attr`, `:dailynote`, etc.
+     - Auto-save Disabled: Readonly files skip auto-save logic
+   - Backup Workflow:
+     1. Open backup file: `./tuo ~/.local/share/tui-outliner/backups/20251103_150405_abc12345.tuo`
+     2. View contents: Full read access, tree navigation works normally
+     3. To restore: Use `:w <new_filename>` to save to new file with original content
+     4. Status bar shows `[READONLY]` and blocks all modifications
+   - Implementation:
+     - New field: `ReadOnly bool` in `JSONStore` struct (auto-detected in `NewJSONStore()`)
+     - New field: `readOnly bool` in `App` struct (initialized from store)
+     - Detection: `isBackupFile()` checks if path is in backup directory
+     - Readonly checks in:
+       - `JSONStore.Save()` and `JSONStore.SaveToFile()` prevent file writes
+       - All edit keybindings check `app.readOnly` before allowing modifications
+       - Command handlers check readonly for `:attr`, `:dailynote`, etc.
+       - Auto-save loop skips execution if readonly
+   - User Feedback:
+     - Editing attempts: "File is readonly" status message
+     - Save attempts: "Cannot write to readonly file" error
+     - Visual indicator: `[READONLY]` badge in status bar
+   - Design Intent:
+     - Prevent accidental modifications to backup files
+     - Encourage intentional restore via `:w <filename>` command
+     - Allow full read access and navigation while protecting data integrity
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

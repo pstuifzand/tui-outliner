@@ -49,6 +49,7 @@ type App struct {
 	historyManager          *history.Manager   // Manager for persisting command and search history
 	cfg                     *config.Config     // Application configuration
 	sessionID          string                // 8-character session ID for backups
+	readOnly           bool                  // Whether the file is readonly (e.g., backup file)
 	statusMsg          string
 	statusTime         time.Time
 	dirty              bool
@@ -174,6 +175,7 @@ func NewApp(filePath string) (*App, error) {
 		historyManager:          historyManager,
 		cfg:                     cfg,
 		sessionID:               sessionID,
+		readOnly:                store.ReadOnly,
 		statusMsg:        "Ready",
 		statusTime:       time.Now(),
 		dirty:            false,
@@ -360,8 +362,8 @@ func (a *App) Run() error {
 		case <-ticker.C:
 			a.render()
 
-			// Auto-save every 5 seconds if dirty
-			if a.dirty && time.Since(a.autoSaveTime) > 5*time.Second {
+			// Auto-save every 5 seconds if dirty (skip for readonly files)
+			if a.dirty && !a.readOnly && time.Since(a.autoSaveTime) > 5*time.Second {
 				if err := a.Save(); err != nil {
 					a.SetStatus("Failed to save: " + err.Error())
 				} else {
@@ -545,6 +547,13 @@ func (a *App) render() {
 		modified := " (modified)"
 		a.screen.DrawString(lineX, height-1, modified, modifiedStyle)
 		lineX += len(modified)
+	}
+
+	// Append readonly indicator
+	if a.readOnly {
+		readonly := " [READONLY]"
+		a.screen.DrawString(lineX, height-1, readonly, modifiedStyle)
+		lineX += len(readonly)
 	}
 
 	// Clear remainder of status line
@@ -1110,6 +1119,10 @@ func (a *App) handleCommand(cmd string) {
 			a.SetStatus("Unknown export format: " + format + " (use 'markdown' or 'text')")
 		}
 	case "dailynote":
+		if a.readOnly {
+			a.SetStatus("Cannot modify readonly file")
+			return
+		}
 		// Create or navigate to today's daily note
 		now := time.Now()
 		today := now.Format("2006-01-02")               // ISO format for attribute storage
@@ -1544,6 +1557,14 @@ func (a *App) SetDebugMode(debug bool) {
 
 // handleAttrCommand processes attribute-related commands
 func (a *App) handleAttrCommand(parts []string) {
+	// Check if trying to modify attributes on a readonly file
+	if len(parts) > 1 && parts[1] != "list" && parts[1] != "" {
+		if a.readOnly {
+			a.SetStatus("Cannot modify readonly file")
+			return
+		}
+	}
+
 	selected := a.tree.GetSelected()
 	if selected == nil {
 		a.SetStatus("No item selected")

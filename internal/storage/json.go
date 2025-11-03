@@ -15,6 +15,7 @@ type JSONStore struct {
 	FilePath       string
 	backupManager  *BackupManager
 	sessionID      string
+	ReadOnly       bool
 }
 
 // NewJSONStore creates a new JSON store for the given file path
@@ -24,11 +25,35 @@ func NewJSONStore(filePath string) *JSONStore {
 		log.Printf("Warning: Failed to initialize backup manager: %v\n", err)
 	}
 
+	// Detect if this is a backup file (readonly)
+	isBackup := isBackupFile(filePath)
+
 	return &JSONStore{
 		FilePath:      filePath,
 		backupManager: backupManager,
 		sessionID:     "",
+		ReadOnly:      isBackup,
 	}
+}
+
+// isBackupFile checks if the given file path is a backup file
+func isBackupFile(filePath string) bool {
+	if filePath == "" {
+		return false
+	}
+	// Backup files are stored in ~/.local/share/tui-outliner/backups/
+	backupDir := filepath.Join(os.Getenv("HOME"), ".local", "share", "tui-outliner", "backups")
+	absFilePath, err := filepath.Abs(filePath)
+	if err != nil {
+		// If we can't determine absolute path, assume not a backup
+		return false
+	}
+	absBackupDir, err := filepath.Abs(backupDir)
+	if err != nil {
+		return false
+	}
+	// Check if file is in backup directory
+	return filepath.HasPrefix(absFilePath, absBackupDir)
 }
 
 // SetSessionID sets the session ID for backup naming
@@ -71,6 +96,9 @@ func (s *JSONStore) Load() (*model.Outline, error) {
 
 // Save saves an outline to a JSON file
 func (s *JSONStore) Save(outline *model.Outline) error {
+	if s.ReadOnly {
+		return fmt.Errorf("cannot write to readonly file")
+	}
 	if s.FilePath == "" {
 		return fmt.Errorf("no file path specified. Use :w <filename> to save")
 	}
@@ -79,6 +107,11 @@ func (s *JSONStore) Save(outline *model.Outline) error {
 
 // SaveToFile saves an outline to a specified file path
 func (s *JSONStore) SaveToFile(outline *model.Outline, filePath string) error {
+	// Check if readonly before attempting save
+	if s.ReadOnly {
+		return fmt.Errorf("cannot write to readonly file")
+	}
+
 	// Create backup before saving (fail gracefully if backup fails)
 	if s.backupManager != nil && s.sessionID != "" {
 		originalPath := filePath
