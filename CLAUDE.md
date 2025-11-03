@@ -733,6 +733,72 @@ ls -la /home/peter/work/tui-outliner/
      - Encourage intentional restore via `:w <filename>` command
      - Allow full read access and navigation while protecting data integrity
 
+29. **Backup Navigation Keybindings**:
+   - Navigate through backup versions with flexible session filtering
+   - Two categories of navigation: same-session and any-session backups
+   - Features:
+     - Same-Session Navigation (`[b` / `]b`):
+       - `[b` - Go to previous backup (same session ID)
+       - `]b` - Go to next backup (same session ID)
+       - Filters backups to current session only
+       - When not viewing backup: jumps to most recent backup of current session
+       - When viewing backup: navigates within same session
+       - Shows error if no other backups in current session
+     - Any-Session Navigation (`[B` / `]B`):
+       - `[B` - Go to previous backup (any session ID)
+       - `]B` - Go to next backup (any session ID)
+       - Shows all backups for the current file
+       - When not viewing backup: jumps to most recent backup (any session)
+       - When viewing backup: navigates through all backups chronologically
+       - Must be viewing a backup to use `]B` (next)
+     - Chronological Ordering:
+       - Backups sorted by timestamp in filename
+       - Previous = older (earlier timestamp)
+       - Next = newer (later timestamp)
+       - Format: `YYYYMMDD_HHMMSS_<sessionID>.tuo` naturally sorts chronologically
+   - Status Display:
+     - Format: `Backup: YYYY-MM-DD HH:MM:SS (sessionID)`
+     - Example: `Backup: 2025-11-03 15:04:05 (abc12345)`
+     - Error messages for edge cases
+   - Backup Metadata:
+     - Filename: `YYYYMMDD_HHMMSS_<sessionID>.tuo`
+     - Timestamp: 15 characters (YYYYMMDD_HHMMSS format)
+     - Session ID: 8 alphanumeric characters
+     - Original filename: Stored in JSON `OriginalFilename` field
+   - Implementation:
+     - New functions in `internal/storage/backup.go`:
+       - `BackupMetadata` struct for parsed backup info
+       - `FindBackupsForFile(originalPath)` - List and sort backups
+       - `parseBackupFilename()` - Extract timestamp/session from filename
+       - `sortBackupsByTimestamp()` - Chronological ordering
+     - New methods in `internal/app/app.go`:
+       - `handlePreviousBackupSameSession()` - Navigate [b
+       - `handleNextBackupSameSession()` - Navigate ]b
+       - `handlePreviousBackupAnySession()` - Navigate [B
+       - `handleNextBackupAnySession()` - Navigate ]B
+       - `loadBackupFile(backup)` - Load and update app state
+     - New tracking fields in App:
+       - `originalFilePath` - For backup filtering
+       - `currentBackupPath` - Track if viewing backup
+     - Keybindings added to `internal/app/keybindings.go`:
+       - Added to '[' prefix: 'b' and 'B' sequences
+       - Added to ']' prefix: 'b' and 'B' sequences
+   - Use Cases:
+     - Review changes: Navigate through backup history to see progression
+     - Compare versions: Jump between sessions to compare edits
+     - Recovery: Find and restore specific backup version
+     - Session-scoped review: Use [b/]b to stay within editing session
+     - Cross-session comparison: Use [B/]B to see all versions
+   - Workflow Example:
+     1. Open outline: `./tuo my_outline.json`
+     2. Make edits over time (auto-saves create backups)
+     3. Press `[b` to jump to previous backup (same session)
+     4. Press `]b` to view next backup (same session)
+     5. Press `[B` to view previous backup (any other session)
+     6. Press `]B` to view next newer backup
+     7. Find desired version, use `:w backup_restore.json` to save
+     8. Restore from saved backup as needed
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

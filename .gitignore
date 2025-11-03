@@ -29,3 +29,6 @@ vendor/
 /generate-test-file
 /.claude/settings.local.json
 /tuo.log
+/diffformat-to-json
+/outline-diff
+/tuo-to-diffformat
