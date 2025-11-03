@@ -209,6 +209,7 @@ type DisplayLine struct {
 	OriginalItem     *model.Item
 	SearchNodeParent *model.Item
 	VirtualAncestors []*model.Item
+	ParentDisplayItem *displayItem // Reference to parent displayItem (for comparing selected items)
 }
 
 // NewTreeView creates a new TreeView
@@ -288,16 +289,17 @@ func (tv *TreeView) buildDisplayLines(displayItems []*displayItem, maxWidth int)
 				isWrapped := wrapIdx > 0 // True if this is a wrapped continuation
 
 				line := &DisplayLine{
-					Item:             dispItem.Item,
-					TextLineIndex:    lineIdx,
-					TextLine:         wrappedText,
-					ItemStartLine:    isFirstLine,
-					IsWrapped:        isWrapped,
-					Depth:            dispItem.Depth,
-					IsVirtual:        dispItem.IsVirtual,
-					OriginalItem:     dispItem.OriginalItem,
-					SearchNodeParent: dispItem.SearchNodeParent,
-					VirtualAncestors: dispItem.VirtualAncestors,
+					Item:              dispItem.Item,
+					TextLineIndex:     lineIdx,
+					TextLine:          wrappedText,
+					ItemStartLine:     isFirstLine,
+					IsWrapped:         isWrapped,
+					Depth:             dispItem.Depth,
+					IsVirtual:         dispItem.IsVirtual,
+					OriginalItem:      dispItem.OriginalItem,
+					SearchNodeParent:  dispItem.SearchNodeParent,
+					VirtualAncestors:  dispItem.VirtualAncestors,
+					ParentDisplayItem: dispItem,
 				}
 				lines = append(lines, line)
 			}
@@ -1453,6 +1455,14 @@ func (tv *TreeView) GetSelected() *model.Item {
 	return nil
 }
 
+// GetSelectedDisplayItem returns the selected displayItem (includes virtual/real status and parent info)
+func (tv *TreeView) GetSelectedDisplayItem() *displayItem {
+	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
+		return tv.filteredView[tv.selectedIdx]
+	}
+	return nil
+}
+
 // GetSelectedIndex returns the currently selected index
 func (tv *TreeView) GetSelectedIndex() int {
 	return tv.selectedIdx
@@ -1539,6 +1549,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 
 	// Get the display line range for the selected item
 	selectedItem := tv.GetSelected()
+	selectedDisplayItem := tv.GetSelectedDisplayItem()
 	var firstLineOfSelected, lastLineOfSelected int
 	if selectedItem != nil {
 		firstLineOfSelected = tv.getFirstDisplayLineForItem(selectedItem)
@@ -1594,7 +1605,9 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		y := screenY
 
 		// Determine if this line's item is selected
-		isLinePartOfSelected := selectedItem != nil && displayLine.Item.ID == selectedItem.ID
+		// Highlight only if this display line is from the same displayItem as the selected item
+		// This prevents multiple references to the same item from all being highlighted
+		isLinePartOfSelected := selectedItem != nil && displayLine.Item.ID == selectedItem.ID && displayLine.ParentDisplayItem == selectedDisplayItem
 
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
@@ -1697,9 +1710,10 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 
 			// Draw the text with link and search highlighting
 			// Links are always highlighted, search highlighting is applied only to current match
+			// Don't highlight virtual references (items shown in search nodes)
 			linkStyle := screen.TreeLinkStyle()
 			var displayLen int
-			if searchQuery != "" && currentMatchItem != nil && displayLine.Item == currentMatchItem {
+			if searchQuery != "" && currentMatchItem != nil && displayLine.Item == currentMatchItem && !displayLine.IsVirtual {
 				_, displayLen = tv.drawTextWithLinksAndSearch(screen, textX, y, text, style, highlightStyle, linkStyle, searchQuery)
 			} else {
 				_, displayLen = tv.drawTextWithLinksAndSearch(screen, textX, y, text, style, highlightStyle, linkStyle, "")
