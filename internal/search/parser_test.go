@@ -2,8 +2,11 @@ package search
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
@@ -211,9 +214,9 @@ func TestDepthFilter(t *testing.T) {
 
 func TestChildrenFilter(t *testing.T) {
 	tests := []struct {
-		query        string
-		childCount   int
-		matches      bool
+		query      string
+		childCount int
+		matches    bool
 	}{
 		{"children:0", 0, true},
 		{"children:0", 1, false},
@@ -242,7 +245,274 @@ func TestChildrenFilter(t *testing.T) {
 	}
 }
 
-func TestAttributeDateFilter(t *testing.T) {
+func TestAttributeDateExprParser(t *testing.T) {
+	tests := []struct {
+		query    string
+		key      string
+		value    string
+		op       ComparisonOp
+		shouldErr bool
+	}{
+		{
+			query:    "@date>=2025-10-10",
+			key:      "date",
+			value:    "2025-10-10",
+			op:       OpGreaterEqual,
+		},
+		{
+			query:    "@date>2025-10-10",
+			key:      "date",
+			value:    "2025-10-10",
+			op:       OpGreater,
+		},
+		{
+			query:    "@date<2025-10-10",
+			key:      "date",
+			value:    "2025-10-10",
+			op:       OpLess,
+		},
+		{
+			query:    "@date<=2025-10-10",
+			key:      "date",
+			value:    "2025-10-10",
+			op:       OpLessEqual,
+		},
+		{
+			query:    "@date=2025-10-10",
+			key:      "date",
+			value:    "2025-10-10",
+			op:       OpEqual,
+		},
+		{
+			query:    "@date!=2025-10-10",
+			key:      "date",
+			value:    "2025-10-10",
+			op:       OpNotEqual,
+		},
+		{
+			query:    "@deadline>-7d",
+			key:      "deadline",
+			value:    "-7d",
+			op:       OpGreater,
+		},
+		{
+			query:    "@duedate<=-30d",
+			key:      "duedate",
+			value:    "-30d",
+			op:       OpLessEqual,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			assert.NoErrorf(t, err, "%q should parse without error", tt.query)
+			assert.Equal(t, tt.key, expr.(*AttributeDateFilter).key, "key should match")
+			assert.Equal(t, tt.value, expr.(*AttributeDateFilter).value, "value should match")
+			assert.Equal(t, tt.op, expr.(*AttributeDateFilter).op, "operator should match")
+		})
+	}
+}
+
+func TestAttributeDateComparisonOpsAllOperators(t *testing.T) {
+	// Test that all date comparison operators parse and can be used
+	// Since parseDate has timing issues with relative dates, this test focuses on
+	// verifying that each operator is correctly parsed and applied to filter expressions
+
+	tests := []struct {
+		name             string
+		query            string
+		expectsOp        ComparisonOp
+		expectsAttribute string
+	}{
+		// All six comparison operators
+		{
+			name:             "OpGreater",
+			query:            "@date>-7d",
+			expectsOp:        OpGreater,
+			expectsAttribute: "date",
+		},
+		{
+			name:             "OpGreaterEqual",
+			query:            "@date>=-7d",
+			expectsOp:        OpGreaterEqual,
+			expectsAttribute: "date",
+		},
+		{
+			name:             "OpLess",
+			query:            "@date<-7d",
+			expectsOp:        OpLess,
+			expectsAttribute: "date",
+		},
+		{
+			name:             "OpLessEqual",
+			query:            "@date<=-7d",
+			expectsOp:        OpLessEqual,
+			expectsAttribute: "date",
+		},
+		{
+			name:             "OpEqual",
+			query:            "@date=-7d",
+			expectsOp:        OpEqual,
+			expectsAttribute: "date",
+		},
+		{
+			name:             "OpNotEqual",
+			query:            "@date!=-7d",
+			expectsOp:        OpNotEqual,
+			expectsAttribute: "date",
+		},
+		// Different attribute keys
+		{
+			name:             "OpGreater with deadline",
+			query:            "@deadline>-30d",
+			expectsOp:        OpGreater,
+			expectsAttribute: "deadline",
+		},
+		{
+			name:             "OpLess with duedate",
+			query:            "@duedate<-14d",
+			expectsOp:        OpLess,
+			expectsAttribute: "duedate",
+		},
+		{
+			name:             "OpEqual with expiry",
+			query:            "@expiry=-0d",
+			expectsOp:        OpEqual,
+			expectsAttribute: "expiry",
+		},
+		{
+			name:             "OpNotEqual with modified",
+			query:            "@modified!=-1w",
+			expectsOp:        OpNotEqual,
+			expectsAttribute: "modified",
+		},
+		// Multiple different operators
+		{
+			name:             "OpGreater with month range",
+			query:            "@created>-1m",
+			expectsOp:        OpGreater,
+			expectsAttribute: "created",
+		},
+		{
+			name:             "OpLessEqual with year range",
+			query:            "@archived<=-1y",
+			expectsOp:        OpLessEqual,
+			expectsAttribute: "archived",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			// Verify it's an AttributeDateFilter
+			dateFilter, ok := expr.(*AttributeDateFilter)
+			if !ok {
+				t.Fatalf("expected *AttributeDateFilter, got %T", expr)
+			}
+
+			// Verify the operator is correct
+			if dateFilter.op != tt.expectsOp {
+				t.Errorf("expected operator %q, got %q", tt.expectsOp, dateFilter.op)
+			}
+
+			// Verify the attribute key is correct
+			if dateFilter.key != tt.expectsAttribute {
+				t.Errorf("expected attribute key %q, got %q", tt.expectsAttribute, dateFilter.key)
+			}
+		})
+	}
+}
+
+func TestAttributeDatePositiveFilter(t *testing.T) {
+	// Test absolute date filters (YYYY-MM-DD format)
+	// The "Positive" name refers to testing the filter with dates that should match
+	now := time.Now()
+	yesterday := now.AddDate(0, 0, -1)
+	weekAgo := now.AddDate(0, 0, -7)
+
+	tests := []struct {
+		query   string
+		dateVal string
+		matches bool
+	}{
+		// Absolute date comparisons
+		{
+			query:   fmt.Sprintf("@date<=%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			matches: true,
+		},
+		{
+			query:   fmt.Sprintf("@date<=%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", weekAgo.Year(), weekAgo.Month(), weekAgo.Day()),
+			matches: true,
+		},
+		{
+			query:   fmt.Sprintf("@date>%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", yesterday.Year(), yesterday.Month(), yesterday.Day()),
+			matches: false,
+		},
+		{
+			query:   fmt.Sprintf("@date>%d-%02d-%02d", weekAgo.Year(), weekAgo.Month(), weekAgo.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			matches: true,
+		},
+		// Equality with absolute dates
+		{
+			query:   fmt.Sprintf("@date=%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			matches: true,
+		},
+		{
+			query:   fmt.Sprintf("@date=%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", yesterday.Year(), yesterday.Month(), yesterday.Day()),
+			matches: false,
+		},
+		// Negative equality
+		{
+			query:   fmt.Sprintf("@date!=%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", yesterday.Year(), yesterday.Month(), yesterday.Day()),
+			matches: true,
+		},
+		{
+			query:   fmt.Sprintf("@date!=%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			dateVal: fmt.Sprintf("%d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+			matches: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := &model.Item{
+				ID:   "test-item",
+				Text: "test",
+				Metadata: &model.Metadata{
+					Created:  time.Now(),
+					Modified: time.Now(),
+					Attributes: map[string]string{
+						"date": tt.dateVal,
+					},
+				},
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("query %s with date %s: expected %v, got %v", tt.query, tt.dateVal, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestAttributeDateNegativeFilter(t *testing.T) {
 	now := time.Now()
 	yesterday := now.AddDate(0, 0, -1)
 	weekAgo := now.AddDate(0, 0, -7)
@@ -321,11 +591,264 @@ func TestAttributeDateFilter(t *testing.T) {
 	}
 }
 
+func TestAttributeDateFutureRelativeDates(t *testing.T) {
+	// Test all date comparison operators with future relative date queries
+	// Item dates are always stored as absolute dates (YYYY-MM-DD)
+	// Queries use relative dates (+Nd format) to compare against items
+	now := time.Now()
+	future7d := now.AddDate(0, 0, 7)
+	future14d := now.AddDate(0, 0, 14)
+	future30d := now.AddDate(0, 0, 30)
+	past7d := now.AddDate(0, 0, -7)
+	past30d := now.AddDate(0, 0, -30)
+	future1y := now.AddDate(1, 0, 0)
+
+	tests := []struct {
+		name     string
+		query    string
+		itemDate time.Time // stored as YYYY-MM-DD
+		matches  bool
+	}{
+		// OpGreater: date > reference (item date is MORE in future)
+		{
+			name:     "OpGreater: 30d future > 7d future",
+			query:    "@date>+7d",
+			itemDate: future30d,
+			matches:  true,
+		},
+		{
+			name:     "OpGreater: 7d future > 7d future (same boundary)",
+			query:    "@date>+7d",
+			itemDate: future7d,
+			matches:  false,
+		},
+		{
+			name:     "OpGreater: 1d future > 7d future (earlier)",
+			query:    "@date>+7d",
+			itemDate: now.AddDate(0, 0, 1),
+			matches:  false,
+		},
+
+		// OpGreaterEqual: date >= reference
+		{
+			name:     "OpGreaterEqual: 14d future >= 7d past",
+			query:    "@date>=-7d",
+			itemDate: future14d,
+			matches:  true,
+		},
+		{
+			name:     "OpGreaterEqual: today >= 7d past",
+			query:    "@date>=-7d",
+			itemDate: now,
+			matches:  true,
+		},
+		{
+			name:     "OpGreaterEqual: 1d future >= 7d past (more recent)",
+			query:    "@date>=-7d",
+			itemDate: now.AddDate(0, 0, 1),
+			matches:  true,
+		},
+
+		// OpLess: date < reference (item date is LESS in future, or in past)
+		{
+			name:     "OpLess: 1d future < 7d future",
+			query:    "@date<+7d",
+			itemDate: now.AddDate(0, 0, 1),
+			matches:  true,
+		},
+		{
+			name:     "OpLess: 7d past < 7d future",
+			query:    "@date<+7d",
+			itemDate: past7d,
+			matches:  true,
+		},
+		{
+			name:     "OpLess: 14d future < 7d future (later)",
+			query:    "@date<+7d",
+			itemDate: future14d,
+			matches:  false,
+		},
+
+		// OpLessEqual: date <= reference
+		{
+			name:     "OpLessEqual: 1d future <= 7d future",
+			query:    "@date<=+7d",
+			itemDate: now.AddDate(0, 0, 1),
+			matches:  true,
+		},
+		{
+			name:     "OpLessEqual: 7d future <= 7d future (equal boundary)",
+			query:    "@date<=+7d",
+			itemDate: future7d,
+			matches:  true,
+		},
+		{
+			name:     "OpLessEqual: 14d future <= 7d future",
+			query:    "@date<=+7d",
+			itemDate: future14d,
+			matches:  false,
+		},
+
+		// OpEqual: date equals reference (same day)
+		{
+			name:     "OpEqual: 7d future = 7d future",
+			query:    "@date=+7d",
+			itemDate: future7d,
+			matches:  true,
+		},
+		{
+			name:     "OpEqual: 1d future = 7d future",
+			query:    "@date=+7d",
+			itemDate: now.AddDate(0, 0, 1),
+			matches:  false,
+		},
+		{
+			name:     "OpEqual: 7d past = 7d future",
+			query:    "@date=+7d",
+			itemDate: past7d,
+			matches:  false,
+		},
+
+		// OpNotEqual: date does not equal reference
+		{
+			name:     "OpNotEqual: 1d future != 7d future",
+			query:    "@date!=+7d",
+			itemDate: now.AddDate(0, 0, 1),
+			matches:  true,
+		},
+		{
+			name:     "OpNotEqual: 7d future != 7d future",
+			query:    "@date!=+7d",
+			itemDate: future7d,
+			matches:  false,
+		},
+		{
+			name:     "OpNotEqual: 7d past != 7d future",
+			query:    "@date!=+7d",
+			itemDate: past7d,
+			matches:  true,
+		},
+
+		// Mixed past and future comparisons
+		{
+			name:     "OpGreater: future date > past reference",
+			query:    "@date>-7d",
+			itemDate: future7d,
+			matches:  true,
+		},
+		{
+			name:     "OpLess: past date < future reference",
+			query:    "@date<+7d",
+			itemDate: past7d,
+			matches:  true,
+		},
+		{
+			name:     "OpGreaterEqual: today >= 7d past",
+			query:    "@date>=-7d",
+			itemDate: now,
+			matches:  true,
+		},
+		{
+			name:     "OpLessEqual: 7d past <= 7d future",
+			query:    "@date<=+7d",
+			itemDate: past7d,
+			matches:  true,
+		},
+
+		// Different attribute keys
+		{
+			name:     "OpGreater with deadline: future deadline",
+			query:    "@deadline>+7d",
+			itemDate: future14d,
+			matches:  true,
+		},
+		{
+			name:     "OpLess with duedate: past due date",
+			query:    "@duedate<-7d",
+			itemDate: past30d,
+			matches:  true,
+		},
+		{
+			name:     "OpEqual with expiry: exact expiry date",
+			query:    "@expiry=+30d",
+			itemDate: future30d,
+			matches:  true,
+		},
+
+		// Week, month, and year ranges
+		{
+			name:     "OpGreater: 14d future > 1 week past",
+			query:    "@date>-1w",
+			itemDate: future14d,
+			matches:  true,
+		},
+		{
+			name:     "OpLess: 15d past < 30d past (approximately 1 month)",
+			query:    "@date<-30d",
+			itemDate: now.AddDate(0, 0, -15),
+			matches:  false,
+		},
+		{
+			name:     "OpLess: 60d past < 1 month past",
+			query:    "@date<-1m",
+			itemDate: now.AddDate(0, 0, -60),
+			matches:  true,
+		},
+		{
+			name:     "OpGreaterEqual: 1 year future >= 1 year past",
+			query:    "@date>=-1y",
+			itemDate: future1y,
+			matches:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			// Extract attribute key from query
+			var attrKey string
+			if strings.Contains(tt.query, "@date") {
+				attrKey = "date"
+			} else if strings.Contains(tt.query, "@deadline") {
+				attrKey = "deadline"
+			} else if strings.Contains(tt.query, "@duedate") {
+				attrKey = "duedate"
+			} else if strings.Contains(tt.query, "@expiry") {
+				attrKey = "expiry"
+			}
+
+			// Convert time.Time to YYYY-MM-DD format for storage
+			dateStr := tt.itemDate.Format("2006-01-02")
+
+			item := &model.Item{
+				ID:   "test-item",
+				Text: "test",
+				Metadata: &model.Metadata{
+					Created:  time.Now(),
+					Modified: time.Now(),
+					Attributes: map[string]string{
+						attrKey: dateStr,
+					},
+				},
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
 func TestBooleanOperators(t *testing.T) {
 	tests := []struct {
-		query string
-		text  string
-		depth int
+		query   string
+		text    string
+		depth   int
 		matches bool
 	}{
 		{"task d:>0", "task", 1, true},
@@ -400,8 +923,8 @@ func createModelItemWithChildren(count int) *model.Item {
 
 	for i := 0; i < count; i++ {
 		child := &model.Item{
-			ID:   fmt.Sprintf("child-%d", i),
-			Text: fmt.Sprintf("child-%d", i),
+			ID:     fmt.Sprintf("child-%d", i),
+			Text:   fmt.Sprintf("child-%d", i),
 			Parent: item,
 			Metadata: &model.Metadata{
 				Created:  time.Now(),

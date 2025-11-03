@@ -298,9 +298,10 @@ func (e *DateFilter) Matches(item *model.Item) bool {
 		return false
 	}
 
-	if e.filterType == FilterTypeCreated {
+	switch e.filterType {
+	case FilterTypeCreated:
 		targetTime = item.Metadata.Created
-	} else if e.filterType == FilterTypeModified {
+	case FilterTypeModified:
 		targetTime = item.Metadata.Modified
 	}
 
@@ -442,8 +443,24 @@ func compare(a int, op ComparisonOp, b int) bool {
 
 // isValidDateValue checks if a date value is in a valid format
 func isValidDateValue(value string) bool {
+	// Empty string is not a valid date
+	if len(value) == 0 {
+		return false
+	}
+
 	// Relative dates: -1d, -7d, -30d, -1w, -4w, -1m, -6m, -1y
 	if strings.HasPrefix(value, "-") {
+		// Need at least 2 characters: "-" + suffix
+		if len(value) < 2 {
+			return false
+		}
+		suffix := value[len(value)-1:]
+		return suffix == "d" || suffix == "w" || suffix == "m" || suffix == "y"
+	} else if strings.HasPrefix(value, "+") {
+		// Need at least 2 characters: "+" + suffix
+		if len(value) < 2 {
+			return false
+		}
 		suffix := value[len(value)-1:]
 		return suffix == "d" || suffix == "w" || suffix == "m" || suffix == "y"
 	}
@@ -455,35 +472,37 @@ func isValidDateValue(value string) bool {
 func parseDate(value string) time.Time {
 	now := time.Now()
 
-	// Relative dates
-	if strings.HasPrefix(value, "-") {
+	// Try to parse as relative date first (format: -/+Nd, -/+Nw, -/+Nm, -/+Ny)
+	if len(value) > 2 && (strings.HasPrefix(value, "-") || strings.HasPrefix(value, "+")) {
+		sgn := 1
+		if strings.HasPrefix(value, "-") {
+			sgn = -1
+		}
+
 		var amount int
 		var suffix string
-		_, err := fmt.Sscanf(value, "-%d%s", &amount, &suffix)
-		if err != nil || len(suffix) != 1 {
-			return time.Time{}
-		}
-
-		switch suffix {
-		case "d":
-			return now.AddDate(0, 0, -amount)
-		case "w":
-			return now.AddDate(0, 0, -amount*7)
-		case "m":
-			return now.AddDate(0, -amount, 0)
-		case "y":
-			return now.AddDate(-amount, 0, 0)
-		default:
-			return time.Time{}
+		_, err := fmt.Sscanf(value[1:], "%d%s", &amount, &suffix)
+		if err == nil && len(suffix) == 1 {
+			switch suffix {
+			case "d":
+				return now.AddDate(0, 0, sgn*amount)
+			case "w":
+				return now.AddDate(0, 0, sgn*amount*7)
+			case "m":
+				return now.AddDate(0, sgn*amount, 0)
+			case "y":
+				return now.AddDate(sgn*amount, 0, 0)
+			}
 		}
 	}
 
-	// Absolute dates: YYYY-MM-DD
+	// Try to parse as absolute date (format: YYYY-MM-DD)
 	t, err := time.Parse("2006-01-02", value)
-	if err != nil {
-		return time.Time{}
+	if err == nil {
+		return t
 	}
-	return t
+
+	return time.Time{}
 }
 
 // GetMatchingItems returns all items that match the given filter expression

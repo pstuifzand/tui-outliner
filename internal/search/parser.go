@@ -12,11 +12,11 @@ const (
 	TokenEOF TokenType = iota
 	TokenText
 	TokenFilter
-	TokenAnd     // + (explicit)
-	TokenOr      // |
-	TokenNot     // -
-	TokenLParen  // (
-	TokenRParen  // )
+	TokenAnd    // + (explicit)
+	TokenOr     // |
+	TokenNot    // -
+	TokenLParen // (
+	TokenRParen // )
 )
 
 // Token represents a single token in the search query
@@ -31,12 +31,11 @@ type FilterType string
 const (
 	FilterTypeText     FilterType = "text"
 	FilterTypeDepth    FilterType = "d"
-	FilterTypeAttr     FilterType = "a"
 	FilterTypeCreated  FilterType = "c"
 	FilterTypeModified FilterType = "m"
 	FilterTypeChildren FilterType = "children"
 	FilterTypeParent   FilterType = "p"
-	FilterTypeAncestor FilterType = "ancestor"
+	FilterTypeAncestor FilterType = "a"
 )
 
 // ComparisonOp represents comparison operators
@@ -191,10 +190,10 @@ func (t *Tokenizer) readFilterCriteria() string {
 		}
 	}
 
-	// Read value (letters, digits, dots, dashes, underscores, etc.)
+	// Read value (letters, digits, dots, dashes, underscores, plus signs for relative dates, etc.)
 	for t.pos < len(t.input) {
 		ch := t.input[t.pos]
-		if ch == ' ' || ch == '\t' || ch == '|' || ch == '+' || ch == ')' {
+		if ch == ' ' || ch == '\t' || ch == '|' || ch == ')' {
 			break
 		}
 		t.pos++
@@ -373,7 +372,7 @@ func (p *Parser) parseAnd() (FilterExpr, error) {
 
 func (p *Parser) parseNot() (FilterExpr, error) {
 	if p.currentToken().Type == TokenNot {
-		p.advance() // consume -
+		p.advance()               // consume -
 		expr, err := p.parseNot() // Allow chaining of NOTs
 		if err != nil {
 			return nil, err
@@ -475,7 +474,7 @@ func parseFilterValue(value string) (FilterExpr, error) {
 		expr, err = parseChildrenFilter(criteria)
 	case string(FilterTypeParent):
 		expr, err = parseParentFilter(criteria)
-	case "a": // Changed from "ancestor" to "a"
+	case string(FilterTypeAncestor): // Changed from "ancestor" to "a"
 		expr, err = parseAncestorFilter(criteria)
 	default:
 		// Unknown filter type, treat as text
