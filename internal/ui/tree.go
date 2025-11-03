@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -10,6 +12,19 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/links"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
+
+// debugLogger is initialized once to log move operations
+var debugLogger *log.Logger
+
+func init() {
+	debugFile, err := os.OpenFile("/tmp/tuo-move-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		// Fallback to stderr if we can't open the debug file
+		debugLogger = log.New(os.Stderr, "[TUO] ", log.LstdFlags)
+	} else {
+		debugLogger = log.New(debugFile, "[TUO] ", log.LstdFlags)
+	}
+}
 
 // GetAllItemsRecursive returns all items in a subtree (depth-first)
 func GetAllItemsRecursive(item *model.Item) []*model.Item {
@@ -788,102 +803,384 @@ func (tv *TreeView) Outdent() bool {
 	return true
 }
 
-// MoveItemDown moves the selected item down in linear order (swaps with next sibling)
+// MoveItemDown moves the selected item down to the next position in linear order
+// Positions cycle through all possible (parent, index) pairs in depth-first order
 func (tv *TreeView) MoveItemDown() bool {
-	if tv.selectedIdx >= len(tv.filteredView)-1 || tv.selectedIdx < 0 {
+	if tv.selectedIdx >= len(tv.filteredView) || tv.selectedIdx < 0 {
 		return false
 	}
 
 	current := tv.filteredView[tv.selectedIdx].Item
-	next := tv.filteredView[tv.selectedIdx+1].Item
 
-	// Only swap if they have the same parent and depth
-	if tv.filteredView[tv.selectedIdx].Depth != tv.filteredView[tv.selectedIdx+1].Depth {
-		return false
-	}
+	// Build list of all possible positions in DFS order, excluding invalid positions for this item
+	positions := tv.buildAllPositionsForItem(current)
 
-	// Get the parent (could be nil for root items)
-	parent := current.Parent
-
-	// Find indices in the parent's children array
-	var currentIdx, nextIdx int
-	var children []*model.Item
-
-	if parent != nil {
-		children = parent.Children
+	// Find current position
+	currentPos := -1
+	currentParentIdx := 0
+	if current.Parent != nil {
+		for idx, child := range current.Parent.Children {
+			if child.ID == current.ID {
+				currentParentIdx = idx
+				break
+			}
+		}
 	} else {
-		children = tv.items
-	}
-
-	for idx, child := range children {
-		if child.ID == current.ID {
-			currentIdx = idx
-		}
-		if child.ID == next.ID {
-			nextIdx = idx
+		for idx, child := range tv.items {
+			if child.ID == current.ID {
+				currentParentIdx = idx
+				break
+			}
 		}
 	}
 
-	// Swap only if they are adjacent
-	if nextIdx != currentIdx+1 {
+	for i, pos := range positions {
+		if pos.Parent == current.Parent && pos.Index == currentParentIdx {
+			currentPos = i
+			break
+		}
+	}
+
+	// Log all positions with current marked
+	logPositions(positions, currentPos, current.Text, "MoveDown")
+
+	if currentPos == -1 || currentPos >= len(positions)-1 {
+		return false // Can't move further down
+	}
+
+	// Find next position
+	// All positions in the list are valid (collapsed nodes are already filtered out)
+	var nextPos Position
+	searchIdx := currentPos + 1
+	if searchIdx < len(positions) {
+		nextPos = positions[searchIdx]
+	}
+
+	// If we couldn't find a valid position, can't move down
+	if searchIdx >= len(positions) {
 		return false
 	}
 
-	// Swap items in the slice
-	children[currentIdx], children[nextIdx] = children[nextIdx], children[currentIdx]
+	// Use the target index directly - positions are built before removal
+	nextIdx := nextPos.Index
+
+	// Remember the previous parent for comparison
+	prevParent := current.Parent
+
+	// Remove item from current parent
+	if current.Parent != nil {
+		current.Parent.Children = append(current.Parent.Children[:currentParentIdx], current.Parent.Children[currentParentIdx+1:]...)
+	} else {
+		tv.items = append(tv.items[:currentParentIdx], tv.items[currentParentIdx+1:]...)
+	}
+
+	// Insert at next position
+	if nextPos.Parent != nil {
+		children := nextPos.Parent.Children
+		// Clamp nextIdx to valid range after array has been modified
+		insertIdx := nextIdx
+		if insertIdx > len(children) {
+			insertIdx = len(children)
+		}
+		newChildren := make([]*model.Item, 0, len(children)+1)
+		newChildren = append(newChildren, children[:insertIdx]...)
+		newChildren = append(newChildren, current)
+		newChildren = append(newChildren, children[insertIdx:]...)
+		nextPos.Parent.Children = newChildren
+	} else {
+		children := tv.items
+		// Clamp nextIdx to valid range after array has been modified
+		insertIdx := nextIdx
+		if insertIdx > len(children) {
+			insertIdx = len(children)
+		}
+		newChildren := make([]*model.Item, 0, len(children)+1)
+		newChildren = append(newChildren, children[:insertIdx]...)
+		newChildren = append(newChildren, current)
+		newChildren = append(newChildren, children[insertIdx:]...)
+		tv.items = newChildren
+	}
+
+	current.Parent = nextPos.Parent
+
+	// After insertion, find the actual index where current ended up
+	var actualIdx int
+	if nextPos.Parent != nil {
+		for i, child := range nextPos.Parent.Children {
+			if child.ID == current.ID {
+				actualIdx = i
+				break
+			}
+		}
+	} else {
+		for i, item := range tv.items {
+			if item.ID == current.ID {
+				actualIdx = i
+				break
+			}
+		}
+	}
+
+	// Verify we actually moved the item. If we ended up in the same parent at the same index, return false
+	if nextPos.Parent == prevParent && actualIdx == currentParentIdx {
+		return false
+	}
 
 	tv.RebuildView()
-	tv.selectedIdx++ // Move selection to follow the item
+	// Find the moved item in the new view and keep selection on it
+	for idx, displayItem := range tv.filteredView {
+		if displayItem.Item.ID == current.ID {
+			tv.selectedIdx = idx
+			break
+		}
+	}
+
 	return true
 }
 
-// MoveItemUp moves the selected item up in linear order (swaps with previous sibling)
+// MoveItemUp moves the selected item up to the previous position in linear order
+// Positions cycle through all possible (parent, index) pairs in depth-first order
 func (tv *TreeView) MoveItemUp() bool {
-	if tv.selectedIdx <= 0 || tv.selectedIdx >= len(tv.filteredView) {
+	if tv.selectedIdx >= len(tv.filteredView) || tv.selectedIdx < 0 {
 		return false
 	}
 
 	current := tv.filteredView[tv.selectedIdx].Item
-	prev := tv.filteredView[tv.selectedIdx-1].Item
 
-	// Only swap if they have the same parent and depth
-	if tv.filteredView[tv.selectedIdx].Depth != tv.filteredView[tv.selectedIdx-1].Depth {
-		return false
-	}
+	// Build list of all possible positions in DFS order, excluding invalid positions for this item
+	positions := tv.buildAllPositionsForItem(current)
 
-	// Get the parent (could be nil for root items)
-	parent := current.Parent
-
-	// Find indices in the parent's children array
-	var currentIdx, prevIdx int
-	var children []*model.Item
-
-	if parent != nil {
-		children = parent.Children
+	// Find current position
+	currentPos := -1
+	currentParentIdx := 0
+	if current.Parent != nil {
+		for idx, child := range current.Parent.Children {
+			if child.ID == current.ID {
+				currentParentIdx = idx
+				break
+			}
+		}
 	} else {
-		children = tv.items
-	}
-
-	for idx, child := range children {
-		if child.ID == current.ID {
-			currentIdx = idx
-		}
-		if child.ID == prev.ID {
-			prevIdx = idx
+		for idx, child := range tv.items {
+			if child.ID == current.ID {
+				currentParentIdx = idx
+				break
+			}
 		}
 	}
 
-	// Swap only if they are adjacent
-	if prevIdx != currentIdx-1 {
+	for i, pos := range positions {
+		if pos.Parent == current.Parent && pos.Index == currentParentIdx {
+			currentPos = i
+			break
+		}
+	}
+
+	// Log all positions with current marked
+	logPositions(positions, currentPos, current.Text, "MoveUp")
+
+	if currentPos <= 0 {
+		return false // Can't move further up
+	}
+
+	// Find previous position
+	// All positions in the list are valid (collapsed nodes are already filtered out)
+	var prevPos Position
+	searchIdx := currentPos - 1
+	if searchIdx >= 0 {
+		prevPos = positions[searchIdx]
+	}
+
+	// If we couldn't find a valid position, can't move up
+	if searchIdx < 0 {
 		return false
 	}
 
-	// Swap items in the slice
-	children[currentIdx], children[prevIdx] = children[prevIdx], children[currentIdx]
+	// Use the target index directly - positions are built before removal
+	prevIdx := prevPos.Index
+
+	// Remove item from current parent
+	if current.Parent != nil {
+		current.Parent.Children = append(current.Parent.Children[:currentParentIdx], current.Parent.Children[currentParentIdx+1:]...)
+	} else {
+		tv.items = append(tv.items[:currentParentIdx], tv.items[currentParentIdx+1:]...)
+	}
+
+	// Insert at previous position
+	if prevPos.Parent != nil {
+		children := prevPos.Parent.Children
+		// Clamp prevIdx to valid range after array has been modified
+		insertIdx := prevIdx
+		if insertIdx > len(children) {
+			insertIdx = len(children)
+		}
+		newChildren := make([]*model.Item, 0, len(children)+1)
+		newChildren = append(newChildren, children[:insertIdx]...)
+		newChildren = append(newChildren, current)
+		newChildren = append(newChildren, children[insertIdx:]...)
+		prevPos.Parent.Children = newChildren
+	} else {
+		children := tv.items
+		// Clamp prevIdx to valid range after array has been modified
+		insertIdx := prevIdx
+		if insertIdx > len(children) {
+			insertIdx = len(children)
+		}
+		newChildren := make([]*model.Item, 0, len(children)+1)
+		newChildren = append(newChildren, children[:insertIdx]...)
+		newChildren = append(newChildren, current)
+		newChildren = append(newChildren, children[insertIdx:]...)
+		tv.items = newChildren
+	}
+
+	current.Parent = prevPos.Parent
 
 	tv.RebuildView()
-	tv.selectedIdx-- // Move selection to follow the item
+	// Find the moved item in the new view and keep selection on it
+	for idx, displayItem := range tv.filteredView {
+		if displayItem.Item.ID == current.ID {
+			tv.selectedIdx = idx
+			break
+		}
+	}
 	return true
+}
+
+// Position represents a location where an item can be placed: (parent, index)
+type Position struct {
+	Parent *model.Item // nil for root level
+	Index  int         // 0 to len(Parent.Children)
+}
+
+// buildAllPositions builds a list of all possible positions in depth-first order
+// Each position is defined as (parent, index) where index is the position in parent's children array
+func (tv *TreeView) buildAllPositions() []Position {
+	var positions []Position
+	tv.buildPositionsRecursive(nil, &positions)
+	return positions
+}
+
+// buildAllPositionsForItem builds a list of all valid positions for moving a specific item
+// It excludes positions where the item would become its own parent or ancestor
+// It builds positions as if the item was temporarily removed from the tree (to get stable ordering)
+func (tv *TreeView) buildAllPositionsForItem(item *model.Item) []Position {
+	// Temporarily remove the item from its current location to get stable positions
+	// that don't depend on where the item currently is
+	var wasParent *model.Item
+	var wasIndex int
+	var wasRemoved bool
+
+	if item.Parent != nil {
+		wasParent = item.Parent
+		for i, child := range item.Parent.Children {
+			if child.ID == item.ID {
+				wasIndex = i
+				wasParent.Children = append(wasParent.Children[:i], wasParent.Children[i+1:]...)
+				wasRemoved = true
+				break
+			}
+		}
+	} else {
+		for i, rootItem := range tv.items {
+			if rootItem.ID == item.ID {
+				wasIndex = i
+				tv.items = append(tv.items[:i], tv.items[i+1:]...)
+				wasRemoved = true
+				break
+			}
+		}
+	}
+
+	// Build positions for the tree WITHOUT the item
+	allPositions := tv.buildAllPositions()
+
+	// Restore the item to its original position
+	if wasRemoved {
+		if wasParent != nil {
+			newChildren := make([]*model.Item, 0, len(wasParent.Children)+1)
+			newChildren = append(newChildren, wasParent.Children[:wasIndex]...)
+			newChildren = append(newChildren, item)
+			newChildren = append(newChildren, wasParent.Children[wasIndex:]...)
+			wasParent.Children = newChildren
+		} else {
+			newItems := make([]*model.Item, 0, len(tv.items)+1)
+			newItems = append(newItems, tv.items[:wasIndex]...)
+			newItems = append(newItems, item)
+			newItems = append(newItems, tv.items[wasIndex:]...)
+			tv.items = newItems
+		}
+	}
+
+	// Build set of descendants of the item (items we can't move it to)
+	descendants := make(map[*model.Item]bool)
+	tv.collectDescendants(item, descendants)
+
+	// Filter out invalid positions
+	var validPositions []Position
+	for _, pos := range allPositions {
+		// Can't move item to be a child of itself or any of its descendants
+		if pos.Parent != item && !descendants[pos.Parent] {
+			validPositions = append(validPositions, pos)
+		}
+	}
+
+	return validPositions
+}
+
+// collectDescendants recursively collects all descendants of an item
+func (tv *TreeView) collectDescendants(item *model.Item, descendants map[*model.Item]bool) {
+	for _, child := range item.Children {
+		descendants[child] = true
+		tv.collectDescendants(child, descendants)
+	}
+}
+
+// buildPositionsRecursive recursively builds all positions starting from a parent
+func (tv *TreeView) buildPositionsRecursive(parent *model.Item, positions *[]Position) {
+	var children []*model.Item
+	if parent == nil {
+		children = tv.items
+	} else {
+		// Only include positions for expanded nodes with children
+		// If a node is Expanded but has no children, treat it as if it's collapsed
+		if !parent.Expanded || len(parent.Children) == 0 {
+			// Don't create any positions for collapsed nodes or expanded nodes with no children
+			return
+		}
+		children = parent.Children
+	}
+
+	// Add positions for all insertion points in this parent's children
+	for i := 0; i <= len(children); i++ {
+		*positions = append(*positions, Position{Parent: parent, Index: i})
+		// Recursively add positions for the child at this index
+		if i < len(children) {
+			tv.buildPositionsRecursive(children[i], positions)
+		}
+	}
+}
+
+// logPositions logs all positions in a readable format with the current position marked as [CUR]
+func logPositions(positions []Position, currentIdx int, itemText string, operation string) {
+	var posStrs []string
+	for i, pos := range positions {
+		var parentName string
+		if pos.Parent == nil {
+			parentName = "root"
+		} else {
+			parentName = pos.Parent.Text
+		}
+
+		posStr := fmt.Sprintf("(%s,%d)", parentName, pos.Index)
+
+		if i == currentIdx {
+			posStr += " [CUR]"
+		}
+
+		posStrs = append(posStrs, posStr)
+	}
+
+	debugLogger.Printf("[%s] '%s': %s", operation, itemText, strings.Join(posStrs, ", "))
 }
 
 // AddItemAfter adds a new item after the selected item

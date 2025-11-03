@@ -48,7 +48,7 @@ func NewItem(text string) *Item {
 			Created:    time.Now(),
 			Modified:   time.Now(),
 		},
-		Expanded:                 true,
+		Expanded:                 false,
 		CollapsedVirtualChildren: make(map[string]bool),
 	}
 }
@@ -84,6 +84,10 @@ func (i *Item) RemoveChild(child *Item) {
 		if c.ID == child.ID {
 			i.Children = append(i.Children[:idx], i.Children[idx+1:]...)
 			child.Parent = nil
+			// If no children remain, set Expanded to false
+			if len(i.Children) == 0 {
+				i.Expanded = false
+			}
 			break
 		}
 	}

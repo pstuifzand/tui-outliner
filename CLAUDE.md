@@ -675,3 +675,12 @@ ls -la /home/peter/work/tui-outliner/
 - The application includes auto-save (5 seconds of inactivity)
 - When adding docs, add these to the ./docs/ directory.
 - always create test outlines in examples/ directory
+
+### MoveUp and MoveDown
+
+Valid positions are:
+
+  1. Root level (parent == nil)
+  2. Expanded nodes (parent.Expanded == true)
+  3. Sibling positions (parent == current.Parent) - Stay as siblings regardless
+

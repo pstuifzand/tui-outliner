@@ -233,3 +233,463 @@ func TestVisattrConfiguration(t *testing.T) {
 		t.Errorf("Expected empty string, got '%s'", visattrConfig)
 	}
 }
+
+func TestMoveUpDownSymmetry(t *testing.T) {
+	// Test that moving down then up returns to original position
+	itemA := model.NewItem("Item A")
+	itemB := model.NewItem("Item B")
+	itemC := model.NewItem("Item C")
+	itemD := model.NewItem("Item D")
+	itemE := model.NewItem("Item E")
+
+	// Collapse all items to keep moves at root level only
+	itemA.Expanded = false
+	itemB.Expanded = false
+	itemC.Expanded = false
+	itemD.Expanded = false
+	itemE.Expanded = false
+
+	items := []*model.Item{itemA, itemB, itemC, itemD, itemE}
+	tv := NewTreeView(items)
+
+	// Test 1: Move down then up should return to original position
+	tv.SelectItem(1) // Select Item B
+	initialParentB := itemB.Parent
+	initialIdxB := 1 // B starts at index 1
+
+	// Move down
+	if !tv.MoveItemDown() {
+		t.Error("MoveItemDown failed")
+	}
+
+	// Move up
+	if !tv.MoveItemUp() {
+		t.Error("MoveItemUp failed")
+	}
+
+	// Verify we're back at original position
+	finalParentB := itemB.Parent
+	finalIdxB := -1
+	if finalParentB == nil {
+		// Find B in the items array
+		for i, item := range tv.items {
+			if item.ID == itemB.ID {
+				finalIdxB = i
+				break
+			}
+		}
+	}
+
+	if finalParentB != initialParentB {
+		t.Errorf("Item B parent changed after down-up: initial=%v, final=%v", initialParentB, finalParentB)
+	}
+	if finalIdxB != initialIdxB {
+		t.Errorf("Item B index changed after down-up: initial=%d, final=%d", initialIdxB, finalIdxB)
+	}
+
+	// Test 2: Move up then down should also be symmetric
+	// But we need to re-find C's position since moves might have changed the order
+	var currentCIdx int
+	for i, item := range tv.items {
+		if item.ID == itemC.ID {
+			currentCIdx = i
+			break
+		}
+	}
+	tv.SelectItem(currentCIdx) // Select Item C
+	initialParentC := itemC.Parent
+
+	// Move up
+	if !tv.MoveItemUp() {
+		t.Error("MoveItemUp failed")
+	}
+
+	// Move down
+	if !tv.MoveItemDown() {
+		t.Error("MoveItemDown failed")
+	}
+
+	// Verify we're back at original position
+	finalParentC := itemC.Parent
+	finalIdxC := -1
+	if finalParentC == nil {
+		for i, item := range tv.items {
+			if item.ID == itemC.ID {
+				finalIdxC = i
+				break
+			}
+		}
+	}
+
+	if finalParentC != initialParentC {
+		t.Errorf("Item C parent changed after up-down: initial=%v, final=%v", initialParentC, finalParentC)
+	}
+	if finalIdxC != currentCIdx {
+		t.Errorf("Item C index changed after up-down: initial=%d, final=%d", currentCIdx, finalIdxC)
+	}
+}
+
+func TestMoveDoesNotExpandCollapsedNodes(t *testing.T) {
+	// Create tree with collapsed node
+	itemA := model.NewItem("Item A")
+	itemB := model.NewItem("Item B")
+	itemC := model.NewItem("Item C")
+	itemD := model.NewItem("Item D")
+
+	itemB.AddChild(itemC)
+	itemB.Expanded = false // Collapsed
+
+	items := []*model.Item{itemA, itemB, itemD}
+	tv := NewTreeView(items)
+
+	// Store initial state - B should be collapsed
+	if itemB.Expanded {
+		t.Error("Item B should start as collapsed")
+	}
+
+	// Try to move D up (should not go into collapsed B)
+	tv.SelectItem(2) // Select D
+	initialParentD := itemD.Parent
+
+	success := tv.MoveItemUp()
+	if success && itemD.Parent == itemB {
+		t.Error("Item D should not have moved into collapsed node B")
+	}
+
+	// B should remain collapsed
+	if itemB.Expanded {
+		t.Error("Collapsed node B was expanded by move operation")
+	}
+
+	// D should stay at root level (or at least not in B)
+	if itemD.Parent == itemB {
+		t.Error("Item D moved into collapsed node, violating requirements")
+	}
+
+	// If move succeeded, D should have same parent as before or at root
+	if success && itemD.Parent != initialParentD {
+		if itemD.Parent != nil {
+			t.Error("Item D parent unexpectedly changed")
+		}
+	}
+}
+
+func TestMoveWithCollapsedNodeHavingChildren(t *testing.T) {
+	// Test that collapsed nodes with children don't accept new children via move
+	itemA := model.NewItem("Item A")
+	itemB := model.NewItem("Item B")
+	itemC := model.NewItem("Item C - Child of B")
+	itemD := model.NewItem("Item D")
+	itemE := model.NewItem("Item E")
+
+	itemB.AddChild(itemC)
+	itemB.Expanded = false // Collapsed
+
+	items := []*model.Item{itemA, itemB, itemD, itemE}
+	tv := NewTreeView(items)
+
+	// Verify B is collapsed
+	if itemB.Expanded {
+		t.Error("Item B should be collapsed")
+	}
+
+	// Try to move E up - it should skip over collapsed B
+	tv.SelectItem(3) // Select E
+	success := tv.MoveItemUp()
+
+	// E should not be a child of B
+	if itemE.Parent == itemB {
+		t.Error("Item E should not have moved into collapsed node B (even though B has children)")
+	}
+
+	// B should still be collapsed
+	if itemB.Expanded {
+		t.Error("Move operation should not expand collapsed nodes")
+	}
+
+	if success {
+		t.Logf("Move succeeded. E is now at parent: %v (B is parent: %v)", itemE.Parent, itemE.Parent == itemB)
+	}
+}
+
+func TestMoveItemADownAndUp(t *testing.T) {
+	// Test moving Item A through all positions down and then back up
+	// This mirrors the structure from examples/move_demo.json with expanded nodes:
+	// A (root, collapsed)
+	// B (root, EXPANDED) -> C (child)
+	// D (root, collapsed)
+	// E (root, EXPANDED) -> F (child)
+	//
+	// With B and E expanded, the DFS position sequence is:
+	// (root,0), (root,1), (B,0), (B,1), (root,2), (root,3), (E,0), (E,1), (root,4)
+	//
+	// A starts at root[0] and should move through: root[0] → root[1] → B[0] → B[1] → root[2] → root[3] → E[0] → E[1] → root[4]
+
+	itemA := model.NewItem("Item A")
+	itemA.Expanded = false // Keep collapsed to prevent nesting
+
+	itemB := model.NewItem("Item B")
+	itemC := model.NewItem("Item C")
+	itemB.AddChild(itemC)
+	itemB.Expanded = true // Expanded - allows A to move into it
+
+	itemD := model.NewItem("Item D")
+	itemD.Expanded = false // Collapsed - skip its positions
+
+	itemE := model.NewItem("Item E")
+	itemF := model.NewItem("Item F")
+	itemE.AddChild(itemF)
+	itemE.Expanded = true // Expanded - allows A to move into it
+
+	items := []*model.Item{itemA, itemB, itemD, itemE}
+	tv := NewTreeView(items)
+
+	// Track all positions of Item A as we move it down
+	type Position struct {
+		ParentText string
+		Index      int
+	}
+	var positionsDown []Position
+	var positionsUp []Position
+
+	// Helper to find A's current position (recursive search through all descendants)
+	var findAPosition func(*model.Item) Position
+	findAPosition = func(parent *model.Item) Position {
+		if parent.ID == itemA.ID {
+			return Position{parent.Text, -1} // Found as a parent itself - shouldn't happen for A
+		}
+		for i, child := range parent.Children {
+			if child.ID == itemA.ID {
+				return Position{parent.Text, i}
+			}
+			// Recursively search in this child's descendants
+			pos := findAPosition(child)
+			if pos.Index != -1 || pos.ParentText != "not found" {
+				return pos
+			}
+		}
+		return Position{"not found", -1}
+	}
+
+	getAPosition := func() Position {
+		// Check root level first
+		for i, item := range tv.items {
+			if item.ID == itemA.ID {
+				return Position{"root", i}
+			}
+		}
+		// Recursively check all descendants
+		for _, item := range tv.items {
+			pos := findAPosition(item)
+			if pos.Index != -1 {
+				return pos
+			}
+		}
+		return Position{"not found", -1}
+	}
+
+	// Record initial position
+	initialPos := getAPosition()
+	positionsDown = append(positionsDown, initialPos)
+
+	// Move Item A down through all valid positions
+	moveCount := 0
+	prevPos := initialPos
+	for {
+		// Find and select A before trying to move
+		currentPos := getAPosition()
+		if currentPos.Index == -1 {
+			t.Fatal("Item A not found in tree")
+		}
+
+		tv.SelectItemByID(itemA.ID)
+		if !tv.MoveItemDown() {
+			break // Can't move down anymore
+		}
+		moveCount++
+
+		// Get new position
+		newPos := getAPosition()
+		positionsDown = append(positionsDown, newPos)
+
+		// Check if we're making progress
+		if newPos.ParentText == prevPos.ParentText && newPos.Index == prevPos.Index {
+			t.Logf("Item A stuck at %s[%d], stopping", newPos.ParentText, newPos.Index)
+			break
+		}
+		prevPos = newPos
+
+		// Safety check to prevent infinite loops
+		if moveCount > 20 {
+			t.Logf("Positions down: %v", positionsDown)
+			t.Fatal("Too many moves down, infinite loop detected")
+		}
+	}
+
+	// A should successfully move through all positions when using stable position ordering
+	// Expected: (root,0), (B,0), (B,1), (root,1), (root,2), (E,0), (E,1), (root,3)
+	// = 8 positions total, so 7 moves to get from position 1 to position 8
+	if moveCount < 7 {
+		t.Errorf("Expected at least 7 moves down (through all expanded nodes), got %d", moveCount)
+	}
+
+	// Now move Item A back up to verify symmetry
+	for i := 0; i < moveCount; i++ {
+		// Find and select A before trying to move
+		currentPos := getAPosition()
+		if currentPos.Index == -1 {
+			t.Errorf("Item A not found at step %d", i)
+			break
+		}
+
+		tv.SelectItemByID(itemA.ID)
+		if !tv.MoveItemUp() {
+			t.Logf("MoveUp failed at step %d (A was at %s[%d])", i+1, currentPos.ParentText, currentPos.Index)
+			break
+		}
+
+		// Get new position after move
+		newPos := getAPosition()
+		positionsUp = append(positionsUp, newPos)
+	}
+
+	// Verify symmetry: for each successful down move, we should have a corresponding up move
+	if len(positionsUp) != moveCount {
+		t.Errorf("Expected %d up moves (same as down), got %d", moveCount, len(positionsUp))
+	}
+
+	// Check that each position when going up matches the reverse of going down
+	// positionsDown[0] is initial, positionsDown[1..moveCount] are after each down move
+	// positionsUp[0..moveCount-1] are after each up move
+	// So positionsUp[i] should equal positionsDown[moveCount - 1 - i]
+	for i, posUp := range positionsUp {
+		expectedDownIdx := moveCount - 1 - i
+		if expectedDownIdx < 0 || expectedDownIdx >= len(positionsDown) {
+			t.Errorf("Index out of bounds at step %d (expectedDownIdx=%d)", i, expectedDownIdx)
+			continue
+		}
+
+		expectedPos := positionsDown[expectedDownIdx]
+		if posUp.ParentText != expectedPos.ParentText || posUp.Index != expectedPos.Index {
+			t.Errorf("Position mismatch at up[%d]: expected %s[%d] (from down[%d]), got %s[%d]",
+				i, expectedPos.ParentText, expectedPos.Index, expectedDownIdx, posUp.ParentText, posUp.Index)
+		}
+	}
+
+	// Final check: A should be back at original position
+	finalPos := getAPosition()
+	if finalPos.ParentText != initialPos.ParentText || finalPos.Index != initialPos.Index {
+		t.Errorf("Item A not back at original position. Expected %s[%d], got %s[%d]",
+			initialPos.ParentText, initialPos.Index, finalPos.ParentText, finalPos.Index)
+	}
+}
+
+func TestPositionBuildingForCollapsedNodes(t *testing.T) {
+	// Test that position building doesn't create positions inside collapsed nodes
+	// Also test that expanded nodes with no children behave like collapsed nodes
+	itemA := model.NewItem("Item A")
+	itemB := model.NewItem("Item B")
+	itemC := model.NewItem("Item C")
+	itemD := model.NewItem("Item D") // Child of A for second test
+
+	// All default to collapsed now
+	items := []*model.Item{itemA, itemB, itemC}
+	tv := NewTreeView(items)
+
+	// Get positions for a simple case (all collapsed)
+	positions := tv.buildAllPositions()
+
+	t.Logf("Positions with all collapsed: %d positions", len(positions))
+	for i, p := range positions {
+		parent := "root"
+		if p.Parent != nil {
+			parent = p.Parent.Text
+		}
+		t.Logf("[%d] (%s,%d)", i, parent, p.Index)
+	}
+
+	// Should only have root-level positions
+	// (root,0), (root,1), (root,2), (root,3)
+	expectedRootPositions := 4
+	actualRootPositions := 0
+	for _, p := range positions {
+		if p.Parent == nil {
+			actualRootPositions++
+		}
+	}
+
+	if actualRootPositions != expectedRootPositions {
+		t.Errorf("Expected %d root positions, got %d", expectedRootPositions, actualRootPositions)
+	}
+
+	// No positions should be inside collapsed nodes
+	for _, p := range positions {
+		if p.Parent != nil && !p.Parent.Expanded {
+			t.Errorf("Found position inside collapsed node %s", p.Parent.Text)
+		}
+	}
+
+	// Now expand A (without children) and verify it still doesn't create child positions
+	itemA.Expanded = true
+	positions2 := tv.buildAllPositions()
+
+	t.Logf("\nPositions with A expanded (no children): %d positions", len(positions2))
+	for i, p := range positions2 {
+		parent := "root"
+		if p.Parent != nil {
+			parent = p.Parent.Text
+		}
+		t.Logf("[%d] (%s,%d)", i, parent, p.Index)
+	}
+
+	// Expanded nodes with no children should NOT create child positions
+	foundAChild := false
+	for _, p := range positions2 {
+		if p.Parent == itemA {
+			foundAChild = true
+			break
+		}
+	}
+
+	if foundAChild {
+		t.Error("Expected NO child positions for expanded item A with no children")
+	}
+
+	// Now add a child to A, expand it, and verify child positions appear
+	itemA.AddChild(itemD)
+	itemA.Expanded = true
+	positions3 := tv.buildAllPositions()
+
+	t.Logf("\nPositions with A expanded (with child): %d positions", len(positions3))
+	for i, p := range positions3 {
+		parent := "root"
+		if p.Parent != nil {
+			parent = p.Parent.Text
+		}
+		t.Logf("[%d] (%s,%d)", i, parent, p.Index)
+	}
+
+	// Now we should have positions inside A
+	foundAChild = false
+	for _, p := range positions3 {
+		if p.Parent == itemA {
+			foundAChild = true
+			break
+		}
+	}
+
+	if !foundAChild {
+		t.Error("Expected to find child positions for expanded item A with children")
+	}
+
+	// Collapse A again - positions should be gone
+	itemA.Expanded = false
+	positions4 := tv.buildAllPositions()
+
+	t.Logf("\nPositions with A re-collapsed: %d positions", len(positions4))
+	for _, p := range positions4 {
+		if p.Parent == itemA {
+			t.Errorf("Found position inside re-collapsed node A")
+		}
+	}
+}
