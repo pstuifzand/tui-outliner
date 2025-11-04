@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/history"
@@ -205,6 +206,9 @@ func (s *Search) updateResults() {
 	// Apply the filter to all items
 	var filtered []*model.Item
 	for idx, item := range s.allItems {
+		debugInfo := search.DebugMatch(item, s.filterExpr)
+		log.Println(search.ExpressionString(s.filterExpr))
+		log.Println(search.FormatDebugInfo(debugInfo))
 		if s.filterExpr.Matches(item) {
 			filtered = append(filtered, item)
 			s.matchIndices = append(s.matchIndices, idx)

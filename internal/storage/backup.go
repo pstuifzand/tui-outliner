@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -85,10 +86,10 @@ func GetBackupDir() string {
 
 // BackupMetadata holds parsed information about a backup file
 type BackupMetadata struct {
-	FilePath       string // Full path to backup file
-	Timestamp      time.Time // Parsed timestamp from filename
-	SessionID      string // 8-character session ID
-	OriginalFile   string // Original filename stored in backup
+	FilePath     string    // Full path to backup file
+	Timestamp    time.Time // Parsed timestamp from filename
+	SessionID    string    // 8-character session ID
+	OriginalFile string    // Original filename stored in backup
 }
 
 // FindBackupsForFile returns all backup files for a given original filename, sorted chronologically
@@ -180,11 +181,7 @@ func parseBackupFilename(filename string, fullPath string) (BackupMetadata, erro
 
 // sortBackupsByTimestamp sorts backups chronologically (oldest first)
 func sortBackupsByTimestamp(backups []BackupMetadata) {
-	for i := 0; i < len(backups); i++ {
-		for j := i + 1; j < len(backups); j++ {
-			if backups[j].Timestamp.Before(backups[i].Timestamp) {
-				backups[i], backups[j] = backups[j], backups[i]
-			}
-		}
-	}
+	slices.SortFunc(backups, func(a, b BackupMetadata) int {
+		return a.Timestamp.Compare(b.Timestamp)
+	})
 }

@@ -9,11 +9,11 @@ import (
 
 // DebugInfo contains detailed information about why an item matched or didn't match
 type DebugInfo struct {
-	Item      *model.Item
-	Expr      FilterExpr
-	Matched   bool
-	Reason    string
-	Details   map[string]string // Additional details about the evaluation
+	Item    *model.Item
+	Expr    FilterExpr
+	Matched bool
+	Reason  string
+	Details map[string]string // Additional details about the evaluation
 }
 
 // ExpressionString returns a pretty-printed representation of the filter expression
@@ -80,7 +80,7 @@ func evaluateWithReason(item *model.Item, expr FilterExpr) string {
 
 	case *AttributeFilter:
 		if item.Metadata == nil || item.Metadata.Attributes == nil {
-			return fmt.Sprintf("No attributes defined")
+			return "No attributes defined"
 		}
 		if val, exists := item.Metadata.Attributes[e.key]; exists {
 			if e.op == "" {
@@ -185,7 +185,7 @@ func addItemDetails(item *model.Item, debug *DebugInfo) {
 			debug.Details["tags"] = strings.Join(item.Metadata.Tags, ", ")
 		}
 
-		if item.Metadata.Attributes != nil && len(item.Metadata.Attributes) > 0 {
+		if len(item.Metadata.Attributes) > 0 {
 			attrs := make([]string, 0, len(item.Metadata.Attributes))
 			for k, v := range item.Metadata.Attributes {
 				attrs = append(attrs, fmt.Sprintf("%s=%s", k, v))

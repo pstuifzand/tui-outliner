@@ -35,39 +35,39 @@ const (
 
 // App is the main application controller
 type App struct {
-	screen             *ui.Screen
-	outline            *model.Outline
-	store              *storage.JSONStore
-	tree               *ui.TreeView
-	editor             *ui.MultiLineEditor
-	search             *ui.Search
-	help                    *ui.HelpScreen
-	splash                  *ui.SplashScreen
-	command                 *ui.CommandMode
-	attributeEditor         *ui.AttributeEditor // Attribute editing modal
-	nodeSearchWidget        *ui.NodeSearchWidget
-	linkAutocompleteWidget  *ui.LinkAutocompleteWidget // Wiki-style link autocomplete
-	calendarWidget          *ui.CalendarWidget // Calendar date picker widget
-	backupSelectorWidget    *ui.BackupSelectorWidget // Backup selector with side-by-side diff preview
-	historyManager          *history.Manager   // Manager for persisting command and search history
-	cfg                     *config.Config     // Application configuration
-	sessionID          string                // 8-character session ID for backups
-	readOnly           bool                  // Whether the file is readonly (e.g., backup file)
-	originalFilePath   string                // Original file path for backup filtering
-	currentBackupPath  string                // Current backup file path if viewing a backup
-	statusMsg          string
-	statusTime         time.Time
-	dirty              bool
-	autoSaveTime       time.Time
-	quit               bool
-	debugMode          bool
-	mode               Mode                // Current editor mode (NormalMode, InsertMode, or VisualMode)
-	clipboard          *model.Item         // For cut/paste operations
-	visualAnchor       int                 // For visual mode selection (index in filteredView, -1 when not in visual mode)
-	keybindings        []KeyBinding        // All keybindings
-	pendingKeybindings []PendingKeyBinding // Pending key definitions (g, z, etc)
-	pendingKeySeq      rune                // Current pending key waiting for second character
-	hasFile            bool                // Whether a file was provided in arguments
+	screen                 *ui.Screen
+	outline                *model.Outline
+	store                  *storage.JSONStore
+	tree                   *ui.TreeView
+	editor                 *ui.MultiLineEditor
+	search                 *ui.Search
+	help                   *ui.HelpScreen
+	splash                 *ui.SplashScreen
+	command                *ui.CommandMode
+	attributeEditor        *ui.AttributeEditor // Attribute editing modal
+	nodeSearchWidget       *ui.NodeSearchWidget
+	linkAutocompleteWidget *ui.LinkAutocompleteWidget // Wiki-style link autocomplete
+	calendarWidget         *ui.CalendarWidget         // Calendar date picker widget
+	backupSelectorWidget   *ui.BackupSelectorWidget   // Backup selector with side-by-side diff preview
+	historyManager         *history.Manager           // Manager for persisting command and search history
+	cfg                    *config.Config             // Application configuration
+	sessionID              string                     // 8-character session ID for backups
+	readOnly               bool                       // Whether the file is readonly (e.g., backup file)
+	originalFilePath       string                     // Original file path for backup filtering
+	currentBackupPath      string                     // Current backup file path if viewing a backup
+	statusMsg              string
+	statusTime             time.Time
+	dirty                  bool
+	autoSaveTime           time.Time
+	quit                   bool
+	debugMode              bool
+	mode                   Mode                // Current editor mode (NormalMode, InsertMode, or VisualMode)
+	clipboard              *model.Item         // For cut/paste operations
+	visualAnchor           int                 // For visual mode selection (index in filteredView, -1 when not in visual mode)
+	keybindings            []KeyBinding        // All keybindings
+	pendingKeybindings     []PendingKeyBinding // Pending key definitions (g, z, etc)
+	pendingKeySeq          rune                // Current pending key waiting for second character
+	hasFile                bool                // Whether a file was provided in arguments
 }
 
 // NewApp creates a new App instance
@@ -181,35 +181,35 @@ func NewApp(filePath string) (*App, error) {
 	}
 
 	app := &App{
-		screen:                  screen,
-		outline:                 outline,
-		store:                   store,
-		tree:                    tree,
-		editor:                  nil,
-		search:                  searchMode,
-		help:                    help,
-		splash:                  splash,
-		command:                 command,
-		attributeEditor:         attributeEditor,
-		nodeSearchWidget:        nodeSearchWidget,
-		linkAutocompleteWidget:  linkAutocompleteWidget,
-		calendarWidget:          calendarWidget,
-		backupSelectorWidget:    backupSelectorWidget,
-		historyManager:          historyManager,
-		cfg:                     cfg,
-		sessionID:               sessionID,
-		readOnly:                store.ReadOnly,
-		originalFilePath:        originalFilePath,
-		currentBackupPath:       currentBackupPath,
-		statusMsg:        "Ready",
-		statusTime:       time.Now(),
-		dirty:            false,
-		autoSaveTime:     time.Now(),
-		quit:             false,
-		mode:             NormalMode,
-		visualAnchor:     -1,
-		pendingKeySeq:    0,
-		hasFile:          hasFile,
+		screen:                 screen,
+		outline:                outline,
+		store:                  store,
+		tree:                   tree,
+		editor:                 nil,
+		search:                 searchMode,
+		help:                   help,
+		splash:                 splash,
+		command:                command,
+		attributeEditor:        attributeEditor,
+		nodeSearchWidget:       nodeSearchWidget,
+		linkAutocompleteWidget: linkAutocompleteWidget,
+		calendarWidget:         calendarWidget,
+		backupSelectorWidget:   backupSelectorWidget,
+		historyManager:         historyManager,
+		cfg:                    cfg,
+		sessionID:              sessionID,
+		readOnly:               store.ReadOnly,
+		originalFilePath:       originalFilePath,
+		currentBackupPath:      currentBackupPath,
+		statusMsg:              "Ready",
+		statusTime:             time.Now(),
+		dirty:                  false,
+		autoSaveTime:           time.Now(),
+		quit:                   false,
+		mode:                   NormalMode,
+		visualAnchor:           -1,
+		pendingKeySeq:          0,
+		hasFile:                hasFile,
 	}
 
 	// Set callback for attribute editor modifications

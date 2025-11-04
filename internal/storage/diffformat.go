@@ -500,8 +500,8 @@ func parseAttributesLine(line string) (id string, attrs map[string]string, err e
 	attrs = make(map[string]string)
 
 	if attrStr != "" {
-		pairs := strings.Split(attrStr, ",")
-		for _, pair := range pairs {
+		pairs := strings.SplitSeq(attrStr, ",")
+		for pair := range pairs {
 			kv := strings.SplitN(pair, "=", 2)
 			if len(kv) == 2 {
 				key := strings.TrimSpace(kv[0])
