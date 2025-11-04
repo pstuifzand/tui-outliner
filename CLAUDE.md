@@ -799,6 +799,56 @@ ls -la /home/peter/work/tui-outliner/
      7. Find desired version, use `:w backup_restore.json` to save
      8. Restore from saved backup as needed
 
+29. **Side-by-Side Backup Diff Viewer with Range Selection**:
+   - Interactive interface for comparing backup versions with live diff preview
+   - Features:
+     - Left panel: Scrollable backup list with inline change statistics
+     - Right panel: Live diff preview showing detailed changes
+     - Preloaded diffs for instant preview updates
+   - Keybindings:
+     - `gd` or `:diff` - Open backup selector
+     - `j`/`k` - Navigate backups
+     - `V` - Enter visual mode for range selection
+     - `R` - Toggle backup list order (newest-first or oldest-first)
+     - `Enter` - Confirm selection and close
+     - `Esc` - Cancel
+   - Visual Mode (Range Selection):
+     - Press `V` to start selecting a range of backups
+     - Use `j`/`k` to extend selection
+     - Left panel shows selected items with `*` prefix
+     - Right panel shows diff between first and last selected backup
+     - Current selection indicated with `>` prefix
+   - Reverse Order Mode:
+     - Press `R` to toggle between normal and reversed order
+     - Default: Reversed (newest first) for easier recent backup browsing
+     - Normal mode: Shows oldest-first chronologically
+     - Diff comparison adapts to selected order:
+       - Reversed: Shows changes from newer → older (newest to oldest)
+       - Normal: Shows changes from older → newer (oldest to newest)
+   - Inline Statistics:
+     - Each backup shows colored change summary: `+N ~M -D`
+       - Green `+N`: Number of added items
+       - Yellow `~M`: Number of modified items
+       - Red `-D`: Number of deleted items
+     - Stats are preloaded for instant display
+   - Implementation (`internal/ui/backup_selector.go`):
+     - `BackupSelectorWidget` struct manages state and rendering
+     - Side-by-side panels with dynamic width splitting
+     - Diff results cached per backup for performance
+     - Visual mode with `selectedIndices` map for range tracking
+     - Helper functions `actualIndex()` and `displayIndex()` handle order reversal
+   - Workflow Example:
+     ```
+     gd                    # Open diff selector
+     j j                   # Navigate to backup #3
+     V                     # Enter visual mode at backup #3
+     k k                   # Extend selection up to backup #1
+     # Right panel shows diff from #3 → #1
+     R                     # Toggle to normal order
+     # List reverses: now shows #1 → #3 chronologically
+     V                     # Exit visual mode
+     ```
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

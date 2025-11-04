@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
@@ -47,6 +48,7 @@ type App struct {
 	nodeSearchWidget        *ui.NodeSearchWidget
 	linkAutocompleteWidget  *ui.LinkAutocompleteWidget // Wiki-style link autocomplete
 	calendarWidget          *ui.CalendarWidget // Calendar date picker widget
+	backupSelectorWidget    *ui.BackupSelectorWidget // Backup selector with side-by-side diff preview
 	historyManager          *history.Manager   // Manager for persisting command and search history
 	cfg                     *config.Config     // Application configuration
 	sessionID          string                // 8-character session ID for backups
@@ -113,6 +115,7 @@ func NewApp(filePath string) (*App, error) {
 	nodeSearchWidget := ui.NewNodeSearchWidget()
 	linkAutocompleteWidget := ui.NewLinkAutocompleteWidget()
 	calendarWidget := ui.NewCalendarWidget()
+	backupSelectorWidget := ui.NewBackupSelectorWidget()
 
 	// Connect calendar widget to attribute editor
 	attributeEditor.SetCalendarWidget(calendarWidget)
@@ -191,6 +194,7 @@ func NewApp(filePath string) (*App, error) {
 		nodeSearchWidget:        nodeSearchWidget,
 		linkAutocompleteWidget:  linkAutocompleteWidget,
 		calendarWidget:          calendarWidget,
+		backupSelectorWidget:    backupSelectorWidget,
 		historyManager:          historyManager,
 		cfg:                     cfg,
 		sessionID:               sessionID,
@@ -598,6 +602,9 @@ func (a *App) render() {
 	// Draw calendar widget if visible
 	a.calendarWidget.Render(a.screen)
 
+	// Draw backup selector widget if visible (includes side-by-side diff preview)
+	a.backupSelectorWidget.Render(a.screen)
+
 	a.screen.Show()
 }
 
@@ -674,6 +681,14 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 			if mouseEv.Buttons()&tcell.Button1 != 0 {
 				a.calendarWidget.HandleMouseEvent(x, y)
 			}
+		}
+		return
+	}
+
+	// Handle backup selector widget input
+	if a.backupSelectorWidget.IsVisible() {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			a.backupSelectorWidget.HandleKeyEvent(keyEv)
 		}
 		return
 	}
@@ -1208,6 +1223,8 @@ func (a *App) handleCommand(cmd string) {
 		a.handleCalendarCommand(parts)
 	case "links":
 		a.handleLinksCommand(parts)
+	case "diff":
+		a.handleDiffCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -2041,6 +2058,94 @@ func (a *App) handleCalendarCommand(parts []string) {
 	}
 
 	a.SetStatus("Usage: :calendar or :calendar attr <name>")
+}
+
+// handleDiffCommand shows diff view with selected backup
+func (a *App) handleDiffCommand(parts []string) {
+	if a.originalFilePath == "" {
+		a.SetStatus("No file to compare backups for")
+		return
+	}
+
+	backupMgr, err := storage.NewBackupManager()
+	if err != nil {
+		a.SetStatus("Failed to access backups")
+		return
+	}
+
+	backups, err := backupMgr.FindBackupsForFile(a.originalFilePath)
+	if err != nil || len(backups) == 0 {
+		a.SetStatus("No backups found for this file")
+		return
+	}
+
+	if len(backups) < 1 {
+		a.SetStatus("No backups found for this file")
+		return
+	}
+
+	// Append the current file as a virtual "backup" entry at the end
+	// Since backups are stored oldest-first, appending at the end makes it the newest
+	// In reversed mode (newest-first display), it will appear at the top
+	currentEntry := storage.BackupMetadata{
+		FilePath:     "(current)",
+		Timestamp:    time.Now(),
+		SessionID:    "current",
+		OriginalFile: a.originalFilePath,
+	}
+	backupsWithCurrent := make([]storage.BackupMetadata, 0, len(backups)+1)
+	backupsWithCurrent = append(backupsWithCurrent, backups...)
+	backupsWithCurrent = append(backupsWithCurrent, currentEntry)
+
+	// Show backup selector with side-by-side diff preview
+	a.backupSelectorWidget.Show(backupsWithCurrent, a.outline,
+		func(backup storage.BackupMetadata) {
+			// Don't restore if it's the "(current)" virtual entry
+			if backup.FilePath == "(current)" {
+				a.SetStatus("Already at current state")
+				return
+			}
+
+			// Load the selected backup
+			backupData, err := os.ReadFile(backup.FilePath)
+			if err != nil {
+				a.SetStatus(fmt.Sprintf("Failed to read backup: %v", err))
+				return
+			}
+
+			var restoredOutline model.Outline
+			if err := json.Unmarshal(backupData, &restoredOutline); err != nil {
+				a.SetStatus(fmt.Sprintf("Failed to parse backup: %v", err))
+				return
+			}
+
+			// Close any active editor
+			if a.editor != nil {
+				a.editor = nil
+			}
+
+			// Replace current outline with restored backup
+			a.outline = &restoredOutline
+			a.dirty = true
+
+			// Recreate the tree view with restored items
+			a.tree = ui.NewTreeView(a.outline.Items)
+
+			// Close search widget if open
+			if a.search != nil && a.search.IsActive() {
+				a.search.Stop()
+			}
+
+			// Close node search widget if open
+			if a.nodeSearchWidget != nil {
+				a.nodeSearchWidget.Hide()
+			}
+
+			a.SetStatus(fmt.Sprintf("Restored backup from %s", backup.Timestamp.Format("2006-01-02 15:04:05")))
+		},
+		func() {
+			a.SetStatus("Diff cancelled")
+		})
 }
 
 // handlePreviousBackupSameSession loads the previous backup with the same session ID

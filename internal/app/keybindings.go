@@ -624,6 +624,13 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						app.handleFollowLinkCommand()
 					},
 				},
+				'd': {
+					Key:         'd',
+					Description: "Show diff with backup",
+					Handler: func(app *App) {
+						app.handleDiffCommand([]string{"diff"})
+					},
+				},
 			},
 		},
 		{
