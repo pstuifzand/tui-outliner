@@ -1,0 +1,246 @@
+{
+  "Title": "Parent/Child Filters Demo",
+  "Items": [
+    {
+      "ID": "root1",
+      "Text": "Project Alpha",
+      "Metadata": {
+        "Created": "2025-11-01T00:00:00Z",
+        "Modified": "2025-11-05T00:00:00Z",
+        "Attributes": {
+          "type": "project",
+          "status": "active"
+        }
+      },
+      "Children": [
+        {
+          "ID": "task1",
+          "Text": "Design phase",
+          "Metadata": {
+            "Created": "2025-11-01T01:00:00Z",
+            "Modified": "2025-11-03T00:00:00Z",
+            "Attributes": {
+              "status": "done"
+            }
+          },
+          "Children": [
+            {
+              "ID": "subtask1",
+              "Text": "Create wireframes",
+              "Metadata": {
+                "Created": "2025-11-01T02:00:00Z",
+                "Modified": "2025-11-02T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            },
+            {
+              "ID": "subtask2",
+              "Text": "Review with stakeholders",
+              "Metadata": {
+                "Created": "2025-11-01T03:00:00Z",
+                "Modified": "2025-11-03T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "ID": "task2",
+          "Text": "Implementation phase",
+          "Metadata": {
+            "Created": "2025-11-02T00:00:00Z",
+            "Modified": "2025-11-05T00:00:00Z",
+            "Attributes": {
+              "status": "done"
+            }
+          },
+          "Children": [
+            {
+              "ID": "subtask3",
+              "Text": "Frontend components",
+              "Metadata": {
+                "Created": "2025-11-02T01:00:00Z",
+                "Modified": "2025-11-04T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            },
+            {
+              "ID": "subtask4",
+              "Text": "Backend API",
+              "Metadata": {
+                "Created": "2025-11-02T02:00:00Z",
+                "Modified": "2025-11-05T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            }
+          ]
+        },
+        {
+          "ID": "task3",
+          "Text": "Testing phase",
+          "Metadata": {
+            "Created": "2025-11-03T00:00:00Z",
+            "Modified": "2025-11-05T00:00:00Z",
+            "Attributes": {
+              "status": "done"
+            }
+          },
+          "Children": [
+            {
+              "ID": "subtask5",
+              "Text": "Unit tests",
+              "Metadata": {
+                "Created": "2025-11-03T01:00:00Z",
+                "Modified": "2025-11-04T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            },
+            {
+              "ID": "subtask6",
+              "Text": "Integration tests",
+              "Metadata": {
+                "Created": "2025-11-03T02:00:00Z",
+                "Modified": "2025-11-05T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "root2",
+      "Text": "Project Beta",
+      "Metadata": {
+        "Created": "2025-10-15T00:00:00Z",
+        "Modified": "2025-11-05T00:00:00Z",
+        "Attributes": {
+          "type": "project",
+          "status": "active"
+        }
+      },
+      "Children": [
+        {
+          "ID": "task4",
+          "Text": "Research",
+          "Metadata": {
+            "Created": "2025-10-15T01:00:00Z",
+            "Modified": "2025-10-20T00:00:00Z",
+            "Attributes": {
+              "status": "done"
+            }
+          },
+          "Children": []
+        },
+        {
+          "ID": "task5",
+          "Text": "Prototype",
+          "Metadata": {
+            "Created": "2025-10-20T00:00:00Z",
+            "Modified": "2025-11-05T00:00:00Z",
+            "Attributes": {
+              "status": "in_progress"
+            }
+          },
+          "Children": [
+            {
+              "ID": "subtask7",
+              "Text": "Build proof of concept",
+              "Metadata": {
+                "Created": "2025-10-20T01:00:00Z",
+                "Modified": "2025-10-25T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            },
+            {
+              "ID": "subtask8",
+              "Text": "Gather feedback",
+              "Metadata": {
+                "Created": "2025-10-20T02:00:00Z",
+                "Modified": "2025-11-05T00:00:00Z",
+                "Attributes": {
+                  "status": "todo"
+                }
+              },
+              "Children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ID": "root3",
+      "Text": "Archive",
+      "Metadata": {
+        "Created": "2025-09-01T00:00:00Z",
+        "Modified": "2025-09-30T00:00:00Z",
+        "Attributes": {
+          "type": "archive",
+          "archived": "true"
+        }
+      },
+      "Children": [
+        {
+          "ID": "task6",
+          "Text": "Old Project Gamma",
+          "Metadata": {
+            "Created": "2025-09-01T01:00:00Z",
+            "Modified": "2025-09-15T00:00:00Z",
+            "Attributes": {
+              "type": "project",
+              "status": "done",
+              "archived": "true"
+            }
+          },
+          "Children": [
+            {
+              "ID": "subtask9",
+              "Text": "Completed task 1",
+              "Metadata": {
+                "Created": "2025-09-01T02:00:00Z",
+                "Modified": "2025-09-10T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            },
+            {
+              "ID": "subtask10",
+              "Text": "Completed task 2",
+              "Metadata": {
+                "Created": "2025-09-01T03:00:00Z",
+                "Modified": "2025-09-15T00:00:00Z",
+                "Attributes": {
+                  "status": "done"
+                }
+              },
+              "Children": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
