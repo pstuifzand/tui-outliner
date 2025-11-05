@@ -2239,10 +2239,22 @@ func TestTokenizerRegex(t *testing.T) {
 			describe: "NOT with regex",
 		},
 		{
-			input:    "/ incomplete",
-			tokens:   []TokenType{TokenText, TokenText, TokenEOF},
-			values:   []string{"/", "incomplete", ""},
-			describe: "unclosed regex treated as text",
+			input:    "/TODO",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"TODO", ""},
+			describe: "unclosed regex at end of input",
+		},
+		{
+			input:    "/^TODO",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"^TODO", ""},
+			describe: "unclosed regex with anchor at end of input",
+		},
+		{
+			input:    "/ ",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{" ", ""},
+			describe: "unclosed regex with space pattern",
 		},
 	}
 
@@ -2300,9 +2312,29 @@ func TestParserRegex(t *testing.T) {
 			describe: "NOT with regex",
 		},
 		{
+			query:    "/TODO",
+			exprType: "*search.RegexExpr",
+			describe: "unclosed regex at end of input",
+		},
+		{
+			query:    "/^TODO",
+			exprType: "*search.RegexExpr",
+			describe: "unclosed regex with anchor",
+		},
+		{
+			query:    "-/TODO",
+			exprType: "*search.NotExpr",
+			describe: "NOT with unclosed regex",
+		},
+		{
 			query:       "/[invalid/",
 			shouldError: true,
 			describe:    "invalid regex pattern",
+		},
+		{
+			query:       "/[invalid",
+			shouldError: true,
+			describe:    "invalid unclosed regex pattern",
 		},
 	}
 

@@ -321,9 +321,14 @@ func (t *Tokenizer) readRegex() Token {
 		t.pos++
 	}
 
-	// No closing / found - reset and read as single "/" text
-	t.pos = startPos
-	return t.readText()
+	// End of input - treat rest as regex pattern
+	pattern := t.input[start:t.pos]
+	if pattern == "" {
+		// Empty pattern after /, treat as text
+		t.pos = startPos
+		return t.readText()
+	}
+	return Token{Type: TokenRegex, Value: pattern}
 }
 
 func isFilterStart(ch byte) bool {
