@@ -15,6 +15,28 @@ type FilterExpr interface {
 	String() string // For debug output
 }
 
+// Quantifier represents how many items must match a filter (for multi-item filters like children, ancestors)
+type Quantifier int
+
+const (
+	QuantifierSome Quantifier = iota // At least one must match (default)
+	QuantifierAll                     // All must match
+	QuantifierNone                    // None must match
+)
+
+func (q Quantifier) String() string {
+	switch q {
+	case QuantifierSome:
+		return "some"
+	case QuantifierAll:
+		return "all"
+	case QuantifierNone:
+		return "none"
+	default:
+		return "unknown"
+	}
+}
+
 // TextExpr matches items whose text contains the search term (case-insensitive)
 type TextExpr struct {
 	term string
@@ -384,28 +406,174 @@ func (e *ParentFilter) String() string {
 	return fmt.Sprintf("parent(%s)", e.inner.String())
 }
 
-// AncestorFilter matches items that have an ancestor matching the inner filter
+// AncestorFilter matches items based on their ancestors (parent* in search syntax)
 type AncestorFilter struct {
-	inner FilterExpr
+	inner      FilterExpr
+	quantifier Quantifier
 }
 
 func NewAncestorFilter(inner FilterExpr) *AncestorFilter {
-	return &AncestorFilter{inner: inner}
+	return &AncestorFilter{inner: inner, quantifier: QuantifierSome}
+}
+
+func NewAncestorFilterWithQuantifier(inner FilterExpr, quantifier Quantifier) *AncestorFilter {
+	return &AncestorFilter{inner: inner, quantifier: quantifier}
 }
 
 func (e *AncestorFilter) Matches(item *model.Item) bool {
+	var ancestors []*model.Item
 	current := item.Parent
 	for current != nil {
-		if e.inner.Matches(current) {
-			return true
-		}
+		ancestors = append(ancestors, current)
 		current = current.Parent
 	}
-	return false
+
+	switch e.quantifier {
+	case QuantifierSome:
+		// At least one ancestor must match
+		for _, ancestor := range ancestors {
+			if e.inner.Matches(ancestor) {
+				return true
+			}
+		}
+		return false
+	case QuantifierAll:
+		// All ancestors must match (vacuously true if no ancestors)
+		if len(ancestors) == 0 {
+			return true
+		}
+		for _, ancestor := range ancestors {
+			if !e.inner.Matches(ancestor) {
+				return false
+			}
+		}
+		return true
+	case QuantifierNone:
+		// No ancestors must match
+		for _, ancestor := range ancestors {
+			if e.inner.Matches(ancestor) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }
 
 func (e *AncestorFilter) String() string {
-	return fmt.Sprintf("ancestor(%s)", e.inner.String())
+	if e.quantifier == QuantifierSome {
+		return fmt.Sprintf("ancestor(%s)", e.inner.String())
+	}
+	return fmt.Sprintf("ancestor(%s,%s)", e.quantifier.String(), e.inner.String())
+}
+
+// ChildFilter matches items based on their immediate children (child in search syntax)
+type ChildFilter struct {
+	inner      FilterExpr
+	quantifier Quantifier
+}
+
+func NewChildFilter(inner FilterExpr, quantifier Quantifier) *ChildFilter {
+	return &ChildFilter{inner: inner, quantifier: quantifier}
+}
+
+func (e *ChildFilter) Matches(item *model.Item) bool {
+	children := item.Children
+
+	switch e.quantifier {
+	case QuantifierSome:
+		// At least one child must match
+		for _, child := range children {
+			if e.inner.Matches(child) {
+				return true
+			}
+		}
+		return false
+	case QuantifierAll:
+		// All children must match (false if no children)
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !e.inner.Matches(child) {
+				return false
+			}
+		}
+		return true
+	case QuantifierNone:
+		// No children must match
+		for _, child := range children {
+			if e.inner.Matches(child) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *ChildFilter) String() string {
+	return fmt.Sprintf("child(%s,%s)", e.quantifier.String(), e.inner.String())
+}
+
+// DescendantFilter matches items based on all their descendants (child* in search syntax)
+type DescendantFilter struct {
+	inner      FilterExpr
+	quantifier Quantifier
+}
+
+func NewDescendantFilter(inner FilterExpr, quantifier Quantifier) *DescendantFilter {
+	return &DescendantFilter{inner: inner, quantifier: quantifier}
+}
+
+func (e *DescendantFilter) Matches(item *model.Item) bool {
+	var descendants []*model.Item
+	e.collectDescendants(item, &descendants)
+
+	switch e.quantifier {
+	case QuantifierSome:
+		// At least one descendant must match
+		for _, descendant := range descendants {
+			if e.inner.Matches(descendant) {
+				return true
+			}
+		}
+		return false
+	case QuantifierAll:
+		// All descendants must match (false if no descendants)
+		if len(descendants) == 0 {
+			return false
+		}
+		for _, descendant := range descendants {
+			if !e.inner.Matches(descendant) {
+				return false
+			}
+		}
+		return true
+	case QuantifierNone:
+		// No descendants must match
+		for _, descendant := range descendants {
+			if e.inner.Matches(descendant) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *DescendantFilter) collectDescendants(item *model.Item, descendants *[]*model.Item) {
+	for _, child := range item.Children {
+		*descendants = append(*descendants, child)
+		e.collectDescendants(child, descendants)
+	}
+}
+
+func (e *DescendantFilter) String() string {
+	return fmt.Sprintf("descendant(%s,%s)", e.quantifier.String(), e.inner.String())
 }
 
 // Helper functions

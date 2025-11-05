@@ -82,6 +82,17 @@ func (t *Tokenizer) NextToken() Token {
 		t.pos++
 		return Token{Type: TokenOr, Value: "|"}
 	case '+':
+		// Check if it's a quantifier (ALL) prefix or an AND operator
+		if t.pos+1 < len(t.input) {
+			next := t.input[t.pos+1]
+			// If next char is a filter start (letter), check if it's a filter keyword
+			if isFilterStart(next) {
+				// Peek ahead to see if this is a filter keyword (parent, child, ancestor)
+				if t.isFilterKeyword() {
+					return t.readFilter()
+				}
+			}
+		}
 		t.pos++
 		return Token{Type: TokenAnd, Value: "+"}
 	case '-':
@@ -91,7 +102,19 @@ func (t *Tokenizer) NextToken() Token {
 			// If next char is digit, letter, or ':' it could be a filter
 			// Otherwise it's a NOT operator
 			if isFilterStart(next) {
-				return t.readFilter()
+				// Check if it's a filter keyword with quantifier support
+				if t.isFilterKeyword() {
+					return t.readFilter()
+				}
+				// Otherwise, check if it's a regular filter (d:, c:, m:, etc.)
+				// by looking for a colon
+				savedPos := t.pos + 1
+				for savedPos < len(t.input) && isAlphaNumeric(t.input[savedPos]) {
+					savedPos++
+				}
+				if savedPos < len(t.input) && t.input[savedPos] == ':' {
+					return t.readFilter()
+				}
 			}
 		}
 		t.pos++
@@ -143,11 +166,14 @@ func (t *Tokenizer) readQuotedText() Token {
 }
 
 func (t *Tokenizer) readFilter() Token {
-	// Check if this is a NOT filter
-	isNot := false
+	// Check for quantifier prefix
+	quantifier := ""
 	start := t.pos
 	if t.input[t.pos] == '-' {
-		isNot = true
+		quantifier = "-"
+		t.pos++
+	} else if t.input[t.pos] == '+' {
+		quantifier = "+"
 		t.pos++
 	}
 
@@ -158,21 +184,25 @@ func (t *Tokenizer) readFilter() Token {
 	}
 	ident := t.input[identStart:t.pos]
 
+	// Check for closure suffix (*)
+	closure := ""
+	if t.pos < len(t.input) && t.input[t.pos] == '*' {
+		closure = "*"
+		t.pos++
+	}
+
 	// Check if there's a colon (filter with criteria)
 	if t.pos < len(t.input) && t.input[t.pos] == ':' {
 		t.pos++ // Skip colon
 		// Read the criteria part
 		criteria := t.readFilterCriteria()
-		value := ident + ":" + criteria
-		if isNot {
-			return Token{Type: TokenFilter, Value: "-" + value}
-		}
+		value := quantifier + ident + closure + ":" + criteria
 		return Token{Type: TokenFilter, Value: value}
 	}
 
 	// Just a text token that looks like a filter identifier
 	value := t.input[start:t.pos]
-	if isNot && ident != "" {
+	if quantifier == "-" && ident != "" {
 		// This was "-" followed by text, so it's NOT operator
 		t.pos = start + 1 // Back up to after the -
 		return Token{Type: TokenNot, Value: "-"}
@@ -269,6 +299,41 @@ func isAlpha(ch byte) bool {
 
 func isAlphaNumeric(ch byte) bool {
 	return isAlpha(ch) || (ch >= '0' && ch <= '9') || ch == '_'
+}
+
+// isFilterKeyword checks if the token starting at the current position (after +/-)
+// is a filter keyword that supports quantifiers
+func (t *Tokenizer) isFilterKeyword() bool {
+	// Save current position
+	savedPos := t.pos
+	if t.input[t.pos] == '+' || t.input[t.pos] == '-' {
+		savedPos++
+	}
+
+	// Read identifier
+	identStart := savedPos
+	identEnd := identStart
+	for identEnd < len(t.input) && (isAlphaNumeric(t.input[identEnd]) || t.input[identEnd] == '_') {
+		identEnd++
+	}
+	ident := t.input[identStart:identEnd]
+
+	// Check for * suffix
+	if identEnd < len(t.input) && t.input[identEnd] == '*' {
+		identEnd++
+	}
+
+	// Check if there's a colon after the identifier (filter syntax)
+	if identEnd < len(t.input) && t.input[identEnd] == ':' {
+		// Check if it's a filter keyword
+		baseIdent := strings.TrimSuffix(ident, "*")
+		switch baseIdent {
+		case "parent", "p", "child", "ancestor", "a":
+			return true
+		}
+	}
+
+	return false
 }
 
 // Parser converts tokens into a FilterExpr tree
@@ -417,10 +482,13 @@ func (p *Parser) parseAtom() (FilterExpr, error) {
 
 // parseFilterValue converts a filter token value into the appropriate FilterExpr
 func parseFilterValue(value string) (FilterExpr, error) {
-	// Check for NOT modifier
-	isNot := false
+	// Extract quantifier prefix
+	quantifier := QuantifierSome
 	if strings.HasPrefix(value, "-") {
-		isNot = true
+		quantifier = QuantifierNone
+		value = value[1:]
+	} else if strings.HasPrefix(value, "+") {
+		quantifier = QuantifierAll
 		value = value[1:]
 	}
 
@@ -431,7 +499,7 @@ func parseFilterValue(value string) (FilterExpr, error) {
 	if strings.HasPrefix(value, "~") {
 		term := value[1:] // Strip ~ and get the search term
 		expr = NewFuzzyExpr(term)
-		if isNot {
+		if quantifier == QuantifierNone {
 			expr = NewNotExpr(expr)
 		}
 		return expr, nil
@@ -443,7 +511,7 @@ func parseFilterValue(value string) (FilterExpr, error) {
 		if err != nil {
 			return nil, err
 		}
-		if isNot {
+		if quantifier == QuantifierNone {
 			expr = NewNotExpr(expr)
 		}
 		return expr, nil
@@ -454,7 +522,7 @@ func parseFilterValue(value string) (FilterExpr, error) {
 	if len(parts) < 2 {
 		// Just a text token that got classified as filter
 		expr = NewTextExpr(value)
-		if isNot {
+		if quantifier == QuantifierNone {
 			expr = NewNotExpr(expr)
 		}
 		return expr, nil
@@ -463,19 +531,40 @@ func parseFilterValue(value string) (FilterExpr, error) {
 	filterType := parts[0]
 	criteria := parts[1]
 
+	// Check for closure suffix (*)
+	hasClosure := strings.HasSuffix(filterType, "*")
+	if hasClosure {
+		filterType = strings.TrimSuffix(filterType, "*")
+	}
+
 	switch filterType {
-	case string(FilterTypeDepth):
+	case "d":
 		expr, err = parseDepthFilter(criteria)
-	case string(FilterTypeCreated):
+	case "c":
 		expr, err = parseDateFilter(FilterTypeCreated, criteria)
-	case string(FilterTypeModified):
+	case "m":
 		expr, err = parseDateFilter(FilterTypeModified, criteria)
-	case string(FilterTypeChildren):
+	case "children":
 		expr, err = parseChildrenFilter(criteria)
-	case string(FilterTypeParent):
-		expr, err = parseParentFilter(criteria)
-	case string(FilterTypeAncestor): // Changed from "ancestor" to "a"
-		expr, err = parseAncestorFilter(criteria)
+	case "parent", "p":
+		if hasClosure {
+			// parent* -> ancestor filter with quantifier
+			expr, err = parseAncestorFilterWithQuantifier(criteria, quantifier)
+		} else {
+			// parent -> simple parent filter (quantifier only affects wrapping with NOT)
+			expr, err = parseParentFilter(criteria)
+		}
+	case "ancestor", "a":
+		// a: is alias for parent* (ancestor with quantifier)
+		expr, err = parseAncestorFilterWithQuantifier(criteria, quantifier)
+	case "child":
+		if hasClosure {
+			// child* -> descendant filter with quantifier
+			expr, err = parseDescendantFilter(criteria, quantifier)
+		} else {
+			// child -> immediate child filter with quantifier
+			expr, err = parseChildFilter(criteria, quantifier)
+		}
 	default:
 		// Unknown filter type, treat as text
 		expr = NewTextExpr(value)
@@ -485,8 +574,11 @@ func parseFilterValue(value string) (FilterExpr, error) {
 		return nil, err
 	}
 
-	if isNot {
-		expr = NewNotExpr(expr)
+	// For parent (without *), wrap with NOT if quantifier is None
+	if filterType == "parent" || filterType == "p" {
+		if !hasClosure && quantifier == QuantifierNone {
+			expr = NewNotExpr(expr)
+		}
 	}
 
 	return expr, nil
@@ -563,6 +655,36 @@ func parseAncestorFilter(criteria string) (FilterExpr, error) {
 		return nil, err
 	}
 	return NewAncestorFilter(innerExpr), nil
+}
+
+func parseAncestorFilterWithQuantifier(criteria string, quantifier Quantifier) (FilterExpr, error) {
+	// Ancestor filter contains another filter expression
+	// Recursively parse it
+	innerExpr, err := parseFilterValue(criteria)
+	if err != nil {
+		return nil, err
+	}
+	return NewAncestorFilterWithQuantifier(innerExpr, quantifier), nil
+}
+
+func parseChildFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
+	// Child filter contains another filter expression
+	// Recursively parse it
+	innerExpr, err := parseFilterValue(criteria)
+	if err != nil {
+		return nil, err
+	}
+	return NewChildFilter(innerExpr, quantifier), nil
+}
+
+func parseDescendantFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
+	// Descendant filter contains another filter expression
+	// Recursively parse it
+	innerExpr, err := parseFilterValue(criteria)
+	if err != nil {
+		return nil, err
+	}
+	return NewDescendantFilter(innerExpr, quantifier), nil
 }
 
 // parseComparison extracts the comparison operator and value from criteria
