@@ -689,8 +689,8 @@ func parseChildrenFilter(criteria string) (FilterExpr, error) {
 
 func parseParentFilter(criteria string) (FilterExpr, error) {
 	// Parent filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -699,8 +699,8 @@ func parseParentFilter(criteria string) (FilterExpr, error) {
 
 func parseAncestorFilter(criteria string) (FilterExpr, error) {
 	// Ancestor filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -709,8 +709,8 @@ func parseAncestorFilter(criteria string) (FilterExpr, error) {
 
 func parseAncestorFilterWithQuantifier(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Ancestor filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -719,8 +719,8 @@ func parseAncestorFilterWithQuantifier(criteria string, quantifier Quantifier) (
 
 func parseChildFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Child filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -729,8 +729,8 @@ func parseChildFilter(criteria string, quantifier Quantifier) (FilterExpr, error
 
 func parseDescendantFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Descendant filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -739,8 +739,8 @@ func parseDescendantFilter(criteria string, quantifier Quantifier) (FilterExpr, 
 
 func parseSiblingFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Sibling filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}

@@ -2336,6 +2336,41 @@ func TestParserRegex(t *testing.T) {
 			shouldError: true,
 			describe:    "invalid unclosed regex pattern",
 		},
+		{
+			query:    "parent:/TODO/",
+			exprType: "*search.ParentFilter",
+			describe: "parent filter with regex",
+		},
+		{
+			query:    "child:/DONE/",
+			exprType: "*search.ChildFilter",
+			describe: "child filter with regex",
+		},
+		{
+			query:    "p:/^Project/",
+			exprType: "*search.ParentFilter",
+			describe: "parent shorthand with regex",
+		},
+		{
+			query:    "ancestor:/test/",
+			exprType: "*search.AncestorFilter",
+			describe: "ancestor filter with regex",
+		},
+		{
+			query:    "a:/test/",
+			exprType: "*search.AncestorFilter",
+			describe: "ancestor shorthand with regex",
+		},
+		{
+			query:    "sibling:/bug/",
+			exprType: "*search.SiblingFilter",
+			describe: "sibling filter with regex",
+		},
+		{
+			query:    "s:/bug/",
+			exprType: "*search.SiblingFilter",
+			describe: "sibling shorthand with regex",
+		},
 	}
 
 	for _, tt := range tests {
@@ -2520,6 +2555,176 @@ func TestRegexWithOtherFilters(t *testing.T) {
 			if matches != tt.matches {
 				t.Errorf("query %q with text %q and depth %d: expected %v, got %v",
 					tt.query, tt.text, tt.depth, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestRegexInPrefixFilters(t *testing.T) {
+	tests := []struct {
+		query    string
+		itemText string
+		relText  string // parent/child/sibling text
+		matches  bool
+		describe string
+	}{
+		{
+			query:    "parent:/^TODO/",
+			itemText: "Subtask",
+			relText:  "TODO: Main task",
+			matches:  true,
+			describe: "parent regex matches",
+		},
+		{
+			query:    "parent:/^TODO/",
+			itemText: "Subtask",
+			relText:  "DONE: Main task",
+			matches:  false,
+			describe: "parent regex doesn't match",
+		},
+		{
+			query:    "p:/\\d{4}/",
+			itemText: "Subtask",
+			relText:  "Project 2025",
+			matches:  true,
+			describe: "parent shorthand with year pattern",
+		},
+		{
+			query:    "child:/DONE/",
+			itemText: "Parent task",
+			relText:  "DONE: Child task",
+			matches:  true,
+			describe: "child regex matches",
+		},
+		{
+			query:    "ancestor:/^Project/",
+			itemText: "Leaf item",
+			relText:  "Project Alpha",
+			matches:  true,
+			describe: "ancestor regex matches",
+		},
+		{
+			query:    "sibling:/bug|issue/",
+			itemText: "Task A",
+			relText:  "Found bug in code",
+			matches:  true,
+			describe: "sibling regex with alternation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			// Create item structure based on filter type
+			var item *model.Item
+			if strings.Contains(tt.query, "parent") || strings.Contains(tt.query, "p:") {
+				// Create parent and child
+				parent := &model.Item{
+					ID:   "parent",
+					Text: tt.relText,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item = &model.Item{
+					ID:     "item",
+					Text:   tt.itemText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				parent.Children = []*model.Item{item}
+			} else if strings.Contains(tt.query, "child") {
+				// Create parent with child
+				item = &model.Item{
+					ID:   "item",
+					Text: tt.itemText,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				child := &model.Item{
+					ID:     "child",
+					Text:   tt.relText,
+					Parent: item,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item.Children = []*model.Item{child}
+			} else if strings.Contains(tt.query, "ancestor") || strings.Contains(tt.query, "a:") {
+				// Create grandparent -> parent -> item
+				grandparent := &model.Item{
+					ID:   "grandparent",
+					Text: tt.relText,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				parent := &model.Item{
+					ID:     "parent",
+					Text:   "Intermediate",
+					Parent: grandparent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item = &model.Item{
+					ID:     "item",
+					Text:   tt.itemText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				grandparent.Children = []*model.Item{parent}
+				parent.Children = []*model.Item{item}
+			} else if strings.Contains(tt.query, "sibling") || strings.Contains(tt.query, "s:") {
+				// Create parent with two siblings
+				parent := &model.Item{
+					ID:   "parent",
+					Text: "Parent",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item = &model.Item{
+					ID:     "item",
+					Text:   tt.itemText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				sibling := &model.Item{
+					ID:     "sibling",
+					Text:   tt.relText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				parent.Children = []*model.Item{item, sibling}
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("query %q: expected %v, got %v", tt.query, tt.matches, matches)
 			}
 		})
 	}

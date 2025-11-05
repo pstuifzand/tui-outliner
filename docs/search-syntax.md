@@ -161,7 +161,7 @@ children:<10     # Nodes with fewer than 10 children
 
 ### Parent Filter: `p:`
 
-Match nodes whose parent matches criteria. Allows filtering by parent's properties.
+Match nodes whose parent matches criteria. Allows filtering by parent's properties. Parent filters support all filter types including regex.
 
 **Syntax:** `p:FILTER`
 
@@ -169,11 +169,13 @@ Match nodes whose parent matches criteria. Allows filtering by parent's properti
 p:d:0            # Nodes whose parent is at root level
 p:@type=project  # Nodes whose parent has 'type=project' attribute
 p:d:>=2          # Nodes whose parent is at depth 2 or deeper
+p:/^TODO/        # Nodes whose parent text starts with TODO (regex)
+p:/\d{4}/        # Nodes whose parent contains a 4-digit year
 ```
 
 ### Ancestor Filter: `a:` or `parent*:`
 
-Match nodes that have an ancestor matching criteria. Use `a:` followed by another filter.
+Match nodes that have an ancestor matching criteria. Ancestor filters support all filter types including regex.
 
 **Syntax:** `a:FILTER` or `parent*:FILTER`
 
@@ -181,6 +183,7 @@ Match nodes that have an ancestor matching criteria. Use `a:` followed by anothe
 a:@type=project    # Nodes anywhere under a node with 'type=project' attribute
 a:d:0              # Any node with root as ancestor (all non-root)
 a:@status=active   # Nodes under a node with 'status=active' attribute
+a:/^Project/       # Nodes with an ancestor starting with "Project" (regex)
 parent*:project    # Same as a:project (alternate syntax)
 ```
 
