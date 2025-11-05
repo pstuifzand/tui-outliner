@@ -155,16 +155,7 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		return false
 	default:
 		ch := ev.Rune()
-		// Handle '/' to clear search and start new search
-		if ch == '/' {
-			s.query = ""
-			s.cursorPos = 0
-			s.results = s.allItems // Clear results back to all items
-			s.matchIndices = nil
-			s.currentMatchIdx = 0
-			return false
-		}
-		// Regular character input
+		// Regular character input (including '/')
 		if ch > 0 && ch < 127 {
 			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
 			s.cursorPos++
