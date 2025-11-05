@@ -102,6 +102,25 @@ This document tracks ideas and suggested enhancements for the type system and fu
 
 ## Recommended Functions Based on Types
 
+This section proposes comprehensive functions for all attribute types. Each function follows the same clear syntax: `:command @attribute [context] [filter]`
+
+### Function Categories Overview
+
+| Category | Description | Example Functions |
+|----------|-------------|-------------------|
+| **Aggregation** | Numeric calculations across items | `sum`, `avg`, `count`, `max`, `min` |
+| **Date** | Date range queries and calculations | `earliest`, `latest`, `duein`, `overdue`, `age` |
+| **Reference** | Relationship validation and analysis | `checkref`, `refcount`, `refby`, `circular` |
+| **String** | Text queries and statistics | `contains`, `unique`, `strlen`, `wordcount` |
+| **List** | Multi-value operations | `listhas`, `listsize`, `listunion` |
+| **Boolean** | True/false counting | `counttrue`, `countfalse`, `percent` |
+
+All functions support multiple execution contexts:
+- **Global**: All items in outline (default)
+- **Subtree**: Current item and descendants
+- **Search**: Filtered items matching search expression
+- **Tagged**: Manually marked items
+
 ### Aggregation Functions
 
 Functions to compute values across multiple items based on their attributes.
@@ -186,6 +205,195 @@ Functions should work in multiple contexts:
 :sum @priority tagged
 ```
 
+### Date Functions
+
+Functions for working with date-type attributes.
+
+#### Date Range and Comparison
+
+- `:earliest @<date-attr>` - Find item with earliest date
+  - Example: `:earliest @due_date` - Find earliest due date
+  - Example: `:earliest @due_date search @type=task +@status=todo` - Earliest due among open tasks
+
+- `:latest @<date-attr>` - Find item with latest date
+  - Example: `:latest @due_date subtree` - Latest due date in subtree
+  - Example: `:latest @created` - Most recently created item
+
+- `:daterange @<date-attr>` - Show date range (earliest to latest)
+  - Example: `:daterange @due_date subtree` - Due date range for project
+  - Output: "2025-11-05 to 2025-12-15 (41 days)"
+
+- `:duein @<date-attr> <days>` - Find items with date within N days
+  - Example: `:duein @due_date 7` - Items due in next 7 days
+  - Example: `:duein @due_date 7 search @status=todo` - Open items due soon
+
+- `:overdue @<date-attr>` - Find items with past dates
+  - Example: `:overdue @due_date` - All overdue items
+  - Example: `:overdue @due_date search @type=task` - Overdue tasks
+
+#### Date Grouping and Statistics
+
+- `:groupby @<date-attr> <period>` - Group items by date period
+  - Periods: `day`, `week`, `month`, `year`
+  - Example: `:groupby @created week` - Items created per week
+  - Output: Shows histogram/counts per period
+
+- `:timeline @<date-attr>` - Show visual timeline of dates
+  - Example: `:timeline @due_date subtree` - Project timeline
+  - Output: ASCII timeline showing date distribution
+
+- `:datecount @<date-attr>` - Count items per unique date
+  - Example: `:datecount @due_date` - How many items per due date
+  - Output: List of dates with counts
+
+#### Date Calculations
+
+- `:daysbetween @<date-attr1> @<date-attr2>` - Calculate days between two dates
+  - Example: `:daysbetween @start_date @due_date` - Task duration
+  - Calculates for each item with both attributes
+
+- `:daysuntil @<date-attr>` - Days until date (from today)
+  - Example: `:daysuntil @due_date subtree` - Days until each due date
+  - Negative for past dates
+
+- `:age @<date-attr>` - Days since date (from today)
+  - Example: `:age @created` - Age of all items
+  - Example: `:age @created search @type=bug +@status=open` - Age of open bugs
+
+### Reference Functions
+
+Functions for working with reference-type attributes and item relationships.
+
+#### Reference Validation
+
+- `:checkref @<ref-attr>` - Check for broken references
+  - Example: `:checkref @depends_on` - Find items with invalid dependencies
+  - Output: List of items with references to non-existent items
+
+- `:resolveref @<ref-attr>` - Show what each reference points to
+  - Example: `:resolveref @depends_on subtree` - Show dependency targets
+  - Output: Item → Referenced Item mapping
+
+- `:orphanref @<ref-attr>` - Find items not referenced by anything
+  - Example: `:orphanref @parent_project` - Items with no parent project
+  - Inverse of reference checking
+
+#### Reference Counting and Analysis
+
+- `:refcount @<ref-attr>` - Count how many items reference each target
+  - Example: `:refcount @project` - How many items per project
+  - Output: Target item with count of referencing items
+
+- `:refby <item-id>` - Find all items that reference this item
+  - Example: `:refby 12345` - What references item 12345
+  - Search all reference-type attributes
+
+- `:refto` - Show all items current item references
+  - Example: `:refto` - Show all outbound references from current item
+  - Lists all reference attributes and their targets
+
+- `:circular @<ref-attr>` - Detect circular references
+  - Example: `:circular @depends_on` - Find dependency cycles
+  - Output: List of items forming circular reference chains
+
+#### Reference Graph Analysis
+
+- `:refchain @<ref-attr>` - Show reference chain from item
+  - Example: `:refchain @depends_on` - Full dependency chain
+  - Output: Current → Ref1 → Ref2 → ... (until end or cycle)
+
+- `:refgraph @<ref-attr>` - Visualize reference graph
+  - Example: `:refgraph @depends_on subtree` - Dependency graph for project
+  - Output: ASCII graph showing relationships
+
+- `:refdepth @<ref-attr>` - Calculate depth of reference chain
+  - Example: `:refdepth @parent_project` - How deep in project hierarchy
+  - Output: Number of levels in reference chain
+
+### String Functions
+
+Functions for working with string-type attributes.
+
+#### String Queries
+
+- `:contains @<str-attr> <text>` - Find items where attribute contains text
+  - Example: `:contains @notes "urgent"` - Notes containing "urgent"
+  - Case-insensitive substring search
+
+- `:startswith @<str-attr> <text>` - Attribute starts with text
+  - Example: `:startswith @title "FIX:"` - Titles starting with FIX:
+  - Useful for prefixed/tagged attributes
+
+- `:endswith @<str-attr> <text>` - Attribute ends with text
+  - Example: `:endswith @filename ".md"` - Markdown files
+  - Pattern matching for suffixes
+
+- `:matches @<str-attr> <regex>` - Regex pattern matching
+  - Example: `:matches @email ".*@example\\.com"` - Specific domain emails
+  - Full regex support
+
+#### String Statistics
+
+- `:strlen @<str-attr>` - Calculate string length
+  - Example: `:strlen @description` - Length of each description
+  - Can use with `:max strlen @description` for longest
+
+- `:wordcount @<str-attr>` - Count words in string attribute
+  - Example: `:wordcount @notes subtree` - Word count per note
+  - Useful for text content attributes
+
+- `:unique @<str-attr>` - List unique values
+  - Example: `:unique @status` - All unique status values
+  - With counts: `:unique @status --count`
+
+### List Functions
+
+Functions for working with list-type attributes (comma-separated or multi-value).
+
+#### List Queries
+
+- `:listhas @<list-attr> <value>` - Items where list contains value
+  - Example: `:listhas @tags "urgent"` - Items tagged with "urgent"
+  - Works with comma-separated values
+
+- `:listsize @<list-attr>` - Count elements in list
+  - Example: `:listsize @tags` - Number of tags per item
+  - Example: `:avg listsize @tags` - Average tags per item
+
+- `:listunion @<list-attr>` - Union of all list values
+  - Example: `:listunion @tags subtree` - All unique tags in subtree
+  - Output: Complete set of all values across items
+
+#### List Set Operations
+
+- `:listintersect @<list-attr> <values>` - Items with all specified values
+  - Example: `:listintersect @tags urgent,important` - Items tagged both
+  - AND operation on list membership
+
+- `:listexclude @<list-attr> <values>` - Items without any specified values
+  - Example: `:listexclude @tags archived,deleted` - Items not archived/deleted
+  - NOT operation on list membership
+
+- `:listcount @<list-attr> <value>` - Count items containing value
+  - Example: `:listcount @tags urgent` - How many urgent items
+  - Similar to `:count` but for list membership
+
+### Boolean Functions
+
+Functions for working with boolean-type attributes.
+
+- `:counttrue @<bool-attr>` - Count items where attribute is true
+  - Example: `:counttrue @completed subtree` - Completed items in subtree
+  - Example: `:counttrue @archived` - How many archived items
+
+- `:countfalse @<bool-attr>` - Count items where attribute is false
+  - Example: `:countfalse @reviewed` - Unreviewed items
+  - Complement of counttrue
+
+- `:percent @<bool-attr>` - Percentage of items where attribute is true
+  - Example: `:percent @completed subtree` - Completion percentage
+  - Output: "65% (13/20 items)"
+
 ### Type-Based Search Enhancements
 
 Already well-supported through the search system! Examples:
@@ -193,6 +401,7 @@ Already well-supported through the search system! Examples:
 - `@type=task +@status=todo` - Find all todo tasks
 - `@priority>5 +d:>2` - High priority items deeply nested
 - `@type=project +children:0` - Projects with no sub-items
+- `@due_date>-7d` - Items due in next 7 days (date comparison)
 
 ### Validation Reports
 
@@ -502,22 +711,87 @@ k k k m
 ## Priority Ranking
 
 ### High Priority
+
+**Essential Functions and Input Helpers:**
 1. Reference type input with filter-based selection
-2. Better enum/string input with usage statistics
+   - Interactive node picker using search filters
+   - Most impactful for usability
+2. Better enum/string input with automatic popups and usage statistics
+   - Small automatic popups for all types
+   - Calendar widget integration for dates
 3. Context-aware function execution (subtree, search, tagged)
-4. Aggregation functions (sum, avg, count)
+   - Foundation for all function types
+4. Basic aggregation functions (sum, avg, count, max, min)
+   - Most commonly needed numeric functions
+
+**Essential Date Functions:**
+5. Date range queries (earliest, latest, duein, overdue)
+   - Critical for task/project management
+6. Date calculations (daysuntil, age, daysbetween)
+   - Useful for tracking and planning
 
 ### Medium Priority
-5. Validation reports and auto-fix
-6. Type usage tracking and statistics
-7. Performance optimization (caching)
-8. Import/export type definitions
+
+**Reference and Validation Functions:**
+7. Reference validation functions (checkref, resolveref, circular)
+   - Maintain data integrity
+8. Reference counting and analysis (refcount, refby, refto)
+   - Understand item relationships
+9. Validation reports and auto-fix
+   - Type-system health checks
+
+**String and List Functions:**
+10. String query functions (contains, startswith, unique)
+    - Common text operations
+11. List operations (listhas, listsize, listunion)
+    - Working with multi-value attributes
+12. Boolean functions (counttrue, percent)
+    - Progress tracking and completion metrics
+
+**System Improvements:**
+13. Type usage tracking and statistics
+14. Performance optimization (caching)
+15. Import/export type definitions
 
 ### Lower Priority
-9. Type composition and inheritance
-10. Computed attributes and constraints
-11. Type-specific behaviors
-12. Attribute templates
+
+**Advanced Date Functions:**
+16. Date grouping and timeline (groupby, timeline, datecount)
+    - Visualization and analysis
+
+**Advanced Reference Functions:**
+17. Reference graph analysis (refchain, refgraph, refdepth)
+    - Complex dependency visualization
+
+**Advanced String Functions:**
+18. Regex matching and word counting
+    - Specialized text analysis
+
+**Type System Enhancements:**
+19. Type composition and inheritance
+20. Computed attributes and constraints
+21. Type-specific behaviors
+22. Attribute templates
+
+## Function Implementation Order
+
+**Phase 1: Foundation (High Priority 1-6)**
+- Input helpers with automatic popups
+- Context-aware execution framework
+- Basic aggregation and date functions
+
+**Phase 2: Data Integrity (Medium Priority 7-9)**
+- Reference validation
+- Type validation and auto-fix
+
+**Phase 3: Analysis Tools (Medium Priority 10-15)**
+- String/list/boolean functions
+- Usage tracking and statistics
+
+**Phase 4: Advanced Features (Lower Priority 16-22)**
+- Advanced visualization
+- Type system enhancements
+- Specialized analysis functions
 
 ## Related Documentation
 
