@@ -151,6 +151,36 @@ a:@status=active   # Nodes under a node with 'status=active' attribute
 parent*:project    # Same as a:project (alternate syntax)
 ```
 
+### Sibling Filter: `sibling:` or `s:`
+
+Match nodes based on their siblings (items sharing the same parent). Siblings are items at the same hierarchical level with the same parent node.
+
+**Syntax:** `sibling:FILTER` | `+sibling:FILTER` | `-sibling:FILTER` | `s:FILTER`
+
+#### Quantifier Prefixes
+
+- **No prefix (default)**: At least one sibling matches (some)
+- **`+` prefix**: All siblings must match (all)
+- **`-` prefix**: No siblings must match (none)
+
+**Examples:**
+```
+sibling:@status=done        # At least one sibling has status=done
++sibling:@status=done       # All siblings have status=done
+-sibling:@status=done       # No siblings have status=done
+s:@priority=high            # Shorthand: at least one sibling has high priority
+sibling:task                # At least one sibling contains "task" in text
++sibling:d:2                # All siblings are at depth 2
+```
+
+**Special Cases:**
+- Root items (nodes with no parent) have no siblings
+- Only children (nodes with no other siblings) behave like having empty sibling set
+- For items with no siblings:
+  - `sibling:FILTER` returns `false` (no siblings to match)
+  - `+sibling:FILTER` returns `false` (can't be "all" if none exist)
+  - `-sibling:FILTER` returns `true` (vacuously true, no siblings to violate condition)
+
 ### Child and Descendant Filters
 
 Match nodes based on their children or descendants. These filters support **quantifiers** to specify how many children/descendants must match.
@@ -202,10 +232,10 @@ parent*:d:0             # At least one ancestor is at root (all non-root nodes)
 
 #### Empty Set Semantics
 
-When there are no children/ancestors, quantifiers behave as follows:
+When there are no children/siblings/ancestors, quantifiers behave as follows:
 
 - **All (`+`)**:
-  - Children/Descendants: `false` (can't be "all" if none exist)
+  - Children/Descendants/Siblings: `false` (can't be "all" if none exist)
   - Ancestors: `true` (vacuously true for root nodes)
 - **Some (default)**: Always `false` (none exist to match)
 - **None (`-`)**: Always `true` (vacuously true, none exist to match)
@@ -214,6 +244,8 @@ When there are no children/ancestors, quantifiers behave as follows:
 ```
 +child:task             # Root nodes with no children: false
 -child:task             # Root nodes with no children: true
++sibling:@done          # Only children with no siblings: false
+-sibling:@done          # Only children with no siblings: true
 +parent*:project        # Root nodes with no ancestors: true
 -parent*:archived       # Root nodes with no ancestors: true
 ```
@@ -321,6 +353,16 @@ child*:@bug                   # Any node with a bug descendant
 +parent*:@type=project        # Nodes where all ancestors are projects
 -parent*:@archived            # Nodes with no archived ancestors
 parent*:@type=milestone       # Nodes under at least one milestone
+```
+
+### Find by siblings
+```
+sibling:@status=done          # Items with at least one completed sibling
++sibling:@status=done         # Items where all siblings are completed
+-sibling:@status=todo         # Items with no incomplete siblings
+@status=todo +sibling:@status=done  # Todo items where all siblings are done
+sibling:@priority=high        # Items with high-priority siblings
+-sibling:@archived            # Items with no archived siblings
 ```
 
 ### Find by attribute dates
