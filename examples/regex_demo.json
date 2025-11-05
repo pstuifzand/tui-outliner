@@ -1,0 +1,266 @@
+{
+  "title": "Regex Search Demo",
+  "items": [
+    {
+      "id": "1",
+      "text": "TODO: Implement regex search feature",
+      "metadata": {
+        "created": "2025-11-01T10:00:00Z",
+        "modified": "2025-11-01T10:00:00Z",
+        "attributes": {
+          "type": "task",
+          "priority": "high"
+        }
+      },
+      "children": [
+        {
+          "id": "1-1",
+          "text": "Add tokenizer support",
+          "metadata": {
+            "created": "2025-11-01T10:01:00Z",
+            "modified": "2025-11-01T10:01:00Z",
+            "attributes": {
+              "status": "done"
+            }
+          },
+          "children": []
+        },
+        {
+          "id": "1-2",
+          "text": "Implement regex filter expression",
+          "metadata": {
+            "created": "2025-11-01T10:02:00Z",
+            "modified": "2025-11-01T10:02:00Z",
+            "attributes": {
+              "status": "done"
+            }
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "text": "DONE: Fix bug in date parsing",
+      "metadata": {
+        "created": "2025-10-28T14:00:00Z",
+        "modified": "2025-10-30T16:30:00Z",
+        "attributes": {
+          "type": "bug",
+          "status": "completed"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "3",
+      "text": "Meeting scheduled for 2025-11-15",
+      "metadata": {
+        "created": "2025-11-02T09:00:00Z",
+        "modified": "2025-11-02T09:00:00Z",
+        "attributes": {
+          "type": "event",
+          "date": "2025-11-15"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "4",
+      "text": "Contact @john for code review",
+      "metadata": {
+        "created": "2025-11-03T11:00:00Z",
+        "modified": "2025-11-03T11:00:00Z",
+        "attributes": {
+          "type": "task",
+          "assignee": "john"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "5",
+      "text": "Email sent to support@example.com",
+      "metadata": {
+        "created": "2025-11-04T08:30:00Z",
+        "modified": "2025-11-04T08:30:00Z",
+        "attributes": {
+          "type": "note"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "6",
+      "text": "Regular Expressions Guide",
+      "metadata": {
+        "created": "2025-11-01T12:00:00Z",
+        "modified": "2025-11-05T14:00:00Z",
+        "attributes": {
+          "type": "documentation"
+        }
+      },
+      "children": [
+        {
+          "id": "6-1",
+          "text": "Pattern: ^TODO matches items starting with TODO",
+          "metadata": {
+            "created": "2025-11-01T12:01:00Z",
+            "modified": "2025-11-01T12:01:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "6-2",
+          "text": "Pattern: \\d{4}-\\d{2}-\\d{2} matches dates like 2025-11-05",
+          "metadata": {
+            "created": "2025-11-01T12:02:00Z",
+            "modified": "2025-11-01T12:02:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "6-3",
+          "text": "Pattern: @[a-z]+ matches usernames like @john, @alice",
+          "metadata": {
+            "created": "2025-11-01T12:03:00Z",
+            "modified": "2025-11-01T12:03:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "6-4",
+          "text": "Pattern: (?i)bug matches BUG, bug, Bug (case-insensitive)",
+          "metadata": {
+            "created": "2025-11-01T12:04:00Z",
+            "modified": "2025-11-01T12:04:00Z"
+          },
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "7",
+      "text": "SKIP: This item should be filtered out",
+      "metadata": {
+        "created": "2025-11-02T15:00:00Z",
+        "modified": "2025-11-02T15:00:00Z",
+        "attributes": {
+          "type": "note"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "8",
+      "text": "Found issue #42 in the codebase",
+      "metadata": {
+        "created": "2025-11-03T10:00:00Z",
+        "modified": "2025-11-03T10:00:00Z",
+        "attributes": {
+          "type": "bug",
+          "issue_number": "42"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "9",
+      "text": "Version 1.2.3 released",
+      "metadata": {
+        "created": "2025-11-04T16:00:00Z",
+        "modified": "2025-11-04T16:00:00Z",
+        "attributes": {
+          "type": "release",
+          "version": "1.2.3"
+        }
+      },
+      "children": []
+    },
+    {
+      "id": "10",
+      "text": "Example Search Queries",
+      "metadata": {
+        "created": "2025-11-05T10:00:00Z",
+        "modified": "2025-11-05T10:00:00Z",
+        "attributes": {
+          "type": "documentation"
+        }
+      },
+      "children": [
+        {
+          "id": "10-1",
+          "text": "/^TODO/ - Find all items starting with TODO",
+          "metadata": {
+            "created": "2025-11-05T10:01:00Z",
+            "modified": "2025-11-05T10:01:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-2",
+          "text": "/^DONE/ - Find all completed items starting with DONE",
+          "metadata": {
+            "created": "2025-11-05T10:02:00Z",
+            "modified": "2025-11-05T10:02:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-3",
+          "text": "/\\d{4}-\\d{2}-\\d{2}/ - Find items with dates",
+          "metadata": {
+            "created": "2025-11-05T10:03:00Z",
+            "modified": "2025-11-05T10:03:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-4",
+          "text": "/@[a-z]+/ - Find items mentioning usernames",
+          "metadata": {
+            "created": "2025-11-05T10:04:00Z",
+            "modified": "2025-11-05T10:04:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-5",
+          "text": "-/^SKIP/ - Find items NOT starting with SKIP",
+          "metadata": {
+            "created": "2025-11-05T10:05:00Z",
+            "modified": "2025-11-05T10:05:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-6",
+          "text": "/bug|issue|problem/ @type=bug - Find bug-related items",
+          "metadata": {
+            "created": "2025-11-05T10:06:00Z",
+            "modified": "2025-11-05T10:06:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-7",
+          "text": "/(?i)todo/ - Case-insensitive search for TODO, todo, Todo",
+          "metadata": {
+            "created": "2025-11-05T10:07:00Z",
+            "modified": "2025-11-05T10:07:00Z"
+          },
+          "children": []
+        },
+        {
+          "id": "10-8",
+          "text": "/^TODO/ d:0 - Root-level TODO items only",
+          "metadata": {
+            "created": "2025-11-05T10:08:00Z",
+            "modified": "2025-11-05T10:08:00Z"
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

@@ -2186,3 +2186,576 @@ func createItemWithSiblings(siblingTexts []string) *model.Item {
 	parent.Children = children
 	return item
 }
+
+// Tests for regex search functionality
+
+func TestTokenizerRegex(t *testing.T) {
+	tests := []struct {
+		input    string
+		tokens   []TokenType
+		values   []string
+		describe string
+	}{
+		{
+			input:    "/TODO/",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"TODO", ""},
+			describe: "simple regex pattern",
+		},
+		{
+			input:    "/^TODO/",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"^TODO", ""},
+			describe: "regex with start anchor",
+		},
+		{
+			input:    `/\d{4}-\d{2}-\d{2}/`,
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{`\d{4}-\d{2}-\d{2}`, ""},
+			describe: "date pattern regex",
+		},
+		{
+			input:    `/test\/with\/slashes/`,
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{`test\/with\/slashes`, ""},
+			describe: "regex with escaped slashes",
+		},
+		{
+			input:    `/TODO/ task`,
+			tokens:   []TokenType{TokenRegex, TokenText, TokenEOF},
+			values:   []string{"TODO", "task", ""},
+			describe: "regex combined with text",
+		},
+		{
+			input:    `/TODO/ | /DONE/`,
+			tokens:   []TokenType{TokenRegex, TokenOr, TokenRegex, TokenEOF},
+			values:   []string{"TODO", "|", "DONE", ""},
+			describe: "OR of two regex patterns",
+		},
+		{
+			input:    `-/TODO/`,
+			tokens:   []TokenType{TokenNot, TokenRegex, TokenEOF},
+			values:   []string{"-", "TODO", ""},
+			describe: "NOT with regex",
+		},
+		{
+			input:    "/TODO",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"TODO", ""},
+			describe: "unclosed regex at end of input",
+		},
+		{
+			input:    "/^TODO",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"^TODO", ""},
+			describe: "unclosed regex with anchor at end of input",
+		},
+		{
+			input:    "/ ",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{" ", ""},
+			describe: "unclosed regex with space pattern",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			tokenizer := NewTokenizer(tt.input)
+			tokens := tokenizer.AllTokens()
+
+			if len(tokens) != len(tt.tokens) {
+				t.Fatalf("expected %d tokens, got %d", len(tt.tokens), len(tokens))
+			}
+
+			for i, expectedType := range tt.tokens {
+				if tokens[i].Type != expectedType {
+					t.Errorf("token %d: expected type %d, got %d", i, expectedType, tokens[i].Type)
+				}
+				if tokens[i].Value != tt.values[i] {
+					t.Errorf("token %d: expected value %q, got %q", i, tt.values[i], tokens[i].Value)
+				}
+			}
+		})
+	}
+}
+
+func TestParserRegex(t *testing.T) {
+	tests := []struct {
+		query       string
+		shouldError bool
+		exprType    string
+		describe    string
+	}{
+		{
+			query:    "/TODO/",
+			exprType: "*search.RegexExpr",
+			describe: "simple regex pattern",
+		},
+		{
+			query:    "/^TODO/",
+			exprType: "*search.RegexExpr",
+			describe: "regex with anchor",
+		},
+		{
+			query:    "/TODO/ task",
+			exprType: "*search.AndExpr",
+			describe: "regex AND text",
+		},
+		{
+			query:    "/TODO/ | /DONE/",
+			exprType: "*search.OrExpr",
+			describe: "OR of two regex patterns",
+		},
+		{
+			query:    "-/TODO/",
+			exprType: "*search.NotExpr",
+			describe: "NOT with regex",
+		},
+		{
+			query:    "/TODO",
+			exprType: "*search.RegexExpr",
+			describe: "unclosed regex at end of input",
+		},
+		{
+			query:    "/^TODO",
+			exprType: "*search.RegexExpr",
+			describe: "unclosed regex with anchor",
+		},
+		{
+			query:    "-/TODO",
+			exprType: "*search.NotExpr",
+			describe: "NOT with unclosed regex",
+		},
+		{
+			query:       "/[invalid/",
+			shouldError: true,
+			describe:    "invalid regex pattern",
+		},
+		{
+			query:       "/[invalid",
+			shouldError: true,
+			describe:    "invalid unclosed regex pattern",
+		},
+		{
+			query:    "parent:/TODO/",
+			exprType: "*search.ParentFilter",
+			describe: "parent filter with regex",
+		},
+		{
+			query:    "child:/DONE/",
+			exprType: "*search.ChildFilter",
+			describe: "child filter with regex",
+		},
+		{
+			query:    "p:/^Project/",
+			exprType: "*search.ParentFilter",
+			describe: "parent shorthand with regex",
+		},
+		{
+			query:    "ancestor:/test/",
+			exprType: "*search.AncestorFilter",
+			describe: "ancestor filter with regex",
+		},
+		{
+			query:    "a:/test/",
+			exprType: "*search.AncestorFilter",
+			describe: "ancestor shorthand with regex",
+		},
+		{
+			query:    "sibling:/bug/",
+			exprType: "*search.SiblingFilter",
+			describe: "sibling filter with regex",
+		},
+		{
+			query:    "s:/bug/",
+			exprType: "*search.SiblingFilter",
+			describe: "sibling shorthand with regex",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+
+			if tt.shouldError && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.shouldError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if err != nil {
+				return
+			}
+
+			actualType := typeOf(expr)
+			if actualType != tt.exprType {
+				t.Errorf("expected type %s, got %s", tt.exprType, actualType)
+			}
+		})
+	}
+}
+
+func TestRegexExprMatching(t *testing.T) {
+	tests := []struct {
+		pattern  string
+		text     string
+		matches  bool
+		describe string
+	}{
+		{
+			pattern:  "^TODO",
+			text:     "TODO: finish task",
+			matches:  true,
+			describe: "start anchor matches",
+		},
+		{
+			pattern:  "^TODO",
+			text:     "Not a TODO",
+			matches:  false,
+			describe: "start anchor doesn't match",
+		},
+		{
+			pattern:  `\d{4}-\d{2}-\d{2}`,
+			text:     "Date: 2025-11-05",
+			matches:  true,
+			describe: "date pattern matches",
+		},
+		{
+			pattern:  `\d{4}-\d{2}-\d{2}`,
+			text:     "No date here",
+			matches:  false,
+			describe: "date pattern doesn't match",
+		},
+		{
+			pattern:  "@[a-z]+",
+			text:     "Mention @username in the task",
+			matches:  true,
+			describe: "username pattern matches",
+		},
+		{
+			pattern:  "@[a-z]+",
+			text:     "No mentions here",
+			matches:  false,
+			describe: "username pattern doesn't match",
+		},
+		{
+			pattern:  "(?i)todo",
+			text:     "TODO: finish",
+			matches:  true,
+			describe: "case-insensitive matches uppercase",
+		},
+		{
+			pattern:  "(?i)todo",
+			text:     "todo: finish",
+			matches:  true,
+			describe: "case-insensitive matches lowercase",
+		},
+		{
+			pattern:  "bug|issue|problem",
+			text:     "Found a bug in the code",
+			matches:  true,
+			describe: "alternation matches first option",
+		},
+		{
+			pattern:  "bug|issue|problem",
+			text:     "This is an issue",
+			matches:  true,
+			describe: "alternation matches middle option",
+		},
+		{
+			pattern:  "bug|issue|problem",
+			text:     "All is well",
+			matches:  false,
+			describe: "alternation doesn't match",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := NewRegexExpr(tt.pattern)
+			if err != nil {
+				t.Fatalf("failed to create regex: %v", err)
+			}
+
+			item := &model.Item{
+				ID:   "test-item",
+				Text: tt.text,
+				Metadata: &model.Metadata{
+					Created:  time.Now(),
+					Modified: time.Now(),
+				},
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("pattern /%s/ with text %q: expected %v, got %v",
+					tt.pattern, tt.text, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestRegexWithOtherFilters(t *testing.T) {
+	tests := []struct {
+		query    string
+		text     string
+		depth    int
+		matches  bool
+		describe string
+	}{
+		{
+			query:    "/^TODO/ d:0",
+			text:     "TODO: root task",
+			depth:    0,
+			matches:  true,
+			describe: "regex AND depth both match",
+		},
+		{
+			query:    "/^TODO/ d:0",
+			text:     "TODO: nested task",
+			depth:    1,
+			matches:  false,
+			describe: "regex matches but depth doesn't",
+		},
+		{
+			query:    "/^TODO/ | d:>1",
+			text:     "Not a TODO",
+			depth:    2,
+			matches:  true,
+			describe: "depth matches in OR",
+		},
+		{
+			query:    "-/^SKIP/ d:0",
+			text:     "Keep this",
+			depth:    0,
+			matches:  true,
+			describe: "NOT regex with depth",
+		},
+		{
+			query:    "-/^SKIP/ d:0",
+			text:     "SKIP this",
+			depth:    0,
+			matches:  false,
+			describe: "NOT regex fails",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createModelItemAtDepth(tt.depth)
+			item.Text = tt.text
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("query %q with text %q and depth %d: expected %v, got %v",
+					tt.query, tt.text, tt.depth, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestRegexInPrefixFilters(t *testing.T) {
+	tests := []struct {
+		query    string
+		itemText string
+		relText  string // parent/child/sibling text
+		matches  bool
+		describe string
+	}{
+		{
+			query:    "parent:/^TODO/",
+			itemText: "Subtask",
+			relText:  "TODO: Main task",
+			matches:  true,
+			describe: "parent regex matches",
+		},
+		{
+			query:    "parent:/^TODO/",
+			itemText: "Subtask",
+			relText:  "DONE: Main task",
+			matches:  false,
+			describe: "parent regex doesn't match",
+		},
+		{
+			query:    "p:/\\d{4}/",
+			itemText: "Subtask",
+			relText:  "Project 2025",
+			matches:  true,
+			describe: "parent shorthand with year pattern",
+		},
+		{
+			query:    "child:/DONE/",
+			itemText: "Parent task",
+			relText:  "DONE: Child task",
+			matches:  true,
+			describe: "child regex matches",
+		},
+		{
+			query:    "ancestor:/^Project/",
+			itemText: "Leaf item",
+			relText:  "Project Alpha",
+			matches:  true,
+			describe: "ancestor regex matches",
+		},
+		{
+			query:    "sibling:/bug|issue/",
+			itemText: "Task A",
+			relText:  "Found bug in code",
+			matches:  true,
+			describe: "sibling regex with alternation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			// Create item structure based on filter type
+			var item *model.Item
+			if strings.Contains(tt.query, "parent") || strings.Contains(tt.query, "p:") {
+				// Create parent and child
+				parent := &model.Item{
+					ID:   "parent",
+					Text: tt.relText,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item = &model.Item{
+					ID:     "item",
+					Text:   tt.itemText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				parent.Children = []*model.Item{item}
+			} else if strings.Contains(tt.query, "child") {
+				// Create parent with child
+				item = &model.Item{
+					ID:   "item",
+					Text: tt.itemText,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				child := &model.Item{
+					ID:     "child",
+					Text:   tt.relText,
+					Parent: item,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item.Children = []*model.Item{child}
+			} else if strings.Contains(tt.query, "ancestor") || strings.Contains(tt.query, "a:") {
+				// Create grandparent -> parent -> item
+				grandparent := &model.Item{
+					ID:   "grandparent",
+					Text: tt.relText,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				parent := &model.Item{
+					ID:     "parent",
+					Text:   "Intermediate",
+					Parent: grandparent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item = &model.Item{
+					ID:     "item",
+					Text:   tt.itemText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				grandparent.Children = []*model.Item{parent}
+				parent.Children = []*model.Item{item}
+			} else if strings.Contains(tt.query, "sibling") || strings.Contains(tt.query, "s:") {
+				// Create parent with two siblings
+				parent := &model.Item{
+					ID:   "parent",
+					Text: "Parent",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				item = &model.Item{
+					ID:     "item",
+					Text:   tt.itemText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				sibling := &model.Item{
+					ID:     "sibling",
+					Text:   tt.relText,
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				parent.Children = []*model.Item{item, sibling}
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("query %q: expected %v, got %v", tt.query, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestRegexExprString(t *testing.T) {
+	tests := []struct {
+		pattern  string
+		expected string
+	}{
+		{
+			pattern:  "^TODO",
+			expected: "regex(/^TODO/)",
+		},
+		{
+			pattern:  `\d+`,
+			expected: `regex(/\d+/)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pattern, func(t *testing.T) {
+			expr, err := NewRegexExpr(tt.pattern)
+			if err != nil {
+				t.Fatalf("failed to create regex: %v", err)
+			}
+
+			actual := expr.String()
+			if actual != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, actual)
+			}
+		})
+	}
+}

@@ -955,6 +955,45 @@ ls -la /home/peter/work/tui-outliner/
      - Marked as implemented in `docs/search-syntax-ideas.md`
    - Example: `examples/parent_child_filters_demo.json` includes sibling filter examples
 
+33. **Regex Text Search with /pattern/ Syntax**:
+   - Added regular expression pattern matching for text searches
+   - Features:
+     - Search items using Go's RE2 regex engine
+     - Syntax: `/pattern/` - pattern enclosed in forward slashes
+     - Full integration with boolean operators (AND, OR, NOT)
+     - Escape handling for special characters (e.g., `\/` for literal slash)
+   - Supported Regex Features:
+     - Anchors: `^` (start), `$` (end)
+     - Character classes: `\d` (digits), `\w` (word chars), `[a-z]` (ranges)
+     - Quantifiers: `*`, `+`, `?`, `{n,m}`
+     - Groups and alternation: `(...)`, `|`
+     - Case-insensitive: `(?i)pattern`
+   - Limitations (RE2 engine):
+     - No negative lookahead `(?!)` or lookbehind `(?<=)`
+     - No backreferences
+   - Examples:
+     - `/^TODO/` - Items starting with TODO
+     - `/\d{4}-\d{2}-\d{2}/` - Items containing dates (YYYY-MM-DD)
+     - `/@[a-z]+/` - Items mentioning usernames
+     - `/(?i)bug/` - Case-insensitive match for "bug"
+     - `/bug|issue|problem/` - Match any of these words
+     - `-/^SKIP/` - Items NOT starting with SKIP
+     - `/^TODO/ d:0` - Root-level items starting with TODO
+   - Implementation:
+     - Added `TokenRegex` type to tokenizer in `internal/search/parser.go`
+     - New `readRegex()` method handles `/pattern/` tokenization with escape support
+     - Created `RegexExpr` filter type in `internal/search/expr.go`
+     - Uses `regexp.Compile()` to validate and compile patterns
+     - Parser integration in `parseAtom()` to handle regex tokens
+   - Testing:
+     - Comprehensive test suite with 50+ test cases
+     - Tests for tokenization, parsing, matching, and integration with other filters
+     - Test categories: basic patterns, anchors, character classes, quantifiers, alternation, escaping
+   - Documentation:
+     - Updated `docs/search-syntax.md` with regex filter section
+     - Includes syntax reference, examples, and RE2 limitations
+   - Example: `examples/regex_demo.json` demonstrates various regex patterns
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

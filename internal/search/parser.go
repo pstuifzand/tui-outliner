@@ -12,6 +12,7 @@ const (
 	TokenEOF TokenType = iota
 	TokenText
 	TokenFilter
+	TokenRegex  // /pattern/
 	TokenAnd    // + (explicit)
 	TokenOr     // |
 	TokenNot    // -
@@ -125,6 +126,8 @@ func (t *Tokenizer) NextToken() Token {
 		return t.readAttrFilter()
 	case '~':
 		return t.readFuzzyFilter()
+	case '/':
+		return t.readRegex()
 	default:
 		if isFilterStart(ch) {
 			return t.readFilter()
@@ -287,6 +290,45 @@ func (t *Tokenizer) readFuzzyFilter() Token {
 
 	value := "~" + term
 	return Token{Type: TokenFilter, Value: value}
+}
+
+func (t *Tokenizer) readRegex() Token {
+	startPos := t.pos
+	t.pos++ // Skip opening /
+	start := t.pos
+	escaped := false
+
+	for t.pos < len(t.input) {
+		ch := t.input[t.pos]
+		if escaped {
+			// Skip escaped character
+			escaped = false
+			t.pos++
+			continue
+		}
+		if ch == '\\' {
+			// Next character is escaped
+			escaped = true
+			t.pos++
+			continue
+		}
+		if ch == '/' {
+			// Found closing /
+			pattern := t.input[start:t.pos]
+			t.pos++ // Skip closing /
+			return Token{Type: TokenRegex, Value: pattern}
+		}
+		t.pos++
+	}
+
+	// End of input - treat rest as regex pattern
+	pattern := t.input[start:t.pos]
+	if pattern == "" {
+		// Empty pattern after /, treat as text
+		t.pos = startPos
+		return t.readText()
+	}
+	return Token{Type: TokenRegex, Value: pattern}
 }
 
 func isFilterStart(ch byte) bool {
@@ -472,6 +514,11 @@ func (p *Parser) parseAtom() (FilterExpr, error) {
 		p.advance()
 		return parseFilterValue(value)
 
+	case TokenRegex:
+		pattern := p.currentToken().Value
+		p.advance()
+		return NewRegexExpr(pattern)
+
 	case TokenEOF:
 		return nil, fmt.Errorf("unexpected end of input")
 
@@ -642,8 +689,8 @@ func parseChildrenFilter(criteria string) (FilterExpr, error) {
 
 func parseParentFilter(criteria string) (FilterExpr, error) {
 	// Parent filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -652,8 +699,8 @@ func parseParentFilter(criteria string) (FilterExpr, error) {
 
 func parseAncestorFilter(criteria string) (FilterExpr, error) {
 	// Ancestor filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -662,8 +709,8 @@ func parseAncestorFilter(criteria string) (FilterExpr, error) {
 
 func parseAncestorFilterWithQuantifier(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Ancestor filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -672,8 +719,8 @@ func parseAncestorFilterWithQuantifier(criteria string, quantifier Quantifier) (
 
 func parseChildFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Child filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -682,8 +729,8 @@ func parseChildFilter(criteria string, quantifier Quantifier) (FilterExpr, error
 
 func parseDescendantFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Descendant filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
@@ -692,8 +739,8 @@ func parseDescendantFilter(criteria string, quantifier Quantifier) (FilterExpr, 
 
 func parseSiblingFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
 	// Sibling filter contains another filter expression
-	// Recursively parse it
-	innerExpr, err := parseFilterValue(criteria)
+	// Parse it as a full query to handle regex tokens
+	innerExpr, err := ParseQuery(criteria)
 	if err != nil {
 		return nil, err
 	}
