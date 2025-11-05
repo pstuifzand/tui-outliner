@@ -69,57 +69,39 @@ child*:@urgent                   # Has some urgent item somewhere in subtree
 
 ---
 
-### 2. Sibling Filter
+### 2. ✅ Sibling Filter (IMPLEMENTED)
+
+**Status:** Implemented in commit e61683c
 
 Find nodes sharing the same parent as nodes matching criteria.
 
-**Syntax:** `sib:FILTER` or `sibling:FILTER`
+**Syntax:** `sibling:FILTER` or `s:FILTER`
 
-**Examples:**
+**Quantifiers:**
 ```
-sib:@type=project           # Find other items at same level as projects
-sib:@done p:d:0             # Siblings of completed root-level items
-```
-
-**Use cases:**
-- "Find related items at the same hierarchy level"
-- "Find other items in same parent container"
-
-
-Great! Following the established pattern, here's the sibling filter with quantifiers:
-
-**Sibling (same parent, same level):**
-
-```
--sib:FILTER                      # No siblings match FILTER
-sib:FILTER                       # Some siblings match FILTER
-+sib:FILTER                      # All siblings match FILTER
+-sibling:FILTER                  # No siblings match FILTER
+sibling:FILTER                   # Some siblings match FILTER
++sibling:FILTER                  # All siblings match FILTER
 ```
 
 **Real examples:**
-
 ```
-sib:@type=project                # Find other items at same level as projects
-+sib:@status=done                # Find nodes where all siblings are done
--sib:@archived                   # Find nodes with no archived siblings
-sib:@urgent                      # Find nodes that have urgent siblings
-+sib:@priority>3                 # Find nodes where all siblings are high priority
+sibling:@type=project            # Find items with at least one project sibling
++sibling:@status=done            # Find nodes where all siblings are done
+-sibling:@archived               # Find nodes with no archived siblings
+sibling:@urgent                  # Find nodes that have urgent siblings
++sibling:@priority=high          # Find nodes where all siblings are high priority
+@status=todo +sibling:@status=done # Todo items where all siblings are done
 ```
 
-**Notes:**
+**Implementation details:**
+- Both `sibling:` and `s:` shorthand syntax supported
+- Quantifiers work with all filter types (attributes, depth, text, etc.)
+- Empty set semantics: items with no siblings return false for Some/All, true for None
+- Root items have no siblings (no parent)
+- Comprehensive test coverage in internal/search/parser_test.go
 
-- `sib:FILTER` finds nodes that have siblings matching FILTER
-- The quantifier applies to how many siblings must match, not to selecting the nodes themselves
-- `+sib:@done` would match a node only if ALL its siblings are done
-- `-sib:@done` would match a node only if NONE of its siblings are done
-
-**Relationship to other filters:**
-
-```
-sib:@type=project                # Siblings matching criteria
-child:@type=project              # Children matching criteria
-parent:@type=project             # Parent matching criteria
-```
+**Documentation:** See docs/search-syntax.md for full details
 
 ---
 
@@ -360,7 +342,7 @@ Show "X of Y results" during search navigation.
 4. **Depth Limits on Ancestor** - More control over existing ancestor functionality
 5. **Text Length Filter** - Practical for content management and cleanup
 6. **Empty Item Detection** - Quick win for finding placeholders
-7. **Sibling Filter** - Useful for finding related items
+7. ~~**Sibling Filter**~~ - ✅ **IMPLEMENTED** (commit e61683c)
 8. **Sort Results** - Quality of life improvement
 9. **Virtual Item Filter** - Niche but useful for search node users
 

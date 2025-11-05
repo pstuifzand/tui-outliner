@@ -923,6 +923,38 @@ ls -la /home/peter/work/tui-outliner/
    - Documentation: `docs/attribute-value-selection.md` - Complete guide with examples
    - Example: `examples/attribute_selector_demo.json` - Demonstrates all attribute types
 
+32. **Sibling Filter with Quantifiers and Closure Support**:
+   - Added sibling filter functionality to search system (commit e61683c)
+   - Features:
+     - Match items based on their siblings (items sharing the same parent)
+     - Full quantifier support: Some (default), All (+), None (-)
+     - Both `sibling:` and `s:` shorthand syntax supported
+     - Works with all filter types (attributes, depth, text, etc.)
+   - Syntax:
+     - `sibling:FILTER` - At least one sibling must match
+     - `+sibling:FILTER` - All siblings must match
+     - `-sibling:FILTER` - No siblings must match
+     - `s:FILTER` - Shorthand for sibling:FILTER
+   - Examples:
+     - `sibling:@status=done` - Items with at least one done sibling
+     - `+sibling:@status=done` - Items where all siblings are done
+     - `-sibling:@status=done` - Items with no done siblings
+     - `@status=todo +sibling:@status=done` - Todo items where all siblings are done
+   - Empty Set Semantics:
+     - Root items have no siblings (no parent)
+     - Only children have no siblings
+     - `sibling:` and `+sibling:` return false for items with no siblings
+     - `-sibling:` returns true for items with no siblings (vacuously true)
+     - Consistent with child/descendant filter behavior
+   - Implementation:
+     - New `SiblingFilter` struct in `internal/search/expr.go`
+     - Parser support in `internal/search/parser.go`
+     - Comprehensive test suite (385 lines) in `internal/search/parser_test.go`
+   - Documentation:
+     - Full syntax reference in `docs/search-syntax.md`
+     - Marked as implemented in `docs/search-syntax-ideas.md`
+   - Example: `examples/parent_child_filters_demo.json` includes sibling filter examples
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI
