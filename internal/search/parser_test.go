@@ -1801,3 +1801,388 @@ func TestParseDateWithHours(t *testing.T) {
 		})
 	}
 }
+
+// Tests for sibling filters with quantifiers
+
+func TestSiblingFilterQuantifiers(t *testing.T) {
+	tests := []struct {
+		name         string
+		query        string
+		siblingTexts []string
+		matches      bool
+	}{
+		// Some quantifier (default)
+		{
+			name:         "sibling:task with one match",
+			query:        "sibling:task",
+			siblingTexts: []string{"task", "other"},
+			matches:      true,
+		},
+		{
+			name:         "sibling:task with no matches",
+			query:        "sibling:task",
+			siblingTexts: []string{"other", "more"},
+			matches:      false,
+		},
+		{
+			name:         "sibling:task with no siblings (only child)",
+			query:        "sibling:task",
+			siblingTexts: []string{},
+			matches:      false,
+		},
+		// All quantifier
+		{
+			name:         "+sibling:task all match",
+			query:        "+sibling:task",
+			siblingTexts: []string{"task", "task"},
+			matches:      true,
+		},
+		{
+			name:         "+sibling:task some don't match",
+			query:        "+sibling:task",
+			siblingTexts: []string{"task", "other"},
+			matches:      false,
+		},
+		{
+			name:         "+sibling:task no siblings",
+			query:        "+sibling:task",
+			siblingTexts: []string{},
+			matches:      false,
+		},
+		// None quantifier
+		{
+			name:         "-sibling:task none match",
+			query:        "-sibling:task",
+			siblingTexts: []string{"other", "more"},
+			matches:      true,
+		},
+		{
+			name:         "-sibling:task one matches",
+			query:        "-sibling:task",
+			siblingTexts: []string{"task", "other"},
+			matches:      false,
+		},
+		{
+			name:         "-sibling:task no siblings",
+			query:        "-sibling:task",
+			siblingTexts: []string{},
+			matches:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createItemWithSiblings(tt.siblingTexts)
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestSiblingFilterShorthand(t *testing.T) {
+	tests := []struct {
+		name         string
+		query        string
+		siblingTexts []string
+		matches      bool
+	}{
+		{
+			name:         "s:task (shorthand) with one match",
+			query:        "s:task",
+			siblingTexts: []string{"task", "other"},
+			matches:      true,
+		},
+		{
+			name:         "+s:task (shorthand) all match",
+			query:        "+s:task",
+			siblingTexts: []string{"task", "task"},
+			matches:      true,
+		},
+		{
+			name:         "-s:task (shorthand) none match",
+			query:        "-s:task",
+			siblingTexts: []string{"other", "more"},
+			matches:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createItemWithSiblings(tt.siblingTexts)
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestSiblingFilterWithAttributes(t *testing.T) {
+	tests := []struct {
+		name      string
+		query     string
+		buildTree func() *model.Item
+		matches   bool
+	}{
+		{
+			name:  "item with at least one sibling with status=done",
+			query: "sibling:@status=done",
+			buildTree: func() *model.Item {
+				parent := &model.Item{
+					ID:   "parent",
+					Text: "parent",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				// Target item
+				item := &model.Item{
+					ID:     "item",
+					Text:   "item",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "todo"},
+					},
+				}
+				// Sibling with status=done
+				sibling1 := &model.Item{
+					ID:     "sibling1",
+					Text:   "sibling1",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "done"},
+					},
+				}
+				// Sibling with status=todo
+				sibling2 := &model.Item{
+					ID:     "sibling2",
+					Text:   "sibling2",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "todo"},
+					},
+				}
+				parent.Children = []*model.Item{item, sibling1, sibling2}
+				return item
+			},
+			matches: true,
+		},
+		{
+			name:  "item with all siblings with status=done",
+			query: "+sibling:@status=done",
+			buildTree: func() *model.Item {
+				parent := &model.Item{
+					ID:   "parent",
+					Text: "parent",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				// Target item
+				item := &model.Item{
+					ID:     "item",
+					Text:   "item",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "todo"},
+					},
+				}
+				// Sibling 1 with status=done
+				sibling1 := &model.Item{
+					ID:     "sibling1",
+					Text:   "sibling1",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "done"},
+					},
+				}
+				// Sibling 2 with status=done
+				sibling2 := &model.Item{
+					ID:     "sibling2",
+					Text:   "sibling2",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "done"},
+					},
+				}
+				parent.Children = []*model.Item{item, sibling1, sibling2}
+				return item
+			},
+			matches: true,
+		},
+		{
+			name:  "item with no siblings with status=done",
+			query: "-sibling:@status=done",
+			buildTree: func() *model.Item {
+				parent := &model.Item{
+					ID:   "parent",
+					Text: "parent",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				// Target item
+				item := &model.Item{
+					ID:     "item",
+					Text:   "item",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "todo"},
+					},
+				}
+				// Sibling 1 with status=todo
+				sibling1 := &model.Item{
+					ID:     "sibling1",
+					Text:   "sibling1",
+					Parent: parent,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "todo"},
+					},
+				}
+				parent.Children = []*model.Item{item, sibling1}
+				return item
+			},
+			matches: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := tt.buildTree()
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestSiblingFilterRootItems(t *testing.T) {
+	tests := []struct {
+		name    string
+		query   string
+		matches bool
+	}{
+		{
+			name:    "root item with sibling:task should not match",
+			query:   "sibling:task",
+			matches: false,
+		},
+		{
+			name:    "root item with +sibling:task should not match",
+			query:   "+sibling:task",
+			matches: false,
+		},
+		{
+			name:    "root item with -sibling:task should match",
+			query:   "-sibling:task",
+			matches: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			// Root item (no parent)
+			item := &model.Item{
+				ID:   "root",
+				Text: "root",
+				Metadata: &model.Metadata{
+					Created:  time.Now(),
+					Modified: time.Now(),
+				},
+			}
+
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+// Helper function for sibling tests
+
+func createItemWithSiblings(siblingTexts []string) *model.Item {
+	parent := &model.Item{
+		ID:   "parent",
+		Text: "parent",
+		Metadata: &model.Metadata{
+			Created:  time.Now(),
+			Modified: time.Now(),
+		},
+	}
+
+	// Create target item
+	item := &model.Item{
+		ID:     "target",
+		Text:   "target",
+		Parent: parent,
+		Metadata: &model.Metadata{
+			Created:  time.Now(),
+			Modified: time.Now(),
+		},
+	}
+
+	// Create siblings
+	children := []*model.Item{item}
+	for i, text := range siblingTexts {
+		sibling := &model.Item{
+			ID:     fmt.Sprintf("sibling-%d", i),
+			Text:   text,
+			Parent: parent,
+			Metadata: &model.Metadata{
+				Created:  time.Now(),
+				Modified: time.Now(),
+			},
+		}
+		children = append(children, sibling)
+	}
+
+	parent.Children = children
+	return item
+}

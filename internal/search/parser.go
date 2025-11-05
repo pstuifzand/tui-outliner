@@ -328,7 +328,7 @@ func (t *Tokenizer) isFilterKeyword() bool {
 		// Check if it's a filter keyword
 		baseIdent := strings.TrimSuffix(ident, "*")
 		switch baseIdent {
-		case "parent", "p", "child", "ancestor", "a":
+		case "parent", "p", "child", "ancestor", "a", "sibling", "s":
 			return true
 		}
 	}
@@ -565,6 +565,9 @@ func parseFilterValue(value string) (FilterExpr, error) {
 			// child -> immediate child filter with quantifier
 			expr, err = parseChildFilter(criteria, quantifier)
 		}
+	case "sibling", "s":
+		// sibling -> sibling filter with quantifier (no closure support)
+		expr, err = parseSiblingFilter(criteria, quantifier)
 	default:
 		// Unknown filter type, treat as text
 		expr = NewTextExpr(value)
@@ -685,6 +688,16 @@ func parseDescendantFilter(criteria string, quantifier Quantifier) (FilterExpr, 
 		return nil, err
 	}
 	return NewDescendantFilter(innerExpr, quantifier), nil
+}
+
+func parseSiblingFilter(criteria string, quantifier Quantifier) (FilterExpr, error) {
+	// Sibling filter contains another filter expression
+	// Recursively parse it
+	innerExpr, err := parseFilterValue(criteria)
+	if err != nil {
+		return nil, err
+	}
+	return NewSiblingFilter(innerExpr, quantifier), nil
 }
 
 // parseComparison extracts the comparison operator and value from criteria

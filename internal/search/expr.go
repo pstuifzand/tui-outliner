@@ -576,6 +576,76 @@ func (e *DescendantFilter) String() string {
 	return fmt.Sprintf("descendant(%s,%s)", e.quantifier.String(), e.inner.String())
 }
 
+// SiblingFilter matches items based on their siblings (items with same parent)
+type SiblingFilter struct {
+	inner      FilterExpr
+	quantifier Quantifier
+}
+
+func NewSiblingFilter(inner FilterExpr, quantifier Quantifier) *SiblingFilter {
+	return &SiblingFilter{inner: inner, quantifier: quantifier}
+}
+
+func (e *SiblingFilter) Matches(item *model.Item) bool {
+	// Root items have no siblings
+	if item.Parent == nil {
+		switch e.quantifier {
+		case QuantifierSome:
+			return false // No siblings to match
+		case QuantifierAll:
+			return false // No siblings, can't match all
+		case QuantifierNone:
+			return true // No siblings means none match
+		default:
+			return false
+		}
+	}
+
+	// Get all siblings (excluding the item itself)
+	var siblings []*model.Item
+	for _, sibling := range item.Parent.Children {
+		if sibling != item {
+			siblings = append(siblings, sibling)
+		}
+	}
+
+	switch e.quantifier {
+	case QuantifierSome:
+		// At least one sibling must match
+		for _, sibling := range siblings {
+			if e.inner.Matches(sibling) {
+				return true
+			}
+		}
+		return false
+	case QuantifierAll:
+		// All siblings must match (false if no siblings)
+		if len(siblings) == 0 {
+			return false
+		}
+		for _, sibling := range siblings {
+			if !e.inner.Matches(sibling) {
+				return false
+			}
+		}
+		return true
+	case QuantifierNone:
+		// No siblings must match
+		for _, sibling := range siblings {
+			if e.inner.Matches(sibling) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *SiblingFilter) String() string {
+	return fmt.Sprintf("sibling(%s,%s)", e.quantifier.String(), e.inner.String())
+}
+
 // Helper functions
 
 // calculateDepth returns the depth of an item in the tree (root = 0)
