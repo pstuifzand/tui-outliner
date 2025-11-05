@@ -20,8 +20,13 @@ type ExternalEditorData struct {
 	Attributes map[string]string   `toml:"attributes"`
 }
 
+// ValidateAttributesFunc is a callback to validate attributes
+// Returns error message if validation fails, empty string if valid
+type ValidateAttributesFunc func(attributes map[string]string) string
+
 // EditItemInExternalEditor opens the item in an external editor, updates it with changes
-func EditItemInExternalEditor(item *model.Item, cfg *config.Config) error {
+// If validateAttrs is provided, it will be called to validate the edited attributes
+func EditItemInExternalEditor(item *model.Item, cfg *config.Config, validateAttrs ValidateAttributesFunc) error {
 	// Create temp file
 	tmpFile, err := os.CreateTemp("", "tuo-edit-*.txt")
 	if err != nil {
@@ -82,6 +87,13 @@ func EditItemInExternalEditor(item *model.Item, cfg *config.Config) error {
 	if err != nil {
 		// Parse error - keep original
 		return fmt.Errorf("failed to parse edited content: %w (keeping original)", err)
+	}
+
+	// Validate attributes if validator provided
+	if validateAttrs != nil && len(data.Attributes) > 0 {
+		if errMsg := validateAttrs(data.Attributes); errMsg != "" {
+			return fmt.Errorf("attribute validation failed: %s (keeping original)", errMsg)
+		}
 	}
 
 	// Update item with parsed data

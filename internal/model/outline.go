@@ -34,9 +34,10 @@ type Metadata struct {
 
 // Outline represents the entire outline document
 type Outline struct {
-	Items                 []*Item          `json:"items"`
-	OriginalFilename      string           `json:"original_filename,omitempty"`
-	itemIndex             map[string]*Item `json:"-"` // Fast O(1) ID lookup cache
+	Items                 []*Item            `json:"items"`
+	OriginalFilename      string             `json:"original_filename,omitempty"`
+	TypeDefinitions       map[string]string  `json:"type_definitions,omitempty"` // Global type definitions (key -> type spec)
+	itemIndex             map[string]*Item   `json:"-"` // Fast O(1) ID lookup cache
 }
 
 // NewItem creates a new outline item with a generated ID
@@ -68,8 +69,9 @@ func NewItemFrom(item *Item) *Item {
 // NewOutline creates a new outline with the given title
 func NewOutline() *Outline {
 	return &Outline{
-		Items:     nil,
-		itemIndex: make(map[string]*Item),
+		Items:           nil,
+		TypeDefinitions: make(map[string]string),
+		itemIndex:       make(map[string]*Item),
 	}
 }
 

@@ -3,11 +3,17 @@ package ui
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
+	tmpl "github.com/pstuifzand/tui-outliner/internal/template"
 )
+
+// ValidateAttributeFunc is a function that validates an attribute value
+// Returns error message if invalid, empty string if valid
+type ValidateAttributeFunc func(key, value string) string
 
 // AttributeEditor manages the attribute editing modal
 type AttributeEditor struct {
@@ -23,8 +29,10 @@ type AttributeEditor struct {
 	keyEditor       *Editor         // Editor for key input
 	valueEditor     *Editor         // Editor for value input
 	onModified      func()          // Callback when attributes are modified
+	validateAttr    ValidateAttributeFunc // Callback to validate attributes
 	calendarWidget  *CalendarWidget // Calendar for date selection
 	calendarVisible bool            // Whether calendar is open
+	typeRegistry    *tmpl.TypeRegistry     // Type definitions for attribute validation
 }
 
 // NewAttributeEditor creates a new AttributeEditor
@@ -32,20 +40,35 @@ func NewAttributeEditor() *AttributeEditor {
 	// Create a temporary item for the editors (they will be replaced when needed)
 	tempItem := model.NewItem("")
 	return &AttributeEditor{
-		visible:     false,
-		item:        nil,
-		attributes:  []string{},
-		selectedIdx: 0,
-		editingIdx:  -1,
-		mode:        "view",
-		keyEditor:   NewEditor(tempItem),
-		valueEditor: NewEditor(tempItem),
+		visible:       false,
+		item:          nil,
+		attributes:    []string{},
+		selectedIdx:   0,
+		editingIdx:    -1,
+		mode:          "view",
+		keyEditor:     NewEditor(tempItem),
+		valueEditor:   NewEditor(tempItem),
+		typeRegistry:  tmpl.NewTypeRegistry(),
 	}
 }
 
 // SetOnModified sets a callback to be called when attributes are modified
 func (ae *AttributeEditor) SetOnModified(callback func()) {
 	ae.onModified = callback
+}
+
+// SetValidateAttribute sets the validation callback for attribute values
+func (ae *AttributeEditor) SetValidateAttribute(validate ValidateAttributeFunc) {
+	ae.validateAttr = validate
+}
+
+// ValidateAttribute validates an attribute using the validation callback
+// Returns error message if invalid, empty string if valid
+func (ae *AttributeEditor) ValidateAttribute(key, value string) string {
+	if ae.validateAttr == nil {
+		return ""
+	}
+	return ae.validateAttr(key, value)
 }
 
 // SetCalendarWidget sets the calendar widget for date selection
@@ -65,6 +88,13 @@ func (ae *AttributeEditor) SetCalendarWidget(calendar *CalendarWidget) {
 			ae.editingValue = dateStr
 			ae.calendarVisible = false
 		})
+	}
+}
+
+// SetTypeRegistry sets the type registry for type-aware value selection
+func (ae *AttributeEditor) SetTypeRegistry(registry *tmpl.TypeRegistry) {
+	if registry != nil {
+		ae.typeRegistry = registry
 	}
 }
 
@@ -228,7 +258,19 @@ func (ae *AttributeEditor) handleEditMode(ev *tcell.EventKey) bool {
 	if ae.valueEditor.WasEnterPressed() {
 		// Save the edited value
 		if ae.item != nil && ae.item.Metadata != nil && ae.item.Metadata.Attributes != nil {
-			ae.item.Metadata.Attributes[ae.editingKey] = ae.valueEditor.GetText()
+			newValue := ae.valueEditor.GetText()
+
+			// Validate the new value if validation is set
+			if ae.validateAttr != nil {
+				if errMsg := ae.validateAttr(ae.editingKey, newValue); errMsg != "" {
+					ae.statusMessage = fmt.Sprintf("Invalid: %s", errMsg)
+					ae.valueEditor.Stop()
+					ae.valueEditor.Start()
+					return true
+				}
+			}
+
+			ae.item.Metadata.Attributes[ae.editingKey] = newValue
 			ae.statusMessage = fmt.Sprintf("Updated '%s'", ae.editingKey)
 			ae.mode = "view"
 			ae.editingIdx = -1
@@ -298,7 +340,20 @@ func (ae *AttributeEditor) handleAddValueMode(ev *tcell.EventKey) bool {
 		if ae.item.Metadata.Attributes == nil {
 			ae.item.Metadata.Attributes = make(map[string]string)
 		}
-		ae.item.Metadata.Attributes[ae.editingKey] = ae.valueEditor.GetText()
+
+		newValue := ae.valueEditor.GetText()
+
+		// Validate the new value if validation is set
+		if ae.validateAttr != nil {
+			if errMsg := ae.validateAttr(ae.editingKey, newValue); errMsg != "" {
+				ae.statusMessage = fmt.Sprintf("Invalid: %s", errMsg)
+				ae.valueEditor.Stop()
+				ae.valueEditor.Start()
+				return true
+			}
+		}
+
+		ae.item.Metadata.Attributes[ae.editingKey] = newValue
 		ae.statusMessage = fmt.Sprintf("Added attribute '%s'", ae.editingKey)
 		ae.mode = "view"
 		ae.refreshAttributes()

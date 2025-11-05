@@ -227,6 +227,36 @@ func NewApp(filePath string) (*App, error) {
 		app.dirty = true
 	})
 
+	// Set validation callback for attribute editor
+	attributeEditor.SetValidateAttribute(func(key, value string) string {
+		// Load type registry from outline
+		registry := tmpl.NewTypeRegistry()
+		if err := registry.LoadFromOutline(app.outline); err != nil {
+			// If we can't load types, allow the value (type system is optional)
+			return ""
+		}
+
+		// Get the type definition for this key
+		typeSpec := registry.GetType(key)
+		if typeSpec == nil {
+			// No type definition for this key - that's OK
+			return ""
+		}
+
+		// Validate the value against the type
+		if err := typeSpec.Validate(value); err != nil {
+			return err.Error()
+		}
+
+		return ""
+	})
+
+	// Set up type registry for type-aware value selection
+	typeRegistry := tmpl.NewTypeRegistry()
+	if err := typeRegistry.LoadFromOutline(app.outline); err == nil {
+		attributeEditor.SetTypeRegistry(typeRegistry)
+	}
+
 	// Set callbacks for node search widget
 	nodeSearchWidget.SetOnSelect(func(item *model.Item) {
 		// Expand parents and navigate to item in current tree
@@ -1345,6 +1375,8 @@ func (a *App) handleCommand(cmd string) {
 		a.handleLinksCommand(parts)
 	case "diff":
 		a.handleDiffCommand(parts)
+	case "typedef":
+		a.handleTypedefCommand(parts)
 	default:
 		a.SetStatus("Unknown command: " + parts[0])
 	}
@@ -1784,6 +1816,13 @@ func (a *App) handleAttrCommand(parts []string) {
 		}
 		key := parts[2]
 		value := strings.Join(parts[3:], " ")
+
+		// Validate attribute value against type definitions if they exist
+		if a.validateAttributeValue(key, value) == false {
+			// validateAttributeValue sets the status message on error
+			return
+		}
+
 		selected.Metadata.Attributes[key] = value
 		selected.Metadata.Modified = time.Now()
 		a.dirty = true
@@ -2012,8 +2051,27 @@ func (a *App) handleExternalEdit() {
 	// Suspend tcell to release terminal control for the editor
 	a.screen.Suspend()
 
+	// Create validation callback for external editor
+	validateAttrs := func(attributes map[string]string) string {
+		// Load type registry from outline
+		registry := tmpl.NewTypeRegistry()
+		if err := registry.LoadFromOutline(a.outline); err != nil {
+			// If we can't load types, allow the attributes (type system is optional)
+			return ""
+		}
+
+		// Validate each attribute
+		for key, value := range attributes {
+			if err := registry.Validate(key, value); err != nil {
+				return err.Error()
+			}
+		}
+
+		return ""
+	}
+
 	// Edit the item in external editor (editor now has full terminal control)
-	err := ui.EditItemInExternalEditor(selected, a.cfg)
+	err := ui.EditItemInExternalEditor(selected, a.cfg, validateAttrs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Editor error: %v\n", err)
 	}
