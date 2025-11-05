@@ -49,25 +49,29 @@ type App struct {
 	linkAutocompleteWidget *ui.LinkAutocompleteWidget // Wiki-style link autocomplete
 	calendarWidget         *ui.CalendarWidget         // Calendar date picker widget
 	backupSelectorWidget   *ui.BackupSelectorWidget   // Backup selector with side-by-side diff preview
+	messageLogger          *ui.MessageLogger          // Message history for :messages command
 	historyManager         *history.Manager           // Manager for persisting command and search history
 	cfg                    *config.Config             // Application configuration
 	sessionID              string                     // 8-character session ID for backups
 	readOnly               bool                       // Whether the file is readonly (e.g., backup file)
 	originalFilePath       string                     // Original file path for backup filtering
 	currentBackupPath      string                     // Current backup file path if viewing a backup
-	statusMsg              string
-	statusTime             time.Time
-	dirty                  bool
-	autoSaveTime           time.Time
-	quit                   bool
-	debugMode              bool
-	mode                   Mode                // Current editor mode (NormalMode, InsertMode, or VisualMode)
-	clipboard              *model.Item         // For cut/paste operations
-	visualAnchor           int                 // For visual mode selection (index in filteredView, -1 when not in visual mode)
-	keybindings            []KeyBinding        // All keybindings
-	pendingKeybindings     []PendingKeyBinding // Pending key definitions (g, z, etc)
-	pendingKeySeq          rune                // Current pending key waiting for second character
-	hasFile                bool                // Whether a file was provided in arguments
+	statusMsg                string
+	statusTime               time.Time
+	dirty                    bool
+	autoSaveTime             time.Time
+	quit                     bool
+	debugMode                bool
+	messagesViewActive       bool                // Whether messages view is currently displayed
+	messagesViewMessages     []*ui.Message      // Messages to display
+	messagesViewScroll       int                // Scroll position for messages view
+	mode                     Mode               // Current editor mode (NormalMode, InsertMode, or VisualMode)
+	clipboard                *model.Item        // For cut/paste operations
+	visualAnchor             int                // For visual mode selection (index in filteredView, -1 when not in visual mode)
+	keybindings              []KeyBinding       // All keybindings
+	pendingKeybindings       []PendingKeyBinding // Pending key definitions (g, z, etc)
+	pendingKeySeq            rune               // Current pending key waiting for second character
+	hasFile                  bool               // Whether a file was provided in arguments
 }
 
 // NewApp creates a new App instance
@@ -116,6 +120,7 @@ func NewApp(filePath string) (*App, error) {
 	linkAutocompleteWidget := ui.NewLinkAutocompleteWidget()
 	calendarWidget := ui.NewCalendarWidget()
 	backupSelectorWidget := ui.NewBackupSelectorWidget()
+	messageLogger := ui.NewMessageLogger(10) // Track last 10 messages
 
 	// Connect calendar widget to attribute editor
 	attributeEditor.SetCalendarWidget(calendarWidget)
@@ -195,6 +200,7 @@ func NewApp(filePath string) (*App, error) {
 		linkAutocompleteWidget: linkAutocompleteWidget,
 		calendarWidget:         calendarWidget,
 		backupSelectorWidget:   backupSelectorWidget,
+		messageLogger:          messageLogger,
 		historyManager:         historyManager,
 		cfg:                    cfg,
 		sessionID:              sessionID,
@@ -206,6 +212,10 @@ func NewApp(filePath string) (*App, error) {
 		dirty:                  false,
 		autoSaveTime:           time.Now(),
 		quit:                   false,
+		debugMode:              false,
+		messagesViewActive:     false,
+		messagesViewMessages:   []*ui.Message{},
+		messagesViewScroll:     0,
 		mode:                   NormalMode,
 		visualAnchor:           -1,
 		pendingKeySeq:          0,
@@ -435,6 +445,16 @@ func (a *App) render() {
 		return
 	}
 
+	// Draw messages view if active
+	if a.messagesViewActive {
+		a.renderMessagesView()
+		if a.command.IsActive() {
+			a.command.Render(a.screen, height-1)
+		}
+		a.screen.Show()
+		return
+	}
+
 	// Draw header (title)
 	headerStyle := a.screen.HeaderStyle()
 	var header string
@@ -608,6 +628,72 @@ func (a *App) render() {
 	a.screen.Show()
 }
 
+// renderMessagesView renders the message history view on the screen
+func (a *App) renderMessagesView() {
+	width := a.screen.GetWidth()
+	height := a.screen.GetHeight()
+
+	// Draw title area
+	titleStyle := a.screen.HelpTitleStyle()
+	title := " Message History "
+	a.screen.DrawString(0, 0, title, titleStyle)
+
+	// Clear rest of title line
+	for x := len(title); x < width; x++ {
+		a.screen.SetCell(x, 0, ' ', titleStyle)
+	}
+
+	// Draw messages starting from line 1
+	contentStyle := a.screen.HelpStyle()
+	startY := 1
+	maxY := height - 2 // Leave room for status bar
+
+	if len(a.messagesViewMessages) == 0 {
+		a.screen.DrawString(1, startY, "No messages", contentStyle)
+		return
+	}
+
+	// Calculate visible range based on scroll
+	visibleLines := maxY - startY
+	if visibleLines <= 0 {
+		return
+	}
+
+	// Display messages from scroll position
+	currentY := startY
+	for i := a.messagesViewScroll; i < len(a.messagesViewMessages) && currentY < maxY; i++ {
+		msg := a.messagesViewMessages[i]
+
+		// Format message with timestamp
+		timestamp := msg.Timestamp.Format("15:04:05")
+		msgText := fmt.Sprintf("[%s] %s", timestamp, msg.Text)
+
+		// Truncate to screen width if needed
+		if len(msgText) > width-2 {
+			msgText = msgText[:width-2]
+		}
+
+		a.screen.DrawString(1, currentY, msgText, contentStyle)
+		currentY++
+	}
+
+	// Fill rest of view with blank lines
+	for currentY < maxY {
+		a.screen.DrawString(1, currentY, "", contentStyle)
+		currentY++
+	}
+
+	// Draw status bar showing help and scroll position
+	statusStyle := a.screen.StatusMessageStyle()
+	statusMsg := fmt.Sprintf("Messages: %d | [q]Close  [j/k]Scroll", len(a.messagesViewMessages))
+	a.screen.DrawString(0, height-1, statusMsg, statusStyle)
+
+	// Fill rest of status line
+	for x := len(statusMsg); x < width; x++ {
+		a.screen.SetCell(x, height-1, ' ', statusStyle)
+	}
+}
+
 // handleRawEvent processes raw input events
 func (a *App) handleRawEvent(ev tcell.Event) {
 	// Handle splash screen
@@ -622,6 +708,38 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 			// Allow ESC to dismiss splash screen
 			if keyEv.Key() == tcell.KeyEscape {
 				a.splash.Hide()
+				return
+			}
+		}
+		return
+	}
+
+	// Handle messages view input
+	if a.messagesViewActive {
+		if keyEv, ok := ev.(*tcell.EventKey); ok {
+			ch := keyEv.Rune()
+			switch ch {
+			case 'q':
+				// Close messages view
+				a.messagesViewActive = false
+				a.messagesViewScroll = 0
+				return
+			case 'j':
+				// Scroll down
+				if a.messagesViewScroll < len(a.messagesViewMessages)-1 {
+					a.messagesViewScroll++
+				}
+				return
+			case 'k':
+				// Scroll up
+				if a.messagesViewScroll > 0 {
+					a.messagesViewScroll--
+				}
+				return
+			case ':':
+				// Allow command mode even in messages view
+				a.messagesViewActive = false
+				a.command.Start()
 				return
 			}
 		}
@@ -1134,6 +1252,8 @@ func (a *App) handleCommand(cmd string) {
 		} else {
 			a.SetStatus("Debug mode OFF")
 		}
+	case "messages":
+		a.handleMessagesCommand()
 	case "export":
 		if len(parts) < 3 {
 			a.SetStatus("Usage: :export <format> <filename>")
@@ -1585,6 +1705,10 @@ func (a *App) handleEditorMouseClick(mouseEv *tcell.EventMouse) {
 func (a *App) SetStatus(msg string) {
 	a.statusMsg = msg
 	a.statusTime = time.Now()
+	// Add message to history
+	if a.messageLogger != nil {
+		a.messageLogger.AddMessage(msg)
+	}
 }
 
 // Quit signals the app to quit
@@ -1595,6 +1719,25 @@ func (a *App) Quit() {
 // SetDebugMode enables or disables debug mode
 func (a *App) SetDebugMode(debug bool) {
 	a.debugMode = debug
+}
+
+// handleMessagesCommand displays the message history
+func (a *App) handleMessagesCommand() {
+	if a.messageLogger == nil {
+		a.SetStatus("Message history not available")
+		return
+	}
+
+	messages := a.messageLogger.GetMessagesReverse() // Newest first
+	if len(messages) == 0 {
+		a.SetStatus("No messages in history")
+		return
+	}
+
+	// Store messages in a temporary state for rendering
+	a.messagesViewActive = true
+	a.messagesViewMessages = messages
+	a.messagesViewScroll = 0
 }
 
 // handleAttrCommand processes attribute-related commands
