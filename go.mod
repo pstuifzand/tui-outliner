@@ -1,6 +1,6 @@
 module github.com/pstuifzand/tui-outliner
 
-go 1.25.3
+go 1.24.7
 
 require github.com/pelletier/go-toml/v2 v2.2.4
 
@@ -10,11 +10,11 @@ require (
 )
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/gdamore/encoding v1.0.1 // indirect
-	github.com/gdamore/tcell/v2 v2.9.0 // indirect
-	github.com/lithammer/fuzzysearch v1.1.8 // indirect
-	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/gdamore/tcell/v2 v2.9.0
+	github.com/lithammer/fuzzysearch v1.1.8
+	github.com/lucasb-eyer/go-colorful v1.2.0
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/stretchr/testify v1.11.1
