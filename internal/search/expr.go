@@ -20,8 +20,8 @@ type Quantifier int
 
 const (
 	QuantifierSome Quantifier = iota // At least one must match (default)
-	QuantifierAll                     // All must match
-	QuantifierNone                    // None must match
+	QuantifierAll                    // All must match
+	QuantifierNone                   // None must match
 )
 
 func (q Quantifier) String() string {
@@ -616,22 +616,28 @@ func isValidDateValue(value string) bool {
 		return false
 	}
 
-	// Relative dates: -1d, -7d, -30d, -1w, -4w, -1m, -6m, -1y
-	if strings.HasPrefix(value, "-") {
+	// Check if ends with a time unit suffix
+	suffix := value[len(value)-1:]
+	isTimeUnit := suffix == "h" || suffix == "d" || suffix == "w" || suffix == "m" || suffix == "y"
+
+	// Relative dates with explicit sign: -1h, -7d, +30d, etc.
+	if strings.HasPrefix(value, "-") || strings.HasPrefix(value, "+") {
 		// Need at least 2 characters: "-" + suffix
 		if len(value) < 2 {
 			return false
 		}
-		suffix := value[len(value)-1:]
-		return suffix == "d" || suffix == "w" || suffix == "m" || suffix == "y"
-	} else if strings.HasPrefix(value, "+") {
-		// Need at least 2 characters: "+" + suffix
-		if len(value) < 2 {
-			return false
-		}
-		suffix := value[len(value)-1:]
-		return suffix == "d" || suffix == "w" || suffix == "m" || suffix == "y"
+		return isTimeUnit
 	}
+
+	// Relative dates without prefix (shortcut for "ago"): 1h, 7d, 30d, etc.
+	// These are interpreted as "N time units ago" (in the past)
+	if isTimeUnit && len(value) >= 2 {
+		// Check if the part before suffix is a valid number
+		var amount int
+		_, err := fmt.Sscanf(value[:len(value)-1], "%d", &amount)
+		return err == nil
+	}
+
 	// Absolute dates: YYYY-MM-DD
 	return len(value) == 10 && value[4] == '-' && value[7] == '-'
 }
@@ -640,7 +646,7 @@ func isValidDateValue(value string) bool {
 func parseDate(value string) time.Time {
 	now := time.Now()
 
-	// Try to parse as relative date first (format: -/+Nd, -/+Nw, -/+Nm, -/+Ny)
+	// Try to parse as relative date with explicit sign (format: -/+Nh, -/+Nd, -/+Nw, -/+Nm, -/+Ny)
 	if len(value) > 2 && (strings.HasPrefix(value, "-") || strings.HasPrefix(value, "+")) {
 		sgn := 1
 		if strings.HasPrefix(value, "-") {
@@ -652,6 +658,8 @@ func parseDate(value string) time.Time {
 		_, err := fmt.Sscanf(value[1:], "%d%s", &amount, &suffix)
 		if err == nil && len(suffix) == 1 {
 			switch suffix {
+			case "h":
+				return now.Add(time.Duration(sgn*amount) * time.Hour)
 			case "d":
 				return now.AddDate(0, 0, sgn*amount)
 			case "w":
@@ -660,6 +668,30 @@ func parseDate(value string) time.Time {
 				return now.AddDate(0, sgn*amount, 0)
 			case "y":
 				return now.AddDate(sgn*amount, 0, 0)
+			}
+		}
+	}
+
+	// Try to parse as relative date without prefix (format: Nh, Nd, Nw, Nm, Ny)
+	// These are interpreted as "N time units ago" (in the past)
+	if len(value) >= 2 {
+		suffix := value[len(value)-1:]
+		if suffix == "h" || suffix == "d" || suffix == "w" || suffix == "m" || suffix == "y" {
+			var amount int
+			_, err := fmt.Sscanf(value[:len(value)-1], "%d", &amount)
+			if err == nil {
+				switch suffix {
+				case "h":
+					return now.Add(time.Duration(-amount) * time.Hour)
+				case "d":
+					return now.AddDate(0, 0, -amount)
+				case "w":
+					return now.AddDate(0, 0, -amount*7)
+				case "m":
+					return now.AddDate(0, -amount, 0)
+				case "y":
+					return now.AddDate(-amount, 0, 0)
+				}
 			}
 		}
 	}

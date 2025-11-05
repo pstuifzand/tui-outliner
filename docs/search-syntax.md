@@ -57,9 +57,10 @@ Match nodes with specific attributes using the `@` prefix.
 If an attribute contains a date value (YYYY-MM-DD format), you can filter using date comparisons:
 
 ```
-@date>-7d       # Attribute 'date' is more recent than 7 days ago
-@date<-30d      # Attribute 'date' is older than 30 days ago
-@date>=-1d      # Attribute 'date' is within the last day
+@date>7d        # Attribute 'date' is more recent than 7 days ago (shortcut)
+@date>-7d       # Attribute 'date' is more recent than 7 days ago (explicit)
+@date<30d       # Attribute 'date' is older than 30 days ago
+@date>=1d       # Attribute 'date' is within the last day
 @date=2025-11-01 # Attribute 'date' is exactly this date
 @date>=2025-10-01 # Attribute 'date' is on or after this date
 @date<=2025-11-30 # Attribute 'date' is on or before this date
@@ -68,9 +69,9 @@ If an attribute contains a date value (YYYY-MM-DD format), you can filter using 
 **Examples with date attributes:**
 
 ```
-@deadline>-7d          # Items with deadlines in the next 7 days
-@completed<-7d         # Items completed more than a week ago
-@start>=-1d m:>-3d     # Recently started items, modified in last 3 days
+@deadline>7d           # Items with deadlines in the next 7 days
+@completed<7d          # Items completed more than a week ago
+@start>=1d m:>3d       # Recently started items, modified in last 3 days
 ```
 
 ### Creation Date Filter: `c:`
@@ -80,12 +81,23 @@ Match nodes created within a time window.
 **Syntax:** `c:DATE` | `c:>=DATE` | `c:>DATE` | `c:<=DATE` | `c:<DATE`
 
 Date formats:
-- Relative: `-1d` (1 day ago), `-7d` (7 days ago), `-30d` (30 days ago), `-1w`, `-4w`, `-1m`, `-6m`, `-1y`
+- Relative (shortcut): `1h`, `2h`, `1d`, `7d`, `30d`, `1w`, `4w`, `1m`, `6m`, `1y` (means "N units ago")
+- Relative (explicit): `-1h`, `-7d`, `-30d`, `-1w`, `-4w`, `-1m`, `-6m`, `-1y` (same as shortcut)
 - Absolute: `2025-11-01` (YYYY-MM-DD format)
 
+Time units:
+- `h` - hours (e.g., `1h` = 1 hour ago, `24h` = 24 hours ago)
+- `d` - days (e.g., `7d` = 7 days ago)
+- `w` - weeks (e.g., `1w` = 1 week ago)
+- `m` - months (e.g., `1m` = 1 month ago)
+- `y` - years (e.g., `1y` = 1 year ago)
+
 ```
-c:>-7d           # Created in the last 7 days
-c:<-30d          # Created more than 30 days ago
+c:>1h            # Created in the last hour
+c:>24h           # Created in the last 24 hours
+c:>7d            # Created in the last 7 days (shortcut syntax)
+c:>-7d           # Created in the last 7 days (explicit syntax, same as above)
+c:<30d           # Created more than 30 days ago
 c:>=2025-11-01   # Created on or after this date
 ```
 
@@ -94,8 +106,10 @@ c:>=2025-11-01   # Created on or after this date
 Match nodes modified within a time window. Same syntax as creation date filter.
 
 ```
-m:>-7d           # Modified in the last 7 days
-m:<-1d           # Modified more than 1 day ago
+m:>1h            # Modified in the last hour
+m:>2h            # Modified in the last 2 hours
+m:>7d            # Modified in the last 7 days
+m:<1d            # Modified more than 1 day ago
 ```
 
 ### Children Count Filter: `children:`

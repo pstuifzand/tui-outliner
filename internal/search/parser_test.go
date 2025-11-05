@@ -247,59 +247,59 @@ func TestChildrenFilter(t *testing.T) {
 
 func TestAttributeDateExprParser(t *testing.T) {
 	tests := []struct {
-		query    string
-		key      string
-		value    string
-		op       ComparisonOp
+		query     string
+		key       string
+		value     string
+		op        ComparisonOp
 		shouldErr bool
 	}{
 		{
-			query:    "@date>=2025-10-10",
-			key:      "date",
-			value:    "2025-10-10",
-			op:       OpGreaterEqual,
+			query: "@date>=2025-10-10",
+			key:   "date",
+			value: "2025-10-10",
+			op:    OpGreaterEqual,
 		},
 		{
-			query:    "@date>2025-10-10",
-			key:      "date",
-			value:    "2025-10-10",
-			op:       OpGreater,
+			query: "@date>2025-10-10",
+			key:   "date",
+			value: "2025-10-10",
+			op:    OpGreater,
 		},
 		{
-			query:    "@date<2025-10-10",
-			key:      "date",
-			value:    "2025-10-10",
-			op:       OpLess,
+			query: "@date<2025-10-10",
+			key:   "date",
+			value: "2025-10-10",
+			op:    OpLess,
 		},
 		{
-			query:    "@date<=2025-10-10",
-			key:      "date",
-			value:    "2025-10-10",
-			op:       OpLessEqual,
+			query: "@date<=2025-10-10",
+			key:   "date",
+			value: "2025-10-10",
+			op:    OpLessEqual,
 		},
 		{
-			query:    "@date=2025-10-10",
-			key:      "date",
-			value:    "2025-10-10",
-			op:       OpEqual,
+			query: "@date=2025-10-10",
+			key:   "date",
+			value: "2025-10-10",
+			op:    OpEqual,
 		},
 		{
-			query:    "@date!=2025-10-10",
-			key:      "date",
-			value:    "2025-10-10",
-			op:       OpNotEqual,
+			query: "@date!=2025-10-10",
+			key:   "date",
+			value: "2025-10-10",
+			op:    OpNotEqual,
 		},
 		{
-			query:    "@deadline>-7d",
-			key:      "deadline",
-			value:    "-7d",
-			op:       OpGreater,
+			query: "@deadline>-7d",
+			key:   "deadline",
+			value: "-7d",
+			op:    OpGreater,
 		},
 		{
-			query:    "@duedate<=-30d",
-			key:      "duedate",
-			value:    "-30d",
-			op:       OpLessEqual,
+			query: "@duedate<=-30d",
+			key:   "duedate",
+			value: "-30d",
+			op:    OpLessEqual,
 		},
 	}
 
@@ -1155,11 +1155,11 @@ func TestChildFilterQuantifiers(t *testing.T) {
 
 func TestDescendantFilterQuantifiers(t *testing.T) {
 	tests := []struct {
-		name         string
-		query        string
-		buildTree    func() *model.Item
-		matches      bool
-		description  string
+		name        string
+		query       string
+		buildTree   func() *model.Item
+		matches     bool
+		description string
 	}{
 		// Some quantifier (default)
 		{
@@ -1253,10 +1253,10 @@ func TestDescendantFilterQuantifiers(t *testing.T) {
 
 func TestAncestorFilterQuantifiers(t *testing.T) {
 	tests := []struct {
-		name        string
-		query       string
-		ancestorTexts []string  // From immediate parent to root
-		matches     bool
+		name          string
+		query         string
+		ancestorTexts []string // From immediate parent to root
+		matches       bool
 	}{
 		// Some quantifier (default) - equivalent to current ancestor behavior
 		{
@@ -1294,7 +1294,7 @@ func TestAncestorFilterQuantifiers(t *testing.T) {
 			name:          "+parent*:project no ancestors (root)",
 			query:         "+parent*:project",
 			ancestorTexts: []string{},
-			matches:       true,  // Vacuously true
+			matches:       true, // Vacuously true
 		},
 		// None quantifier
 		{
@@ -1371,10 +1371,10 @@ func TestParentFilterWithNegation(t *testing.T) {
 			matches:    false,
 		},
 		{
-			name:       "parent:project no parent",
-			query:      "parent:project",
-			hasParent:  false,
-			matches:    false,
+			name:      "parent:project no parent",
+			query:     "parent:project",
+			hasParent: false,
+			matches:   false,
 		},
 	}
 
@@ -1425,8 +1425,8 @@ func TestComplexParentChildQueries(t *testing.T) {
 					},
 				}
 				child1 := &model.Item{
-					ID:   "child1",
-					Text: "task1",
+					ID:     "child1",
+					Text:   "task1",
 					Parent: root,
 					Metadata: &model.Metadata{
 						Created:    time.Now(),
@@ -1435,8 +1435,8 @@ func TestComplexParentChildQueries(t *testing.T) {
 					},
 				}
 				child2 := &model.Item{
-					ID:   "child2",
-					Text: "task2",
+					ID:     "child2",
+					Text:   "task2",
 					Parent: root,
 					Metadata: &model.Metadata{
 						Created:    time.Now(),
@@ -1462,8 +1462,8 @@ func TestComplexParentChildQueries(t *testing.T) {
 					},
 				}
 				child1 := &model.Item{
-					ID:   "child1",
-					Text: "task1",
+					ID:     "child1",
+					Text:   "task1",
 					Parent: root,
 					Metadata: &model.Metadata{
 						Created:    time.Now(),
@@ -1472,8 +1472,8 @@ func TestComplexParentChildQueries(t *testing.T) {
 					},
 				}
 				child2 := &model.Item{
-					ID:   "child2",
-					Text: "task2",
+					ID:     "child2",
+					Text:   "task2",
 					Parent: root,
 					Metadata: &model.Metadata{
 						Created:    time.Now(),
@@ -1561,4 +1561,243 @@ func createItemWithAncestors(ancestorTexts []string) *model.Item {
 	}
 
 	return item
+}
+
+// TestCreatedModifiedDateFilters tests the c: and m: filters with various time units
+func TestCreatedModifiedDateFilters(t *testing.T) {
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	twoHoursAgo := now.Add(-2 * time.Hour)
+	oneDayAgo := now.AddDate(0, 0, -1)
+	sevenDaysAgo := now.AddDate(0, 0, -7)
+	oneMonthAgo := now.AddDate(0, -1, 0)
+
+	tests := []struct {
+		name         string
+		query        string
+		createdTime  time.Time
+		modifiedTime time.Time
+		matches      bool
+	}{
+		// Hour-based filters with explicit "-" prefix
+		{
+			name:         "Created: >-1h matches item created 30min ago",
+			query:        "c:>-1h",
+			createdTime:  now.Add(-30 * time.Minute),
+			modifiedTime: now,
+			matches:      true,
+		},
+		{
+			name:         "Created: >-1h doesn't match item created 2h ago",
+			query:        "c:>-1h",
+			createdTime:  twoHoursAgo,
+			modifiedTime: now,
+			matches:      false,
+		},
+		{
+			name:         "Modified: >-2h matches item modified 1h ago",
+			query:        "m:>-2h",
+			createdTime:  oneDayAgo,
+			modifiedTime: oneHourAgo,
+			matches:      true,
+		},
+		{
+			name:         "Modified: <-1h matches item modified 2h ago",
+			query:        "m:<-1h",
+			createdTime:  oneDayAgo,
+			modifiedTime: twoHoursAgo,
+			matches:      true,
+		},
+		// Hour-based filters with shortcut syntax (no prefix)
+		{
+			name:         "Created: >1h matches item created 30min ago (shortcut)",
+			query:        "c:>1h",
+			createdTime:  now.Add(-30 * time.Minute),
+			modifiedTime: now,
+			matches:      true,
+		},
+		{
+			name:         "Created: >1h doesn't match item created 2h ago (shortcut)",
+			query:        "c:>1h",
+			createdTime:  twoHoursAgo,
+			modifiedTime: now,
+			matches:      false,
+		},
+		{
+			name:         "Modified: >2h matches item modified 1h ago (shortcut)",
+			query:        "m:>2h",
+			createdTime:  oneDayAgo,
+			modifiedTime: oneHourAgo,
+			matches:      true,
+		},
+		{
+			name:         "Modified: <1h matches item modified 2h ago (shortcut)",
+			query:        "m:<1h",
+			createdTime:  oneDayAgo,
+			modifiedTime: twoHoursAgo,
+			matches:      true,
+		},
+		{
+			name:         "Modified: >24h matches item modified 2h ago (shortcut)",
+			query:        "m:>24h",
+			createdTime:  oneDayAgo,
+			modifiedTime: twoHoursAgo,
+			matches:      true,
+		},
+		// Day-based filters with shortcut syntax
+		{
+			name:         "Created: >7d matches item created 1 day ago (shortcut)",
+			query:        "c:>7d",
+			createdTime:  oneDayAgo,
+			modifiedTime: now,
+			matches:      true,
+		},
+		{
+			name:         "Created: <7d matches item created 1 month ago (shortcut)",
+			query:        "c:<7d",
+			createdTime:  oneMonthAgo,
+			modifiedTime: now,
+			matches:      true,
+		},
+		{
+			name:         "Modified: >7d matches item modified 1 day ago (shortcut)",
+			query:        "m:>7d",
+			createdTime:  oneMonthAgo,
+			modifiedTime: oneDayAgo,
+			matches:      true,
+		},
+		// Mixed queries
+		{
+			name:         "Both created and modified recent",
+			query:        "c:>1d m:>2h",
+			createdTime:  now.Add(-12 * time.Hour),
+			modifiedTime: oneHourAgo,
+			matches:      true,
+		},
+		{
+			name:         "Created recent but modified old",
+			query:        "c:>1d m:>2h",
+			createdTime:  now.Add(-12 * time.Hour),
+			modifiedTime: sevenDaysAgo,
+			matches:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := &model.Item{
+				ID:   "test-item",
+				Text: "test",
+				Metadata: &model.Metadata{
+					Created:  tt.createdTime,
+					Modified: tt.modifiedTime,
+				},
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+// TestDateValueValidation tests the isValidDateValue function with new hour support
+func TestDateValueValidation(t *testing.T) {
+	tests := []struct {
+		value string
+		valid bool
+	}{
+		// Hour formats
+		{"1h", true},
+		{"24h", true},
+		{"-1h", true},
+		{"-24h", true},
+		{"+1h", true},
+		// Day formats (shortcut and explicit)
+		{"1d", true},
+		{"7d", true},
+		{"-1d", true},
+		{"-7d", true},
+		{"+7d", true},
+		// Week formats
+		{"1w", true},
+		{"-1w", true},
+		{"+1w", true},
+		// Month formats
+		{"1m", true},
+		{"-1m", true},
+		{"+6m", true},
+		// Year formats
+		{"1y", true},
+		{"-1y", true},
+		{"+1y", true},
+		// Absolute dates
+		{"2025-11-01", true},
+		{"2025-01-31", true},
+		// Invalid formats
+		{"", false},
+		{"h", false},
+		{"1", false},
+		{"abc", false},
+		{"-", false},
+		{"+", false},
+		{"1x", false},
+		{"-1x", false},
+		{"2025-11", false},
+		{"2025/11/01", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			result := isValidDateValue(tt.value)
+			if result != tt.valid {
+				t.Errorf("isValidDateValue(%q) = %v, want %v", tt.value, result, tt.valid)
+			}
+		})
+	}
+}
+
+// TestParseDateWithHours tests the parseDate function with hour-based values
+func TestParseDateWithHours(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		value          string
+		expectedOffset time.Duration
+	}{
+		// Hours with explicit "-"
+		{"-1h", -1 * time.Hour},
+		{"-2h", -2 * time.Hour},
+		{"-24h", -24 * time.Hour},
+		// Hours with shortcut syntax (no prefix = ago)
+		{"1h", -1 * time.Hour},
+		{"2h", -2 * time.Hour},
+		{"24h", -24 * time.Hour},
+		// Days with shortcut syntax
+		{"1d", -24 * time.Hour},
+		{"7d", -7 * 24 * time.Hour},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			result := parseDate(tt.value)
+			if result.IsZero() {
+				t.Fatalf("parseDate(%q) returned zero time", tt.value)
+			}
+
+			expected := now.Add(tt.expectedOffset)
+			// Allow 1 second tolerance for test execution time
+			diff := result.Sub(expected)
+			if diff < -1*time.Second || diff > 1*time.Second {
+				t.Errorf("parseDate(%q) = %v, want approximately %v (diff: %v)",
+					tt.value, result, expected, diff)
+			}
+		})
+	}
 }
