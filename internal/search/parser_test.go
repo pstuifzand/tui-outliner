@@ -2186,3 +2186,339 @@ func createItemWithSiblings(siblingTexts []string) *model.Item {
 	parent.Children = children
 	return item
 }
+
+// Tests for regex search functionality
+
+func TestTokenizerRegex(t *testing.T) {
+	tests := []struct {
+		input    string
+		tokens   []TokenType
+		values   []string
+		describe string
+	}{
+		{
+			input:    "/TODO/",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"TODO", ""},
+			describe: "simple regex pattern",
+		},
+		{
+			input:    "/^TODO/",
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{"^TODO", ""},
+			describe: "regex with start anchor",
+		},
+		{
+			input:    `/\d{4}-\d{2}-\d{2}/`,
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{`\d{4}-\d{2}-\d{2}`, ""},
+			describe: "date pattern regex",
+		},
+		{
+			input:    `/test\/with\/slashes/`,
+			tokens:   []TokenType{TokenRegex, TokenEOF},
+			values:   []string{`test\/with\/slashes`, ""},
+			describe: "regex with escaped slashes",
+		},
+		{
+			input:    `/TODO/ task`,
+			tokens:   []TokenType{TokenRegex, TokenText, TokenEOF},
+			values:   []string{"TODO", "task", ""},
+			describe: "regex combined with text",
+		},
+		{
+			input:    `/TODO/ | /DONE/`,
+			tokens:   []TokenType{TokenRegex, TokenOr, TokenRegex, TokenEOF},
+			values:   []string{"TODO", "|", "DONE", ""},
+			describe: "OR of two regex patterns",
+		},
+		{
+			input:    `-/TODO/`,
+			tokens:   []TokenType{TokenNot, TokenRegex, TokenEOF},
+			values:   []string{"-", "TODO", ""},
+			describe: "NOT with regex",
+		},
+		{
+			input:    "/ incomplete",
+			tokens:   []TokenType{TokenText, TokenText, TokenEOF},
+			values:   []string{"/", "incomplete", ""},
+			describe: "unclosed regex treated as text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			tokenizer := NewTokenizer(tt.input)
+			tokens := tokenizer.AllTokens()
+
+			if len(tokens) != len(tt.tokens) {
+				t.Fatalf("expected %d tokens, got %d", len(tt.tokens), len(tokens))
+			}
+
+			for i, expectedType := range tt.tokens {
+				if tokens[i].Type != expectedType {
+					t.Errorf("token %d: expected type %d, got %d", i, expectedType, tokens[i].Type)
+				}
+				if tokens[i].Value != tt.values[i] {
+					t.Errorf("token %d: expected value %q, got %q", i, tt.values[i], tokens[i].Value)
+				}
+			}
+		})
+	}
+}
+
+func TestParserRegex(t *testing.T) {
+	tests := []struct {
+		query       string
+		shouldError bool
+		exprType    string
+		describe    string
+	}{
+		{
+			query:    "/TODO/",
+			exprType: "*search.RegexExpr",
+			describe: "simple regex pattern",
+		},
+		{
+			query:    "/^TODO/",
+			exprType: "*search.RegexExpr",
+			describe: "regex with anchor",
+		},
+		{
+			query:    "/TODO/ task",
+			exprType: "*search.AndExpr",
+			describe: "regex AND text",
+		},
+		{
+			query:    "/TODO/ | /DONE/",
+			exprType: "*search.OrExpr",
+			describe: "OR of two regex patterns",
+		},
+		{
+			query:    "-/TODO/",
+			exprType: "*search.NotExpr",
+			describe: "NOT with regex",
+		},
+		{
+			query:       "/[invalid/",
+			shouldError: true,
+			describe:    "invalid regex pattern",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+
+			if tt.shouldError && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.shouldError && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if err != nil {
+				return
+			}
+
+			actualType := typeOf(expr)
+			if actualType != tt.exprType {
+				t.Errorf("expected type %s, got %s", tt.exprType, actualType)
+			}
+		})
+	}
+}
+
+func TestRegexExprMatching(t *testing.T) {
+	tests := []struct {
+		pattern  string
+		text     string
+		matches  bool
+		describe string
+	}{
+		{
+			pattern:  "^TODO",
+			text:     "TODO: finish task",
+			matches:  true,
+			describe: "start anchor matches",
+		},
+		{
+			pattern:  "^TODO",
+			text:     "Not a TODO",
+			matches:  false,
+			describe: "start anchor doesn't match",
+		},
+		{
+			pattern:  `\d{4}-\d{2}-\d{2}`,
+			text:     "Date: 2025-11-05",
+			matches:  true,
+			describe: "date pattern matches",
+		},
+		{
+			pattern:  `\d{4}-\d{2}-\d{2}`,
+			text:     "No date here",
+			matches:  false,
+			describe: "date pattern doesn't match",
+		},
+		{
+			pattern:  "@[a-z]+",
+			text:     "Mention @username in the task",
+			matches:  true,
+			describe: "username pattern matches",
+		},
+		{
+			pattern:  "@[a-z]+",
+			text:     "No mentions here",
+			matches:  false,
+			describe: "username pattern doesn't match",
+		},
+		{
+			pattern:  "(?i)todo",
+			text:     "TODO: finish",
+			matches:  true,
+			describe: "case-insensitive matches uppercase",
+		},
+		{
+			pattern:  "(?i)todo",
+			text:     "todo: finish",
+			matches:  true,
+			describe: "case-insensitive matches lowercase",
+		},
+		{
+			pattern:  "bug|issue|problem",
+			text:     "Found a bug in the code",
+			matches:  true,
+			describe: "alternation matches first option",
+		},
+		{
+			pattern:  "bug|issue|problem",
+			text:     "This is an issue",
+			matches:  true,
+			describe: "alternation matches middle option",
+		},
+		{
+			pattern:  "bug|issue|problem",
+			text:     "All is well",
+			matches:  false,
+			describe: "alternation doesn't match",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := NewRegexExpr(tt.pattern)
+			if err != nil {
+				t.Fatalf("failed to create regex: %v", err)
+			}
+
+			item := &model.Item{
+				ID:   "test-item",
+				Text: tt.text,
+				Metadata: &model.Metadata{
+					Created:  time.Now(),
+					Modified: time.Now(),
+				},
+			}
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("pattern /%s/ with text %q: expected %v, got %v",
+					tt.pattern, tt.text, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestRegexWithOtherFilters(t *testing.T) {
+	tests := []struct {
+		query    string
+		text     string
+		depth    int
+		matches  bool
+		describe string
+	}{
+		{
+			query:    "/^TODO/ d:0",
+			text:     "TODO: root task",
+			depth:    0,
+			matches:  true,
+			describe: "regex AND depth both match",
+		},
+		{
+			query:    "/^TODO/ d:0",
+			text:     "TODO: nested task",
+			depth:    1,
+			matches:  false,
+			describe: "regex matches but depth doesn't",
+		},
+		{
+			query:    "/^TODO/ | d:>1",
+			text:     "Not a TODO",
+			depth:    2,
+			matches:  true,
+			describe: "depth matches in OR",
+		},
+		{
+			query:    "-/^SKIP/ d:0",
+			text:     "Keep this",
+			depth:    0,
+			matches:  true,
+			describe: "NOT regex with depth",
+		},
+		{
+			query:    "-/^SKIP/ d:0",
+			text:     "SKIP this",
+			depth:    0,
+			matches:  false,
+			describe: "NOT regex fails",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.describe, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createModelItemAtDepth(tt.depth)
+			item.Text = tt.text
+
+			matches := expr.Matches(item)
+			if matches != tt.matches {
+				t.Errorf("query %q with text %q and depth %d: expected %v, got %v",
+					tt.query, tt.text, tt.depth, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestRegexExprString(t *testing.T) {
+	tests := []struct {
+		pattern  string
+		expected string
+	}{
+		{
+			pattern:  "^TODO",
+			expected: "regex(/^TODO/)",
+		},
+		{
+			pattern:  `\d+`,
+			expected: `regex(/\d+/)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pattern, func(t *testing.T) {
+			expr, err := NewRegexExpr(tt.pattern)
+			if err != nil {
+				t.Fatalf("failed to create regex: %v", err)
+			}
+
+			actual := expr.String()
+			if actual != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, actual)
+			}
+		})
+	}
+}

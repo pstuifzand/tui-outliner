@@ -25,6 +25,39 @@ task                 # Find nodes containing "task"
 TODO                 # Case-insensitive
 ```
 
+### Regex Filter: `/pattern/`
+
+Match nodes using regular expression patterns. Use Go's regex syntax (RE2).
+
+**Syntax:** `/pattern/`
+
+```
+/^TODO/              # Items starting with TODO
+/\d{4}-\d{2}-\d{2}/  # Items containing dates in YYYY-MM-DD format
+/@[a-z]+/            # Items mentioning usernames (@username)
+/(?i)bug/            # Case-insensitive match for "bug"
+/bug|issue|problem/  # Match any of these words
+```
+
+**Important Notes:**
+- Uses Go's RE2 regex engine (not all Perl features supported)
+- No support for negative lookahead `(?!)` or lookbehind `(?<=)`
+- Backslashes must be escaped: `\/` for literal slash
+- Supports common features: anchors (`^`, `$`), character classes (`\d`, `\w`, `[a-z]`), quantifiers (`*`, `+`, `?`, `{n,m}`), groups, alternation
+
+**Use cases:**
+- Complex text patterns beyond simple substring matching
+- Extract structured data from text (dates, emails, etc.)
+- Pattern-based filtering with anchors and boundaries
+
+**Examples:**
+
+```
+/^TODO/ d:0          # Root-level items starting with TODO
+-/^SKIP/             # Items NOT starting with SKIP
+/bug|issue/ @status=open  # Open bugs or issues
+```
+
 ### Depth Filter: `d:`
 
 Match nodes at specific depth levels.

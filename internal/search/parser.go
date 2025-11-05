@@ -12,6 +12,7 @@ const (
 	TokenEOF TokenType = iota
 	TokenText
 	TokenFilter
+	TokenRegex  // /pattern/
 	TokenAnd    // + (explicit)
 	TokenOr     // |
 	TokenNot    // -
@@ -125,6 +126,8 @@ func (t *Tokenizer) NextToken() Token {
 		return t.readAttrFilter()
 	case '~':
 		return t.readFuzzyFilter()
+	case '/':
+		return t.readRegex()
 	default:
 		if isFilterStart(ch) {
 			return t.readFilter()
@@ -287,6 +290,40 @@ func (t *Tokenizer) readFuzzyFilter() Token {
 
 	value := "~" + term
 	return Token{Type: TokenFilter, Value: value}
+}
+
+func (t *Tokenizer) readRegex() Token {
+	startPos := t.pos
+	t.pos++ // Skip opening /
+	start := t.pos
+	escaped := false
+
+	for t.pos < len(t.input) {
+		ch := t.input[t.pos]
+		if escaped {
+			// Skip escaped character
+			escaped = false
+			t.pos++
+			continue
+		}
+		if ch == '\\' {
+			// Next character is escaped
+			escaped = true
+			t.pos++
+			continue
+		}
+		if ch == '/' {
+			// Found closing /
+			pattern := t.input[start:t.pos]
+			t.pos++ // Skip closing /
+			return Token{Type: TokenRegex, Value: pattern}
+		}
+		t.pos++
+	}
+
+	// No closing / found - reset and read as single "/" text
+	t.pos = startPos
+	return t.readText()
 }
 
 func isFilterStart(ch byte) bool {
@@ -471,6 +508,11 @@ func (p *Parser) parseAtom() (FilterExpr, error) {
 		value := p.currentToken().Value
 		p.advance()
 		return parseFilterValue(value)
+
+	case TokenRegex:
+		pattern := p.currentToken().Value
+		p.advance()
+		return NewRegexExpr(pattern)
 
 	case TokenEOF:
 		return nil, fmt.Errorf("unexpected end of input")

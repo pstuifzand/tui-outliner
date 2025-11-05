@@ -2,6 +2,7 @@ package search
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -69,6 +70,28 @@ func (e *FuzzyExpr) Matches(item *model.Item) bool {
 
 func (e *FuzzyExpr) String() string {
 	return fmt.Sprintf("fuzzy(%q)", e.term)
+}
+
+// RegexExpr matches items whose text matches a regular expression pattern
+type RegexExpr struct {
+	pattern string
+	re      *regexp.Regexp
+}
+
+func NewRegexExpr(pattern string) (*RegexExpr, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid regex pattern: %v", err)
+	}
+	return &RegexExpr{pattern: pattern, re: re}, nil
+}
+
+func (e *RegexExpr) Matches(item *model.Item) bool {
+	return e.re.MatchString(item.Text)
+}
+
+func (e *RegexExpr) String() string {
+	return fmt.Sprintf("regex(/%s/)", e.pattern)
 }
 
 // GetMatchPositions returns the positions of characters that match the fuzzy query
