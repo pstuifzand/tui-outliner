@@ -1067,3 +1067,498 @@ func TestFuzzyHighlightPositions(t *testing.T) {
 func typeOf(v interface{}) string {
 	return string([]rune(string([]rune(fmt.Sprintf("%T", v)))))
 }
+
+// Tests for parent/child filters with quantifiers
+
+func TestChildFilterQuantifiers(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		childTexts []string
+		matches    bool
+	}{
+		// Some quantifier (default)
+		{
+			name:       "child:task with one match",
+			query:      "child:task",
+			childTexts: []string{"task", "other"},
+			matches:    true,
+		},
+		{
+			name:       "child:task with no matches",
+			query:      "child:task",
+			childTexts: []string{"other", "more"},
+			matches:    false,
+		},
+		{
+			name:       "child:task with no children",
+			query:      "child:task",
+			childTexts: []string{},
+			matches:    false,
+		},
+		// All quantifier
+		{
+			name:       "+child:task all match",
+			query:      "+child:task",
+			childTexts: []string{"task", "task"},
+			matches:    true,
+		},
+		{
+			name:       "+child:task some don't match",
+			query:      "+child:task",
+			childTexts: []string{"task", "other"},
+			matches:    false,
+		},
+		{
+			name:       "+child:task no children",
+			query:      "+child:task",
+			childTexts: []string{},
+			matches:    false,
+		},
+		// None quantifier
+		{
+			name:       "-child:task none match",
+			query:      "-child:task",
+			childTexts: []string{"other", "more"},
+			matches:    true,
+		},
+		{
+			name:       "-child:task one matches",
+			query:      "-child:task",
+			childTexts: []string{"task", "other"},
+			matches:    false,
+		},
+		{
+			name:       "-child:task no children",
+			query:      "-child:task",
+			childTexts: []string{},
+			matches:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createItemWithChildren(tt.childTexts)
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestDescendantFilterQuantifiers(t *testing.T) {
+	tests := []struct {
+		name         string
+		query        string
+		buildTree    func() *model.Item
+		matches      bool
+		description  string
+	}{
+		// Some quantifier (default)
+		{
+			name:  "child*:task some match",
+			query: "child*:task",
+			buildTree: func() *model.Item {
+				// root -> child1("task") -> grandchild1("other")
+				// root -> child2("other")
+				root := &model.Item{ID: "root", Text: "root", Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1 := &model.Item{ID: "child1", Text: "task", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				grandchild1 := &model.Item{ID: "grandchild1", Text: "other", Parent: child1, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1.Children = []*model.Item{grandchild1}
+				child2 := &model.Item{ID: "child2", Text: "other", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				root.Children = []*model.Item{child1, child2}
+				return root
+			},
+			matches:     true,
+			description: "Some descendants match",
+		},
+		{
+			name:  "child*:task none match",
+			query: "child*:task",
+			buildTree: func() *model.Item {
+				root := &model.Item{ID: "root", Text: "root", Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1 := &model.Item{ID: "child1", Text: "other", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				root.Children = []*model.Item{child1}
+				return root
+			},
+			matches:     false,
+			description: "No descendants match",
+		},
+		// All quantifier
+		{
+			name:  "+child*:task all match",
+			query: "+child*:task",
+			buildTree: func() *model.Item {
+				root := &model.Item{ID: "root", Text: "root", Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1 := &model.Item{ID: "child1", Text: "task", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				grandchild1 := &model.Item{ID: "grandchild1", Text: "task", Parent: child1, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1.Children = []*model.Item{grandchild1}
+				root.Children = []*model.Item{child1}
+				return root
+			},
+			matches:     true,
+			description: "All descendants match",
+		},
+		{
+			name:  "+child*:task some don't match",
+			query: "+child*:task",
+			buildTree: func() *model.Item {
+				root := &model.Item{ID: "root", Text: "root", Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1 := &model.Item{ID: "child1", Text: "task", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child2 := &model.Item{ID: "child2", Text: "other", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				root.Children = []*model.Item{child1, child2}
+				return root
+			},
+			matches:     false,
+			description: "Not all descendants match",
+		},
+		// None quantifier
+		{
+			name:  "-child*:task none match",
+			query: "-child*:task",
+			buildTree: func() *model.Item {
+				root := &model.Item{ID: "root", Text: "root", Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				child1 := &model.Item{ID: "child1", Text: "other", Parent: root, Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()}}
+				root.Children = []*model.Item{child1}
+				return root
+			},
+			matches:     true,
+			description: "No descendants match",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := tt.buildTree()
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("%s: expected %v, got %v", tt.description, tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestAncestorFilterQuantifiers(t *testing.T) {
+	tests := []struct {
+		name        string
+		query       string
+		ancestorTexts []string  // From immediate parent to root
+		matches     bool
+	}{
+		// Some quantifier (default) - equivalent to current ancestor behavior
+		{
+			name:          "parent*:project some match",
+			query:         "parent*:project",
+			ancestorTexts: []string{"project", "other"},
+			matches:       true,
+		},
+		{
+			name:          "parent*:project no match",
+			query:         "parent*:project",
+			ancestorTexts: []string{"other", "more"},
+			matches:       false,
+		},
+		{
+			name:          "parent*:project no ancestors (root)",
+			query:         "parent*:project",
+			ancestorTexts: []string{},
+			matches:       false,
+		},
+		// All quantifier
+		{
+			name:          "+parent*:project all match",
+			query:         "+parent*:project",
+			ancestorTexts: []string{"project", "project"},
+			matches:       true,
+		},
+		{
+			name:          "+parent*:project some don't match",
+			query:         "+parent*:project",
+			ancestorTexts: []string{"project", "other"},
+			matches:       false,
+		},
+		{
+			name:          "+parent*:project no ancestors (root)",
+			query:         "+parent*:project",
+			ancestorTexts: []string{},
+			matches:       true,  // Vacuously true
+		},
+		// None quantifier
+		{
+			name:          "-parent*:project none match",
+			query:         "-parent*:project",
+			ancestorTexts: []string{"other", "more"},
+			matches:       true,
+		},
+		{
+			name:          "-parent*:project one matches",
+			query:         "-parent*:project",
+			ancestorTexts: []string{"project", "other"},
+			matches:       false,
+		},
+		{
+			name:          "-parent*:project no ancestors (root)",
+			query:         "-parent*:project",
+			ancestorTexts: []string{},
+			matches:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createItemWithAncestors(tt.ancestorTexts)
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestParentFilterWithNegation(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		parentText string
+		hasParent  bool
+		matches    bool
+	}{
+		{
+			name:       "parent:project matches",
+			query:      "parent:project",
+			parentText: "project",
+			hasParent:  true,
+			matches:    true,
+		},
+		{
+			name:       "parent:project doesn't match",
+			query:      "parent:project",
+			parentText: "other",
+			hasParent:  true,
+			matches:    false,
+		},
+		{
+			name:       "-parent:project matches (parent is other)",
+			query:      "-parent:project",
+			parentText: "other",
+			hasParent:  true,
+			matches:    true,
+		},
+		{
+			name:       "-parent:project doesn't match (parent is project)",
+			query:      "-parent:project",
+			parentText: "project",
+			hasParent:  true,
+			matches:    false,
+		},
+		{
+			name:       "parent:project no parent",
+			query:      "parent:project",
+			hasParent:  false,
+			matches:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			var item *model.Item
+			if tt.hasParent {
+				item = createItemWithAncestors([]string{tt.parentText})
+			} else {
+				item = &model.Item{
+					ID:       "root",
+					Text:     "root",
+					Metadata: &model.Metadata{Created: time.Now(), Modified: time.Now()},
+				}
+			}
+
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+func TestComplexParentChildQueries(t *testing.T) {
+	tests := []struct {
+		name      string
+		query     string
+		buildTree func() *model.Item
+		matches   bool
+	}{
+		{
+			name:  "item with all children done",
+			query: "+child:@status=done",
+			buildTree: func() *model.Item {
+				root := &model.Item{
+					ID:   "root",
+					Text: "root",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				child1 := &model.Item{
+					ID:   "child1",
+					Text: "task1",
+					Parent: root,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "done"},
+					},
+				}
+				child2 := &model.Item{
+					ID:   "child2",
+					Text: "task2",
+					Parent: root,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "done"},
+					},
+				}
+				root.Children = []*model.Item{child1, child2}
+				return root
+			},
+			matches: true,
+		},
+		{
+			name:  "item with some children not done",
+			query: "+child:@status=done",
+			buildTree: func() *model.Item {
+				root := &model.Item{
+					ID:   "root",
+					Text: "root",
+					Metadata: &model.Metadata{
+						Created:  time.Now(),
+						Modified: time.Now(),
+					},
+				}
+				child1 := &model.Item{
+					ID:   "child1",
+					Text: "task1",
+					Parent: root,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "done"},
+					},
+				}
+				child2 := &model.Item{
+					ID:   "child2",
+					Text: "task2",
+					Parent: root,
+					Metadata: &model.Metadata{
+						Created:    time.Now(),
+						Modified:   time.Now(),
+						Attributes: map[string]string{"status": "todo"},
+					},
+				}
+				root.Children = []*model.Item{child1, child2}
+				return root
+			},
+			matches: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := tt.buildTree()
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("expected %v, got %v", tt.matches, matches)
+			}
+		})
+	}
+}
+
+// Helper functions
+
+func createItemWithChildren(childTexts []string) *model.Item {
+	item := &model.Item{
+		ID:       "parent",
+		Text:     "parent",
+		Children: make([]*model.Item, len(childTexts)),
+		Metadata: &model.Metadata{
+			Created:  time.Now(),
+			Modified: time.Now(),
+		},
+	}
+
+	for i, text := range childTexts {
+		child := &model.Item{
+			ID:     fmt.Sprintf("child-%d", i),
+			Text:   text,
+			Parent: item,
+			Metadata: &model.Metadata{
+				Created:  time.Now(),
+				Modified: time.Now(),
+			},
+		}
+		item.Children[i] = child
+	}
+
+	return item
+}
+
+func createItemWithAncestors(ancestorTexts []string) *model.Item {
+	item := &model.Item{
+		ID:       "item",
+		Text:     "item",
+		Children: make([]*model.Item, 0),
+		Metadata: &model.Metadata{
+			Created:  time.Now(),
+			Modified: time.Now(),
+		},
+	}
+
+	current := item
+	for i, text := range ancestorTexts {
+		parent := &model.Item{
+			ID:       fmt.Sprintf("ancestor-%d", i),
+			Text:     text,
+			Children: []*model.Item{current},
+			Metadata: &model.Metadata{
+				Created:  time.Now(),
+				Modified: time.Now(),
+			},
+		}
+		current.Parent = parent
+		current = parent
+	}
+
+	return item
+}

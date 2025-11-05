@@ -124,16 +124,84 @@ p:@type=project  # Nodes whose parent has 'type=project' attribute
 p:d:>=2          # Nodes whose parent is at depth 2 or deeper
 ```
 
-### Ancestor Filter: `a:`
+### Ancestor Filter: `a:` or `parent*:`
 
 Match nodes that have an ancestor matching criteria. Use `a:` followed by another filter.
 
-**Syntax:** `a:FILTER`
+**Syntax:** `a:FILTER` or `parent*:FILTER`
 
 ```
 a:@type=project    # Nodes anywhere under a node with 'type=project' attribute
 a:d:0              # Any node with root as ancestor (all non-root)
 a:@status=active   # Nodes under a node with 'status=active' attribute
+parent*:project    # Same as a:project (alternate syntax)
+```
+
+### Child and Descendant Filters
+
+Match nodes based on their children or descendants. These filters support **quantifiers** to specify how many children/descendants must match.
+
+#### Quantifier Prefixes
+
+- **No prefix (default)**: At least one matches (some)
+- **`+` prefix**: All must match (all)
+- **`-` prefix**: None must match (none)
+
+#### Child Filter: `child:`
+
+Match nodes based on their immediate children (one level down).
+
+**Syntax:** `child:FILTER` | `+child:FILTER` | `-child:FILTER`
+
+```
+child:task              # At least one child contains "task"
++child:@status=done     # All children have status=done
+-child:@urgent          # No children have urgent attribute
+child:d:>2              # At least one child is at depth > 2
+```
+
+#### Descendant Filter: `child*:`
+
+Match nodes based on all their descendants (recursive, all levels down).
+
+**Syntax:** `child*:FILTER` | `+child*:FILTER` | `-child*:FILTER`
+
+```
+child*:task             # At least one descendant contains "task"
++child*:@status=done    # All descendants have status=done
+-child*:@urgent         # No descendants have urgent attribute
+child*:d:>3             # At least one descendant is at depth > 3
+```
+
+#### Parent* Filter (Ancestor with Quantifiers): `parent*:`
+
+Match nodes based on all their ancestors (recursive, all levels up).
+
+**Syntax:** `parent*:FILTER` | `+parent*:FILTER` | `-parent*:FILTER`
+
+```
+parent*:project         # At least one ancestor contains "project" (same as a:project)
++parent*:@type=section  # All ancestors have type=section
+-parent*:@archived      # No ancestors are archived
+parent*:d:0             # At least one ancestor is at root (all non-root nodes)
+```
+
+#### Empty Set Semantics
+
+When there are no children/ancestors, quantifiers behave as follows:
+
+- **All (`+`)**:
+  - Children/Descendants: `false` (can't be "all" if none exist)
+  - Ancestors: `true` (vacuously true for root nodes)
+- **Some (default)**: Always `false` (none exist to match)
+- **None (`-`)**: Always `true` (vacuously true, none exist to match)
+
+**Examples:**
+```
++child:task             # Root nodes with no children: false
+-child:task             # Root nodes with no children: true
++parent*:project        # Root nodes with no ancestors: true
+-parent*:archived       # Root nodes with no ancestors: true
 ```
 
 ## Operators
@@ -225,6 +293,22 @@ a:@type=work            # Nodes under a node with 'type=work' attribute
 a:d:0                   # All nodes except root (have a root ancestor)
 ```
 
+### Find by children/descendants
+```
++child:@status=done           # Projects where all immediate children are done
+-child:@urgent                # Projects with no urgent children
+child*:@bug                   # Any node with a bug descendant
++child*:@status=done          # Projects where all descendants are done
+-child*:@status=todo          # Projects with no incomplete descendants
+```
+
+### Find by ancestors (advanced)
+```
++parent*:@type=project        # Nodes where all ancestors are projects
+-parent*:@archived            # Nodes with no archived ancestors
+parent*:@type=milestone       # Nodes under at least one milestone
+```
+
 ### Find by attribute dates
 ```
 @deadline>-7d           # Items with upcoming deadlines (next 7 days)
@@ -271,6 +355,15 @@ p:d:0 -children:0        # Top-level children that themselves have children
 
 # Attribute date range
 @date>=2025-10-01 @date<=2025-10-31  # Items from October
+
+# Projects with all children done
++child:@status=done @type=project
+
+# Items with no incomplete descendants
+-child*:@status=todo
+
+# Deep nodes under active projects
+d:>3 +parent*:@type=project -parent*:@archived
 ```
 
 ## Notes
