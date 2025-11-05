@@ -4,29 +4,41 @@ This document lists potential missing features and enhancements to the TUI Outli
 
 ## High-Priority Missing Features
 
-### 1. Descendant/Subtree Filter
+### 1. ✅ Descendant/Subtree Filter (IMPLEMENTED)
 
-Logical opposite of `a:` (ancestor) filter to find nodes that have descendants matching criteria.
+**Status:** Implemented as `child:` and `child*:` filters
 
-**Syntax:** `desc:FILTER` or `subtree:FILTER`
+Find nodes that have children or descendants matching criteria. This is the logical opposite of ancestor filtering.
 
-**Examples:**
+**Syntax:**
+- `child:FILTER` - Direct children only (one level down)
+- `child*:FILTER` - All descendants recursively (entire subtree)
+
+**Quantifiers:**
 ```
-desc:@deadline>-7d           # Find projects that contain upcoming deadlines
-desc:children:0              # Find nodes that contain leaf nodes
-@type=project desc:@urgent   # Projects containing urgent items
+-child:FILTER                    # No children match FILTER
+child:FILTER                     # Some children match FILTER
++child:FILTER                    # All children match FILTER
+
+-child*:FILTER                   # No descendants match FILTER (at any depth)
+child*:FILTER                    # Some descendant matches FILTER (at any depth)
++child*:FILTER                   # All descendants match FILTER (entire subtree)
 ```
 
-**Use cases:**
-- "Find parent nodes whose children match criteria"
-- "Find nodes with specific descendant patterns"
+**Real examples:**
+```
+child:@status=done               # Items with at least one done child
++child:@status=done              # Items where all children are done
+-child:@archived                 # Items with no archived children
+child*:@urgent                   # Items with urgent descendants anywhere in subtree
++child*:@status=done             # Items where ALL descendants are done
+-child*:@archived                # Items with no archived descendants at any level
+@type=project child*:@deadline>-7d  # Projects with upcoming deadlines in subtree
+```
 
-
-
-Perfect! Here's the complete system formatted clearly:
+**Complete Hierarchy Navigation System:**
 
 **Parent (singular, one level up):**
-
 ```
 -parent:FILTER                   # Parent doesn't match FILTER
 parent:FILTER                    # Parent matches FILTER
@@ -34,15 +46,13 @@ parent:FILTER                    # Parent matches FILTER
 ```
 
 **Parent* (recursive, all ancestors to root):**
-
 ```
 -parent*:FILTER                  # No ancestors match FILTER
 parent*:FILTER                   # At least one ancestor matches FILTER
 +parent*:FILTER                  # All ancestors (entire chain to root) match FILTER
 ```
 
-**Child (single level, multiple siblings):**
-
+**Child (single level, multiple children):**
 ```
 -child:FILTER                    # No children match FILTER
 child:FILTER                     # Some children match FILTER
@@ -50,15 +60,13 @@ child:FILTER                     # Some children match FILTER
 ```
 
 **Child* (recursive, all descendants):**
-
 ```
 -child*:FILTER                   # No descendants match FILTER (at any depth)
 child*:FILTER                    # Some descendant matches FILTER (at any depth)
 +child*:FILTER                   # All descendants match FILTER (entire subtree)
 ```
 
-**Real examples:**
-
+**Multi-level examples:**
 ```
 +parent*:@type=project           # Every ancestor up to root is a project
 parent*:@status=active           # At least one ancestor is active
@@ -66,6 +74,14 @@ parent*:@status=active           # At least one ancestor is active
 child*:@urgent                   # Has some urgent item somewhere in subtree
 -child*:@archived                # Nothing in subtree is archived
 ```
+
+**Use cases:**
+- Find parent nodes whose children match criteria
+- Find projects containing specific items in subtree
+- Validate completion (all descendants done)
+- Find containers with specific content patterns
+
+**Documentation:** See docs/search-syntax.md for full details
 
 ---
 
@@ -337,7 +353,7 @@ Show "X of Y results" during search navigation.
 **Recommend implementing in this order:**
 
 1. **Regex Text Search** - Unlocks advanced pattern matching, high user demand
-2. **Descendant Filter** - Mirrors ancestor filter, completes the hierarchy navigation
+2. ~~**Descendant Filter**~~ - ✅ **IMPLEMENTED** (`child:` and `child*:` filters)
 3. **Text Qualifiers** - Improves precision with minimal parser changes
 4. **Depth Limits on Ancestor** - More control over existing ancestor functionality
 5. **Text Length Filter** - Practical for content management and cleanup
