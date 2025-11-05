@@ -851,7 +851,17 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 					Key:         'a',
 					Description: "Add attribute (prompt for key and value)",
 					Handler: func(app *App) {
-						app.SetStatus("Use :attr add <key> <value> to add attributes")
+						if app.readOnly {
+							app.SetStatus("File is readonly")
+							return
+						}
+						selected := app.tree.GetSelected()
+						if selected != nil {
+							app.attributeEditor.ShowInAddMode(selected)
+							app.SetStatus("Adding attribute (Escape to cancel)")
+						} else {
+							app.SetStatus("No item selected")
+						}
 					},
 				},
 				'd': {

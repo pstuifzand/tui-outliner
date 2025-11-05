@@ -108,6 +108,21 @@ func (ae *AttributeEditor) Show(item *model.Item) {
 	ae.refreshAttributes()
 }
 
+// ShowInAddMode shows the attribute editor for an item and immediately starts adding a new attribute
+func (ae *AttributeEditor) ShowInAddMode(item *model.Item) {
+	ae.item = item
+	ae.visible = true
+	ae.selectedIdx = 0
+	ae.editingIdx = -1
+	ae.mode = "add_key"
+	ae.statusMessage = "Enter attribute key"
+	ae.refreshAttributes()
+
+	// Start the key editor
+	ae.keyEditor.SetText("")
+	ae.keyEditor.Start()
+}
+
 // Hide hides the attribute editor
 func (ae *AttributeEditor) Hide() {
 	ae.visible = false
