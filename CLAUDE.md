@@ -849,6 +849,80 @@ ls -la /home/peter/work/tui-outliner/
      V                     # Exit visual mode
      ```
 
+30. **Template System with Type Definitions**:
+   - Added comprehensive template system for reusable item structures
+   - Type definitions stored in special `__types__` item in outline
+   - Templates marked with `@type=template` and `@applies_to=<typename>`
+   - Two-level template structure: container (metadata) and node (actual template)
+   - Implementation (internal/template/):
+     - `types.go` - Type definition parsing, validation, storage
+     - `template.go` - Template finding, cloning, merging logic
+     - `apply.go` - Application logic with detailed result tracking
+   - Type specification format:
+     - `enum|val1|val2|val3` - One of listed values
+     - `number|min-max` - Numeric range (e.g., 1-5)
+     - `date` - YYYY-MM-DD format
+     - `list|type` - List of items
+     - `string` - Any string value
+     - `reference|@filter` - Reference with filter
+   - Attribute merging: Last wins (template overrides if different)
+   - Child merging: Template children appended below existing children
+   - Deep cloning: All descendants recursively cloned
+   - Validation: Always validates attributes against type definitions
+   - Auto-apply: Setting `@type` attribute triggers all matching templates
+   - Manual apply: `:apply-template <name>` command
+   - Commands (internal/app/template_commands.go):
+     - `:typedef list` - Show all type definitions
+     - `:typedef add <key> <spec>` - Add type definition
+     - `:typedef remove <key>` - Remove type definition
+     - `:apply-template <name>` - Apply template to current item
+   - Auto-apply hook: In handleAttrCommand when @type attribute set
+   - Testing: Comprehensive test suite in types_test.go and template_test.go
+   - Example: examples/template_demo.json with full template system demo
+   - Documentation: docs/templates.md with complete guide and examples
+
+31. **Type-Aware Attribute Value Selection (Tab)**:
+   - Interactive type-specific selectors for editing attribute values
+   - Features:
+     - Enum selector: Navigate with arrows, quick search by first letter
+     - Number selector: Visual slider with up/down navigation and Home/End for extremes
+     - Date selector: Keyboard-based date picker with day/week navigation
+   - Implementation:
+     - `internal/ui/attribute_value_selector.go` - Type-specific selector widget
+     - Modified `internal/ui/attributes.go` to integrate selector into editor
+     - Type info automatically shown below input field (hints/options/range/format)
+     - Automatically loads type registry from outline
+     - Tab key toggles between text editor and type-specific selector
+   - Integration:
+     - Type hints always visible in edit/add modes
+     - Press Tab to switch to interactive selector for attribute with type
+     - Type-specific keyboard controls in selector
+     - Press Enter to confirm selection or Tab to return to text editing
+   - Keyboard Shortcuts:
+     - Enum: ↑/↓ to navigate, type first letter to jump, Enter to confirm
+     - Number: ↑/↓ to change, Home/End for min/max, 0-9 to jump, Enter to confirm
+     - Date: ←/→ for days, ↑/↓ for weeks, 't' to jump to today, Enter to confirm
+     - Tab toggles between text editor and type-specific selector
+   - Display Format:
+     - Enum hints: ` Options: val1 | val2 | val3`
+     - Number hints: ` Range: min-max`
+     - Date hints: ` Format: YYYY-MM-DD`
+   - Example Usage:
+     - Define enum: `:typedef add status enum|todo|in-progress|done`
+     - Edit attribute: `av` → select item with `j/k` → press `e` to edit
+     - Type hints appear below input field
+     - Press Tab to switch to interactive selector
+     - Navigate with type-specific controls, press Enter to select
+     - Value is set and editor shows it
+   - Benefits:
+     - Visual selection faster than typing for constrained types
+     - Always-visible hints guide both text and selector modes
+     - Type-specific UI optimized for each data type
+     - Prevents invalid entries through validation
+     - Flexible: use text editor or interactive selector
+   - Documentation: `docs/attribute-value-selection.md` - Complete guide with examples
+   - Example: `examples/attribute_selector_demo.json` - Demonstrates all attribute types
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

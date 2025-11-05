@@ -20,7 +20,7 @@ Converts a TUI Outliner JSON file to the diff-optimized format.
 Options:
 `)
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, `
+		fmt.Fprint(os.Stderr, `
 Arguments:
   input.json   Path to the outline JSON file to convert
   output.txt   Path to write the diff-formatted output (optional)

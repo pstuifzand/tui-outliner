@@ -192,84 +192,6 @@ func TestTypedefListShowsMultiple(t *testing.T) {
 	}
 }
 
-// TestApplyTemplateMissingArgs tests missing arguments for apply-template
-func TestApplyTemplateMissingArgs(t *testing.T) {
-	app := createTestApp()
-
-	parts := []string{"apply-template"}
-	app.handleApplyTemplateCommand(parts)
-
-	if !strings.Contains(app.statusMsg, ":apply-template") {
-		t.Errorf("Should show usage, got: %s", app.statusMsg)
-	}
-}
-
-// TestApplyTemplateNoSelection tests apply-template with no selection
-func TestApplyTemplateNoSelection(t *testing.T) {
-	app := createTestApp()
-
-	// Remove all items so there's no selection
-	app.outline.Items = []*model.Item{}
-	app.tree = ui.NewTreeView(app.outline.Items)
-
-	parts := []string{"apply-template", "test"}
-	app.handleApplyTemplateCommand(parts)
-
-	if !strings.Contains(app.statusMsg, "No item selected") {
-		t.Errorf("Should report no item selected, got: %s", app.statusMsg)
-	}
-}
-
-// TestApplyTemplateNotFound tests applying non-existent template
-func TestApplyTemplateNotFound(t *testing.T) {
-	app := createTestApp()
-
-	// Ensure there's a selected item
-	item := model.NewItem("Test Item")
-	app.outline.Items = []*model.Item{item}
-	app.tree = ui.NewTreeView(app.outline.Items)
-
-	parts := []string{"apply-template", "nonexistent"}
-	app.handleApplyTemplateCommand(parts)
-
-	if !strings.Contains(app.statusMsg, "Failed to apply template") {
-		t.Errorf("Should report template not found, got: %s", app.statusMsg)
-	}
-}
-
-// TestApplyTemplateWithoutTypesFails tests apply with invalid attributes
-func TestApplyTemplateWithoutTypesFails(t *testing.T) {
-	app := createTestApp()
-
-	// Create type definition
-	app.handleTypedefCommand([]string{"typedef", "add", "status", "enum|todo|done"})
-
-	// Create template with valid attributes
-	template := model.NewItem("Template: Test")
-	template.Metadata.Attributes["type"] = "template"
-	template.Metadata.Attributes["applies_to"] = "test"
-	template.Metadata.Attributes["name"] = "test-template"
-
-	templateNode := model.NewItem("Test Item")
-	templateNode.Metadata.Attributes["status"] = "todo"
-	template.AddChild(templateNode)
-
-	app.outline.Items = []*model.Item{template}
-
-	// Create target item
-	target := model.NewItem("My Item")
-	app.outline.Items = append(app.outline.Items, target)
-	app.tree = ui.NewTreeView(app.outline.Items)
-	app.tree.SelectItem(1) // Select target item
-
-	// Apply should succeed
-	app.handleApplyTemplateCommand([]string{"apply-template", "test-template"})
-
-	if !strings.Contains(app.statusMsg, "Applied template") {
-		t.Errorf("Should successfully apply template, got: %s", app.statusMsg)
-	}
-}
-
 // TestReadOnlyBlocked tests that readonly files block typedef changes
 func TestReadOnlyBlocked(t *testing.T) {
 	app := createTestApp()
@@ -283,37 +205,20 @@ func TestReadOnlyBlocked(t *testing.T) {
 	}
 }
 
-// TestReadOnlyBlockedApplyTemplate tests that readonly files block apply-template
-func TestReadOnlyBlockedApplyTemplate(t *testing.T) {
-	app := createTestApp()
-	app.readOnly = true
-
-	item := model.NewItem("Test")
-	app.outline.Items = []*model.Item{item}
-	app.tree = ui.NewTreeView(app.outline.Items)
-
-	parts := []string{"apply-template", "test"}
-	app.handleApplyTemplateCommand(parts)
-
-	if !strings.Contains(app.statusMsg, "readonly") {
-		t.Errorf("Should block readonly modifications, got: %s", app.statusMsg)
-	}
-}
-
 // Helper function to create a test app
 func createTestApp() *App {
 	// Create a default item for testing
 	item := model.NewItem("Test Item")
 
 	app := &App{
-		outline:     model.NewOutline(),
-		statusMsg:   "",
-		dirty:       false,
-		readOnly:    false,
-		screen:      createMockScreen(),
-		tree:        ui.NewTreeView([]*model.Item{}),
-		store:       &storage.JSONStore{},
-		editor:      ui.NewMultiLineEditor(item),
+		outline:          model.NewOutline(),
+		statusMsg:        "",
+		dirty:            false,
+		readOnly:         false,
+		screen:           createMockScreen(),
+		tree:             ui.NewTreeView([]*model.Item{}),
+		store:            &storage.JSONStore{},
+		editor:           ui.NewMultiLineEditor(item),
 		nodeSearchWidget: &ui.NodeSearchWidget{},
 	}
 

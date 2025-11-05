@@ -19,3 +19,6 @@ sources = ["internal/**/*.go", "main.go"]
 description="Tail log"
 depends=["build"]
 run="tail -f tuo.log"
+
+[tools]
+"npm:@anthropic-ai/claude-code" = "latest"

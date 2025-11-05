@@ -21,6 +21,7 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	search "github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
+	tmpl "github.com/pstuifzand/tui-outliner/internal/template"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
@@ -56,22 +57,22 @@ type App struct {
 	readOnly               bool                       // Whether the file is readonly (e.g., backup file)
 	originalFilePath       string                     // Original file path for backup filtering
 	currentBackupPath      string                     // Current backup file path if viewing a backup
-	statusMsg                string
-	statusTime               time.Time
-	dirty                    bool
-	autoSaveTime             time.Time
-	quit                     bool
-	debugMode                bool
-	messagesViewActive       bool                // Whether messages view is currently displayed
-	messagesViewMessages     []*ui.Message      // Messages to display
-	messagesViewScroll       int                // Scroll position for messages view
-	mode                     Mode               // Current editor mode (NormalMode, InsertMode, or VisualMode)
-	clipboard                *model.Item        // For cut/paste operations
-	visualAnchor             int                // For visual mode selection (index in filteredView, -1 when not in visual mode)
-	keybindings              []KeyBinding       // All keybindings
-	pendingKeybindings       []PendingKeyBinding // Pending key definitions (g, z, etc)
-	pendingKeySeq            rune               // Current pending key waiting for second character
-	hasFile                  bool               // Whether a file was provided in arguments
+	statusMsg              string
+	statusTime             time.Time
+	dirty                  bool
+	autoSaveTime           time.Time
+	quit                   bool
+	debugMode              bool
+	messagesViewActive     bool                // Whether messages view is currently displayed
+	messagesViewMessages   []*ui.Message       // Messages to display
+	messagesViewScroll     int                 // Scroll position for messages view
+	mode                   Mode                // Current editor mode (NormalMode, InsertMode, or VisualMode)
+	clipboard              *model.Item         // For cut/paste operations
+	visualAnchor           int                 // For visual mode selection (index in filteredView, -1 when not in visual mode)
+	keybindings            []KeyBinding        // All keybindings
+	pendingKeybindings     []PendingKeyBinding // Pending key definitions (g, z, etc)
+	pendingKeySeq          rune                // Current pending key waiting for second character
+	hasFile                bool                // Whether a file was provided in arguments
 }
 
 // NewApp creates a new App instance

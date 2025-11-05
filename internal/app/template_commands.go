@@ -13,7 +13,7 @@ var debugLog *log.Logger
 
 func init() {
 	// Initialize debug logger
-	logFile, err := os.OpenFile("/tmp/tuo-template-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile("/tmp/tuo-template-debug.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		// If we can't open log file, use stderr
 		debugLog = log.New(os.Stderr, "[TEMPLATE] ", log.LstdFlags|log.Lshortfile)
@@ -24,9 +24,10 @@ func init() {
 
 // handleTypedefCommand handles :typedef command
 // Subcommands:
-//   :typedef list           - Show all type definitions
-//   :typedef add <key> <spec> - Add type definition
-//   :typedef remove <key>   - Remove type definition
+//
+//	:typedef list           - Show all type definitions
+//	:typedef add <key> <spec> - Add type definition
+//	:typedef remove <key>   - Remove type definition
 func (a *App) handleTypedefCommand(parts []string) {
 	debugLog.Printf("handleTypedefCommand called with parts: %v", parts)
 
@@ -192,72 +193,6 @@ func (a *App) handleTypedefRemove(registry *tmpl.TypeRegistry, key string) {
 
 	a.dirty = true
 	a.SetStatus(fmt.Sprintf("Removed type: %s", key))
-}
-
-// handleApplyTemplateCommand applies a template to the current item
-// Command: :apply-template <template-name>
-func (a *App) handleApplyTemplateCommand(parts []string) {
-	if a.readOnly {
-		a.SetStatus("Cannot modify readonly file")
-		return
-	}
-
-	if len(parts) < 2 {
-		a.SetStatus(":apply-template <name>")
-		return
-	}
-
-	templateName := strings.Join(parts[1:], " ")
-
-	// Get selected item
-	selected := a.tree.GetSelected()
-	if selected == nil {
-		a.SetStatus("No item selected")
-		return
-	}
-
-	// Load type registry
-	registry := tmpl.NewTypeRegistry()
-	if err := registry.LoadFromOutline(a.outline); err != nil {
-		a.SetStatus(fmt.Sprintf("Error loading types: %s", err.Error()))
-		return
-	}
-
-	// Apply template
-	if err := tmpl.ApplyTemplateByName(a.outline, selected, templateName, registry); err != nil {
-		a.SetStatus(fmt.Sprintf("Failed to apply template: %s", err.Error()))
-		return
-	}
-
-	a.dirty = true
-	a.SetStatus(fmt.Sprintf("Applied template '%s'", templateName))
-}
-
-// triggerAutoApplyTemplates is called when @type attribute is set
-// It auto-applies all matching templates based on the type value
-func (a *App) triggerAutoApplyTemplates(item *string, typeName string) error {
-	if a.readOnly {
-		return nil // Don't auto-apply on readonly files
-	}
-
-	registry := tmpl.NewTypeRegistry()
-	if err := registry.LoadFromOutline(a.outline); err != nil {
-		// Log error but don't fail - type system is optional
-		return nil
-	}
-
-	selected := a.tree.GetSelected()
-	if selected == nil {
-		return nil // No item selected
-	}
-
-	// Auto-apply all matching templates
-	if err := tmpl.AutoApplyTemplates(a.outline, selected, typeName, registry); err != nil {
-		// Log but don't fail - let user see error in status
-		return err
-	}
-
-	return nil
 }
 
 // validateAttributeValue validates an attribute value against type definitions

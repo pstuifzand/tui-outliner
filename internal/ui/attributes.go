@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -26,13 +25,13 @@ type AttributeEditor struct {
 	editingValue    string // Current value being edited
 	mode            string // "view", "edit", "add_key", "add_value"
 	statusMessage   string
-	keyEditor       *Editor         // Editor for key input
-	valueEditor     *Editor         // Editor for value input
-	onModified      func()          // Callback when attributes are modified
+	keyEditor       *Editor               // Editor for key input
+	valueEditor     *Editor               // Editor for value input
+	onModified      func()                // Callback when attributes are modified
 	validateAttr    ValidateAttributeFunc // Callback to validate attributes
-	calendarWidget  *CalendarWidget // Calendar for date selection
-	calendarVisible bool            // Whether calendar is open
-	typeRegistry    *tmpl.TypeRegistry     // Type definitions for attribute validation
+	calendarWidget  *CalendarWidget       // Calendar for date selection
+	calendarVisible bool                  // Whether calendar is open
+	typeRegistry    *tmpl.TypeRegistry    // Type definitions for attribute validation
 }
 
 // NewAttributeEditor creates a new AttributeEditor
@@ -40,15 +39,15 @@ func NewAttributeEditor() *AttributeEditor {
 	// Create a temporary item for the editors (they will be replaced when needed)
 	tempItem := model.NewItem("")
 	return &AttributeEditor{
-		visible:       false,
-		item:          nil,
-		attributes:    []string{},
-		selectedIdx:   0,
-		editingIdx:    -1,
-		mode:          "view",
-		keyEditor:     NewEditor(tempItem),
-		valueEditor:   NewEditor(tempItem),
-		typeRegistry:  tmpl.NewTypeRegistry(),
+		visible:      false,
+		item:         nil,
+		attributes:   []string{},
+		selectedIdx:  0,
+		editingIdx:   -1,
+		mode:         "view",
+		keyEditor:    NewEditor(tempItem),
+		valueEditor:  NewEditor(tempItem),
+		typeRegistry: tmpl.NewTypeRegistry(),
 	}
 }
 

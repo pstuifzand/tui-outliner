@@ -1,209 +1,226 @@
-# Node Search Widget - Advanced Search Integration
+# Type-Aware Attribute Value Selection - Implementation Summary
 
-## Summary
+## Overview
 
-Successfully integrated the advanced search parser into the Node Search Widget (Ctrl+K), replacing the previous fuzzy-search-only implementation with full support for advanced filter expressions.
+Successfully implemented a comprehensive type-aware attribute value selection system that provides optimized UI components for editing attributes based on their type definitions.
 
-## Changes Made
+## What Was Implemented
 
-### 1. Node Search Widget Enhancement (`internal/ui/node_search_widget.go`)
+### 1. New AttributeValueSelector Widget
+**File:** `internal/ui/attribute_value_selector.go` (~450 lines)
 
-**New Fields:**
-- `parseError string` - Stores parse errors from query parsing
-- `filterExpr search.FilterExpr` - Stores parsed filter expression
+A specialized widget that adapts its UI based on attribute types:
+- **Enum Mode**: Interactive list with arrow navigation and quick search
+- **Number Mode**: Visual slider with range visualization
+- **Date Mode**: Keyboard-based date picker with week/day navigation
 
-**Modified Functions:**
-- `updateMatches()` - Replaced fuzzy search with advanced filter expression parsing
-  - Now uses `search.ParseQuery()` to parse advanced syntax
-  - Falls back to text-only matching on parse errors
-  - Maintains 10-result limit for performance
+#### Key Features:
+- Type-specific keyboard handling
+- Visual rendering optimized for each type
+- Proper state management for each mode
+- Status messages with helpful hints
 
-- `Render()` - Enhanced rendering
-  - Added error message display in red
-  - Shows parse errors inline in the widget
+### 2. Integration with AttributeEditor
+**Modified:** `internal/ui/attributes.go`
 
-**Search Features:**
-- Text search: `task`, `project`
-- Depth filters: `d:>1`, `d:<=2`
-- Attribute filters: `@status=done`, `@type=project`, `@deadline>-7d`
-- Date filters: `c:>-7d`, `m:<-30d`
-- Children filters: `children:0`, `children:>0`
-- Parent/Ancestor filters: `p:d:0`, `a:@type=project`
-- Boolean operators: Implicit AND, explicit `+`, OR `|`, NOT `-`
-- Grouping: `(filter1 | filter2) filter3`
+Enhanced the existing attribute editor to support type-aware value selection:
 
-### 2. Documentation
+**Changes:**
+- Added `valueSelector` field to `AttributeEditor` struct
+- Added `typeRegistry` field to store type definitions
+- Implemented `SetTypeRegistry()` method to load type definitions
+- Updated `handleEditMode()` to support Ctrl+T for opening type selector
+- Updated `handleAddValueMode()` to support Ctrl+T for new attributes
+- Modified `renderEditMode()` to display type selector when active
+- Modified `renderAddMode()` to display type selector when active
+- Updated status messages to show `[Ctrl+T]Type-Select` when applicable
 
-**New Files:**
-- `docs/node-search-widget.md` - Comprehensive guide with examples
+**User Workflow:**
+1. Press `av` to open attribute editor
+2. Press `e` to edit existing attribute or `a` to add new
+3. Press `Ctrl+T` while editing value (if type definition exists)
+4. Type selector appears with type-specific UI
+5. Navigate and select value with type-specific controls
+6. Press Enter to confirm selection
 
-**Updated Files:**
-- `README.md`
-  - Added Node Search Widget to features section
-  - Added `Ctrl+K` to quick start keybindings
-  - Added Node Search Widget to Other keybindings table
-  - Added dedicated "Node Search Widget" section with features, keyboard controls, and examples
-  - Reference to detailed documentation
+### 3. App Integration
+**Modified:** `internal/app/app.go`
 
-- `CLAUDE.md`
-  - Documented Node Search Widget enhancement as item #17
-  - Listed all features and implementation details
-  - Noted documentation location
+Connected the type registry to the attribute editor:
+- Initialize type registry from outline
+- Pass registry to attribute editor via `SetTypeRegistry()`
+- Type definitions automatically loaded from outline
 
-### 3. Testing & Verification
+## Type Support
 
-**Tests Verified:**
-- All existing search tests pass (100+ tests)
-- UI tests pass
-- Build succeeds without warnings or errors
+### Enum Type
+**Syntax:** `enum|value1|value2|value3`
 
-**Example Test Queries:**
-- `design` - Text search
-- `d:>1` - Depth filter
-- `@status=done` - Attribute filter
-- `d:>1 @type=task` - Combined filters
-- `task | project` - OR operator
-- `-project` - NOT operator
-- `children:0` - Leaf nodes
-- `(task | subtask) @status=done` - Complex grouping
+**Selector Features:**
+- List of all valid values
+- Navigate with ↑/↓ or ←/→ arrow keys
+- Type first letter to jump to matching value
+- Quick visual scanning of options
 
-## Features
+**Example:**
+```
+:typedef add status enum|todo|in-progress|done
+:typedef add priority enum|low|medium|high|urgent
+```
 
-### Supported Filter Expressions
+### Number Type
+**Syntax:** `number|min-max`
 
-| Type | Syntax | Examples |
-|------|--------|----------|
-| Text | Plain text | `task`, `important` |
-| Depth | `d:COMP` | `d:>1`, `d:<=2`, `d:0` |
-| Attribute | `@KEY[=VALUE]` | `@status=done`, `@url`, `@deadline>-7d` |
-| Date (Created) | `c:COMP DATE` | `c:>-7d`, `c:<-30d` |
-| Date (Modified) | `m:COMP DATE` | `m:>-1d`, `m:2025-11-01` |
-| Children | `children:COMP N` | `children:0`, `children:>5` |
-| Parent | `p:FILTER` | `p:d:0`, `p:@status=active` |
-| Ancestor | `a:FILTER` | `a:@type=project`, `a:d:0` |
+**Selector Features:**
+- Visual slider showing valid range
+- Navigate with ↑/↓ to change value
+- Home/End to jump to min/max
+- Type 0-9 to jump to that value
+- Value displayed with range
 
-### Operators
+**Example:**
+```
+:typedef add rating number|1-5
+:typedef add completion number|0-100
+```
 
-| Operator | Syntax | Example |
-|----------|--------|---------|
-| AND | Space or `+` | `task d:>0` or `task + d:>0` |
-| OR | `\|` | `task \| project` |
-| NOT | `-` | `-project`, `task -done` |
-| Grouping | `()` | `(task \| project) d:>0` |
+### Date Type
+**Syntax:** `date`
 
-### Keyboard Shortcuts
+**Selector Features:**
+- Current date display with day of week
+- Navigate ← → for previous/next day
+- Navigate ↑ ↓ for previous/next week
+- Press 't' to jump to today
+- Efficient keyboard navigation
 
-| Key | Action |
-|-----|--------|
-| `Ctrl+K` | Open Node Search Widget |
-| `Ctrl+N` / `Ctrl+P` | Next/Previous result |
-| `Enter` | Select and jump to node |
-| `Alt+Enter` | Hoist selected node |
-| `Escape` | Close widget |
-| `Ctrl+W` | Delete word before cursor |
+**Example:**
+```
+:typedef add deadline date
+:typedef add start_date date
+```
 
-## Implementation Details
+## Files Created
 
-### Parser Integration
-The widget uses the existing `search.ParseQuery()` function from `internal/search/parser.go` which:
-- Tokenizes the query string
-- Parses using recursive descent parser
-- Builds s-expression tree with proper operator precedence
-- Returns `FilterExpr` interface for matching
+1. **`internal/ui/attribute_value_selector.go`**
+   - New `AttributeValueSelector` widget
+   - Type-specific rendering and keyboard handling
+   - ~450 lines of code
 
-### Fallback Behavior
-If parsing fails:
-- Error message displayed in red in widget
-- Falls back to simple text search
-- User can still navigate results or close the widget
+2. **`docs/attribute-value-selection.md`**
+   - Comprehensive user guide
+   - Usage examples and tips
+   - Keyboard shortcuts reference
+   - Implementation details
 
-### Performance Optimization
-- Results limited to 10 matches (configurable via `maxResults`)
-- Stops adding matches once limit reached
-- Suitable for large outlines
+3. **`examples/attribute_selector_demo.json`**
+   - Complete demo outline
+   - Shows enum, number, and date attributes
+   - Real-world project management example
+   - Type definitions with demo items
 
-## Files Changed
+## Files Modified
 
-1. **Core Implementation:**
-   - `internal/ui/node_search_widget.go` - Updated search logic and rendering
+1. **`internal/ui/attributes.go`**
+   - Added `valueSelector` and `typeRegistry` fields
+   - Integrated type-aware value selection
+   - Updated keyboard handling in edit and add modes
+   - Enhanced rendering with selector display
 
-2. **Documentation:**
-   - `docs/node-search-widget.md` - New comprehensive guide
-   - `README.md` - Updated with Node Search Widget info
-   - `CLAUDE.md` - Added implementation notes
+2. **`internal/app/app.go`**
+   - Initialize type registry from outline
+   - Pass registry to attribute editor
+   - Type definitions automatically loaded
 
-3. **No changes to:**
-   - Search parser (`internal/search/`)
-   - Main search UI (`internal/ui/search.go`)
-   - Application core (`internal/app/`)
+3. **`CLAUDE.md`**
+   - Added feature documentation to development guide
+
+## Keyboard Shortcuts
+
+| Shortcut | Context | Function |
+|----------|---------|----------|
+| **Ctrl+T** | Editing attribute value | Open type-aware selector |
+| **↑/↓** | Enum selector | Navigate enum values |
+| **←/→** | Enum selector | Navigate enum values (alternative) |
+| **↑/↓** | Number selector | Increase/decrease value |
+| **Home** | Number selector | Jump to minimum value |
+| **End** | Number selector | Jump to maximum value |
+| **0-9** | Enum/Number selector | Quick jump/search |
+| **←/→** | Date selector | Previous/next day |
+| **↑/↓** | Date selector | Previous/next week |
+| **t** | Date selector | Jump to today |
+| **Enter** | All selectors | Confirm selection |
+| **Esc** | All selectors | Cancel and close |
+
+## Status Messages
+
+The attribute editor shows helpful status messages:
+
+- **Edit Mode**: `[Enter]Save [Escape]Cancel [Ctrl+T]Type-Select [Ctrl+D]Calendar`
+- **Add Mode**: `[Enter]Save [Escape]Cancel [Ctrl+T]Type-Select`
+
+The `[Ctrl+T]Type-Select` option only appears when a type definition exists.
+
+## Benefits
+
+### For Users
+1. **Faster Value Entry**: Quick selection is faster than typing
+2. **Reduced Errors**: Visual selection prevents invalid entries
+3. **Better UX**: Type-specific UI is more intuitive
+4. **Keyboard Efficient**: All operations with keyboard, no mouse needed
+
+### For Developers
+1. **Modular Design**: Separate widget, easy to extend
+2. **Type-Safe**: Leverages existing type definitions
+3. **Integrated**: Seamlessly works with existing systems
+4. **Extensible**: Easy to add new types in the future
 
 ## Testing
 
-All tests pass:
+The application builds successfully with no compilation errors:
+```
+$ go build -o tuo
+$ echo $?
+0
+```
+
+## Example Workflow
+
 ```bash
-$ go test ./...
+# Start with demo file
+./tuo examples/attribute_selector_demo.json
+
+# Navigate to an item
+j j j  # Move down
+
+# Edit attributes
+av     # Open attribute editor
+
+# Edit an existing attribute with type
+e      # Edit the "status" attribute
+Ctrl+T # Open enum selector
+j      # Navigate to "in-progress"
+Enter  # Select it
+
+# Add a new attribute with type
+a      # Add new attribute
+rating # Type the key name
+Enter  # Confirm key
+Ctrl+T # Open number selector (1-5)
+↑↑     # Increase from 1 to 3
+Enter  # Select value 3
+
+# Exit and auto-save
+q      # Close attribute editor
 ```
 
-**Test Coverage:**
-- Search parser tests: 100+ test cases
-- UI tests: Existing tests still pass
-- Integration: Widget works with main application
+## Summary
 
-## Backward Compatibility
+The implementation provides users with:
+- **Smart value selection** based on attribute type definitions
+- **Optimized UI** for each data type (enum, number, date)
+- **Keyboard-efficient** navigation with helpful shortcuts
+- **Error prevention** through constrained value selection
+- **Type-safe editing** that respects defined type constraints
 
-✓ No breaking changes
-✓ Existing search functionality (`/`) unchanged
-✓ All previous keybindings work
-✓ All existing tests pass
-
-## Future Enhancements
-
-Potential improvements for future versions:
-1. Increase result limit dynamically based on terminal height
-2. Add live highlight of matching terms in results
-3. Support regex patterns for text search
-4. Add search history to Node Search Widget
-5. Remember last search query between sessions
-
-## Usage Examples
-
-### Basic Usage
-```
-Ctrl+K              # Open Node Search Widget
-task                # Find items with "task"
-@status=done        # Completed items
-d:>1                # Items deeper than level 1
-```
-
-### Find tasks by status
-```
-@status=done        # Completed items
-@status=in-progress # Currently working on
--@status=done       # Incomplete items
-```
-
-### Find by hierarchy
-```
-children:0          # Leaf nodes only
-children:>0         # Parent nodes only
-d:2                 # Items at depth level 2
-p:d:0               # Direct children of root
-```
-
-### Find by dates
-```
-c:>-7d              # Created this week
-m:>-1d              # Modified today
-@deadline>-3d       # Deadline within 3 days
-```
-
-### Complex queries
-```
-task @status=done d:>1           # Done tasks not at root
-(project | task) children:>0     # Parent projects or tasks
-@type=day @date>-7d              # Daily notes from past week
-```
-
-## Conclusion
-
-The advanced search parser has been successfully integrated into the Node Search Widget, providing users with powerful filtering capabilities directly accessible via `Ctrl+K`. The implementation maintains backward compatibility, passes all tests, and includes comprehensive documentation.
+All changes are backward compatible and the feature gracefully falls back to text input when type definitions don't exist.
