@@ -85,21 +85,24 @@ func (s *Screen) SetCell(x, y int, r rune, style tcell.Style) {
 }
 
 // DrawString draws a string at the given position with the given style
+// Properly handles multi-byte Unicode characters with correct display widths
 func (s *Screen) DrawString(x, y int, text string, style tcell.Style) {
-	for i, r := range text {
-		s.SetCell(x+i, y, r, style)
+	column := x
+	for _, r := range text {
+		s.SetCell(column, y, r, style)
+		column += RuneWidth(r)
 	}
 }
 
-// DrawStringLimited draws a string, truncating it if it exceeds maxWidth
+// DrawStringLimited draws a string, truncating it if it exceeds maxWidth (in display width, not bytes)
+// Properly handles multi-byte Unicode characters
 func (s *Screen) DrawStringLimited(x, y int, text string, maxWidth int, style tcell.Style) {
 	if maxWidth <= 0 {
 		return
 	}
-	if len(text) > maxWidth {
-		text = text[:maxWidth]
-	}
-	s.DrawString(x, y, text, style)
+	// Truncate to max display width
+	truncated := TruncateToWidth(text, maxWidth)
+	s.DrawString(x, y, truncated, style)
 }
 
 // PollEvent polls for the next event (key press, mouse, etc.)

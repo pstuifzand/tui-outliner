@@ -228,39 +228,44 @@ func (tv *TreeView) SetItems(items []*model.Item) {
 	tv.RebuildView()
 }
 
-// wrapTextAtWidth wraps a single text line to the specified width
+// wrapTextAtWidth wraps a single text line to the specified display width
 // Returns a slice of wrapped text portions
+// Properly handles multi-byte Unicode characters
 func wrapTextAtWidth(text string, maxWidth int) []string {
 	if maxWidth <= 0 {
 		return []string{text}
 	}
 
-	if len(text) <= maxWidth {
+	if StringWidth(text) <= maxWidth {
 		return []string{text}
 	}
 
 	var result []string
 	remaining := text
 
-	for len(remaining) > maxWidth {
-		// Try to find a word boundary within maxWidth
-		// Look for the last space before maxWidth
-		lastSpace := -1
-		for i := 0; i < maxWidth && i < len(remaining); i++ {
-			if remaining[i] == ' ' {
-				lastSpace = i
-			}
-		}
+	for StringWidth(remaining) > maxWidth {
+		// Use CalculateBreakPoint to find proper break location
+		// This handles word boundaries and multi-byte characters correctly
+		byteIdx, _ := CalculateBreakPoint(remaining, maxWidth)
 
-		// If we found a space, wrap at it (excluding the space)
-		if lastSpace > 0 && lastSpace < maxWidth {
-			result = append(result, remaining[:lastSpace])
-			// Skip the space when continuing
-			remaining = strings.TrimPrefix(remaining[lastSpace:], " ")
+		if byteIdx <= 0 {
+			// Edge case: even first character exceeds maxWidth
+			// Just take the first rune
+			runes := []rune(remaining)
+			if len(runes) > 0 {
+				result = append(result, string(runes[0]))
+				remaining = string(runes[1:])
+			} else {
+				break
+			}
 		} else {
-			// No good word boundary, wrap at character boundary
-			result = append(result, remaining[:maxWidth])
-			remaining = remaining[maxWidth:]
+			// Slice safely at byte boundary
+			line := remaining[:byteIdx]
+			result = append(result, strings.TrimRight(line, " "))
+
+			// Skip spaces at the beginning of next line
+			remaining = remaining[byteIdx:]
+			remaining = strings.TrimLeft(remaining, " ")
 		}
 	}
 
@@ -1825,10 +1830,12 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 						}
 
 						// Draw the attribute string if it fits on screen
+						// Use StringWidth for proper display width calculation with Unicode characters
 						attrX := totalLen
-						if attrX+len(attrStr) <= screenWidth {
+						attrWidth := StringWidth(attrStr)
+						if attrX+attrWidth <= screenWidth {
 							screen.DrawString(attrX, y, attrStr, attrStyle)
-							totalLen = attrX + len(attrStr)
+							totalLen = attrX + attrWidth
 						}
 					}
 				}

@@ -564,9 +564,10 @@ func (ae *AttributeEditor) renderEditMode(screen *Screen, startX, startY, boxWid
 	screen.SetCell(startX, y, '│', borderStyle)
 	valuePrefix := " Value: "
 	screen.DrawString(startX+1, y, valuePrefix, contentStyle)
-	// Render the editor for the remaining width
-	maxValueWidth := boxWidth - 2 - len(valuePrefix)
-	ae.valueEditor.Render(screen, startX+1+len(valuePrefix), y, maxValueWidth)
+	// Render the editor for the remaining width - use StringWidth for proper Unicode handling
+	valuePrefixWidth := StringWidth(valuePrefix)
+	maxValueWidth := boxWidth - 2 - valuePrefixWidth
+	ae.valueEditor.Render(screen, startX+1+valuePrefixWidth, y, maxValueWidth)
 	screen.SetCell(startX+boxWidth-1, y, '│', borderStyle)
 	y++
 
@@ -594,16 +595,17 @@ func (ae *AttributeEditor) renderAddMode(screen *Screen, startX, startY, boxWidt
 		screen.SetCell(startX, y, '│', borderStyle)
 		keyPrefix := " Key: "
 		screen.DrawString(startX+1, y, keyPrefix, contentStyle)
-		maxKeyWidth := boxWidth - 2 - len(keyPrefix)
-		ae.keyEditor.Render(screen, startX+1+len(keyPrefix), y, maxKeyWidth)
+		// Use StringWidth for proper Unicode handling
+		keyPrefixWidth := StringWidth(keyPrefix)
+		maxKeyWidth := boxWidth - 2 - keyPrefixWidth
+		ae.keyEditor.Render(screen, startX+1+keyPrefixWidth, y, maxKeyWidth)
 		screen.SetCell(startX+boxWidth-1, y, '│', borderStyle)
 		y++
 	} else {
 		// Add key (display only)
 		keyLine := fmt.Sprintf(" Key: %s", ae.editingKey)
-		if len(keyLine) > boxWidth-2 {
-			keyLine = keyLine[:boxWidth-2]
-		}
+		// Use StringWidth and TruncateToWidth for proper Unicode handling
+		keyLine = TruncateToWidth(keyLine, boxWidth-2)
 		screen.SetCell(startX, y, '│', borderStyle)
 		screen.DrawString(startX+1, y, keyLine, contentStyle)
 		screen.SetCell(startX+boxWidth-1, y, '│', borderStyle)
@@ -613,8 +615,10 @@ func (ae *AttributeEditor) renderAddMode(screen *Screen, startX, startY, boxWidt
 		screen.SetCell(startX, y, '│', borderStyle)
 		valuePrefix := " Value: "
 		screen.DrawString(startX+1, y, valuePrefix, contentStyle)
-		maxValueWidth := boxWidth - 2 - len(valuePrefix)
-		ae.valueEditor.Render(screen, startX+1+len(valuePrefix), y, maxValueWidth)
+		// Use StringWidth for proper Unicode handling
+		valuePrefixWidth := StringWidth(valuePrefix)
+		maxValueWidth := boxWidth - 2 - valuePrefixWidth
+		ae.valueEditor.Render(screen, startX+1+valuePrefixWidth, y, maxValueWidth)
 		screen.SetCell(startX+boxWidth-1, y, '│', borderStyle)
 		y++
 	}
