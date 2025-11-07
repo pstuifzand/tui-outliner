@@ -167,9 +167,9 @@ While tuo is running with a file, you can add items to the inbox from another te
 ./tuo add -a type=meeting -a date=2025-11-07 "Team standup"
 
 # Add todo items (using -t flag)
-./tuo add -t "" "Call dentist"              # Sets type=todo
-./tuo add -t todo "Fix bug"                 # Sets type=todo, status=todo
-./tuo add -t done "Update docs"             # Sets type=todo, status=done
+./tuo add -t "Call dentist"                        # Sets type=todo
+./tuo add -t -a status=todo "Fix bug"              # Sets type=todo, status=todo
+./tuo add -t -a status=done "Update docs"          # Sets type=todo, status=done
 ```
 
 ### How It Works
@@ -178,7 +178,7 @@ While tuo is running with a file, you can add items to the inbox from another te
 2. The `add` subcommand finds and connects to this socket
 3. Items are added to a node marked with `@type=inbox` attribute
 4. You can optionally set attributes with `-a` or `--attr` (can be used multiple times)
-5. Use `-t [status]` to quickly add todo items (sets type=todo, optionally with status)
+5. Use `-t` to quickly add todo items (sets type=todo)
 6. If no inbox exists, one is automatically created at the root level
 
 **Socket Location:**

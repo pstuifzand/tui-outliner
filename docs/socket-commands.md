@@ -60,16 +60,16 @@ Add a new item to the inbox of a running tuo instance:
 ./tuo add --attr type=todo --attr status=done "Completed item"
 
 # Add as a todo item (sets type=todo)
-./tuo add -t "" "Call dentist"
+./tuo add -t "Call dentist"
 
 # Add as todo with status
-./tuo add -t todo "Review PR"
-./tuo add -t done "Completed task"
+./tuo add -t -a status=todo "Review PR"
+./tuo add -t -a status=done "Completed task"
 ```
 
 **Options:**
 - `-a, --attr key=value` - Set an attribute on the new item (can be used multiple times)
-- `-t [status]` - Add as a todo item (sets type=todo attribute, optionally with status)
+- `-t` - Add as a todo item (sets type=todo attribute)
 
 **Behavior:**
 - Finds the item marked with `@type=inbox`
@@ -96,9 +96,9 @@ Add a new item to the inbox of a running tuo instance:
 ./tuo add -a url=https://example.com -a type=bookmark "Useful resource"
 
 # Add todo items (using -t flag)
-./tuo add -t "" "Call dentist"              # type=todo
-./tuo add -t todo "Fix bug in parser"       # type=todo, status=todo
-./tuo add -t done "Update documentation"    # type=todo, status=done
+./tuo add -t "Call dentist"                        # type=todo
+./tuo add -t -a status=todo "Fix bug in parser"    # type=todo, status=todo
+./tuo add -t -a status=done "Update documentation" # type=todo, status=done
 
 # All items will appear in the inbox node with their attributes
 ```

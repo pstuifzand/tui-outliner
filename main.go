@@ -75,22 +75,21 @@ func (a *attrFlags) Set(value string) error {
 // handleAddCommand handles the 'add' subcommand
 func handleAddCommand() {
 	var attrs attrFlags
-	var todoStatus string
+	var todoFlag bool
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addCmd.Var(&attrs, "attr", "Set an attribute (key=value, can be used multiple times)")
 	addCmd.Var(&attrs, "a", "Set an attribute (key=value, shorthand)")
-	addCmd.StringVar(&todoStatus, "t", "", "Add as a todo item with optional initial status (e.g., -t or -t todo)")
+	addCmd.BoolVar(&todoFlag, "t", false, "Add as a todo item (sets type=todo)")
 	addCmd.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: tuo add [options] <text>\n")
 		fmt.Fprintf(os.Stderr, "Add a node to the inbox of a running tuo instance\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fmt.Fprintf(os.Stderr, "  -a, --attr key=value    Set an attribute (can be used multiple times)\n")
-		fmt.Fprintf(os.Stderr, "  -t [status]             Add as todo item (sets type=todo, optional status)\n\n")
+		fmt.Fprintf(os.Stderr, "  -t                      Add as todo item (sets type=todo)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -t \"Call dentist\"                     # Add as todo\n")
-		fmt.Fprintf(os.Stderr, "  tuo add -t todo \"Review PR\"                   # Add as todo with status\n")
-		fmt.Fprintf(os.Stderr, "  tuo add -t done \"Completed task\"              # Add as done todo\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -t -a status=done \"Completed task\"    # Add as done todo\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -a priority=high \"Important task\"\n")
 	}
 
@@ -128,22 +127,8 @@ func handleAddCommand() {
 	}
 
 	// Handle -t flag for todo items
-	// Check if -t flag was explicitly set by the user
-	var todoFlagSet bool
-	addCmd.Visit(func(f *flag.Flag) {
-		if f.Name == "t" {
-			todoFlagSet = true
-		}
-	})
-
-	if todoFlagSet {
-		// Always set type=todo when -t is used
+	if todoFlag {
 		attributes["type"] = "todo"
-
-		// If a status value was provided, set it as well
-		if todoStatus != "" {
-			attributes["status"] = todoStatus
-		}
 	}
 
 	if err := sendAddNode(text, attributes); err != nil {
