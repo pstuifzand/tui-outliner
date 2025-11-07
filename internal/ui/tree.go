@@ -1695,12 +1695,12 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
 
-		// Prepare arrow style with background color
-		leafArrowStyle := screen.TreeLeafArrowStyle().Background(bgColor)
-		expandableArrowStyle := screen.TreeExpandableArrowStyle().Background(bgColor)
-
 		// Check if in visual selection range
 		inVisualRange := hasVisualSelection && i >= visualStart && i <= visualEnd
+
+		// Determine appropriate background color for all line elements
+		lineBackgroundColor := bgColor
+		var leafArrowStyle, expandableArrowStyle tcell.Style
 
 		if inVisualRange {
 			leafArrowStyle = visualCursorStyle
@@ -1712,6 +1712,14 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			}
 		} else if isLinePartOfSelected {
 			style = selectedStyle
+			// Use selected background color for all elements on this line
+			lineBackgroundColor = screen.Theme.Colors.TreeSelectedBg
+			leafArrowStyle = screen.TreeLeafArrowStyle().Background(lineBackgroundColor)
+			expandableArrowStyle = screen.TreeExpandableArrowStyle().Background(lineBackgroundColor)
+		} else {
+			// Normal unselected line
+			leafArrowStyle = screen.TreeLeafArrowStyle().Background(bgColor)
+			expandableArrowStyle = screen.TreeExpandableArrowStyle().Background(bgColor)
 		}
 
 		// Only render item metadata (indent, arrow, attributes, progress) on the first line
@@ -1759,7 +1767,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			screen.DrawString(prefixX, y, arrow, arrowStyle)
 
 			// Draw attribute indicator or space to maintain alignment
-			indicatorStyle := screen.TreeAttributeIndicatorStyle()
+			indicatorStyle := screen.TreeAttributeIndicatorStyle().Background(lineBackgroundColor)
 			if isLinePartOfSelected {
 				indicatorStyle = selectedStyle // Use selected style if item is selected
 			}
@@ -1824,7 +1832,7 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 					// Draw attributes in gray if any are found
 					if len(visibleAttrs) > 0 {
 						attrStr := "  [" + strings.Join(visibleAttrs, ", ") + "]"
-						attrStyle := screen.TreeAttributeStyle().Background(bgColor) // Gray/dim style with background color
+						attrStyle := screen.TreeAttributeStyle().Background(lineBackgroundColor) // Gray/dim style with background color
 						if isLinePartOfSelected {
 							attrStyle = selectedStyle // Use selected style if item is selected
 						}
@@ -1867,19 +1875,14 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 								break
 							}
 
-							blockStyle := screen.GrayStyle().Background(bgColor) // Default to gray for todo
+							blockStyle := screen.GrayStyle().Background(lineBackgroundColor) // Default to gray for todo
 							switch block.Status {
 							case lastStatus:
-								blockStyle = screen.GreenStyle().Background(bgColor) // Green for done
+								blockStyle = screen.GreenStyle().Background(lineBackgroundColor) // Green for done
 							case firstStatus:
-								blockStyle = screen.GrayStyle().Background(bgColor) // Gray for todo
+								blockStyle = screen.GrayStyle().Background(lineBackgroundColor) // Gray for todo
 							default:
-								blockStyle = screen.OrangeStyle().Background(bgColor) // Orange for doing/in-progress
-							}
-
-							// When selected, use selected background but keep status color
-							if isLinePartOfSelected {
-								blockStyle = blockStyle.Background(screen.Theme.Colors.TreeSelectedBg)
+								blockStyle = screen.OrangeStyle().Background(lineBackgroundColor) // Orange for doing/in-progress
 							}
 
 							screen.SetCell(blockX, y, '■', blockStyle)
