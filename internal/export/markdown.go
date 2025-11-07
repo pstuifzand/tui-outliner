@@ -2,6 +2,7 @@ package export
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -11,6 +12,25 @@ import (
 // ExportToMarkdown exports an outline to a markdown file with unordered list format.
 // Items are represented as bullets with indentation based on depth.
 func ExportToMarkdown(outline *model.Outline, filePath string) error {
+	content := GenerateMarkdown(outline)
+
+	// Write to file
+	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("failed to write markdown file: %w", err)
+	}
+
+	return nil
+}
+
+// ExportToMarkdownWriter exports an outline to markdown format and writes to the given writer.
+func ExportToMarkdownWriter(outline *model.Outline, w io.Writer) error {
+	content := GenerateMarkdown(outline)
+	_, err := w.Write([]byte(content))
+	return err
+}
+
+// GenerateMarkdown generates markdown content from an outline.
+func GenerateMarkdown(outline *model.Outline) string {
 	var sb strings.Builder
 
 	// TODO: When writing Hugo markdown, write the attributes from the root node
@@ -21,13 +41,7 @@ func ExportToMarkdown(outline *model.Outline, filePath string) error {
 		writeItemAsMarkdown(&sb, item, 0)
 	}
 
-	// Write to file
-	content := sb.String()
-	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
-		return fmt.Errorf("failed to write markdown file: %w", err)
-	}
-
-	return nil
+	return sb.String()
 }
 
 // writeItemAsMarkdown recursively writes an item and its children as markdown bullets.

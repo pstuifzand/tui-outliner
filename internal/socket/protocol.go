@@ -6,6 +6,7 @@ type Message struct {
 	Text       string            `json:"text,omitempty"`
 	Target     string            `json:"target,omitempty"`     // Default: "inbox"
 	Attributes map[string]string `json:"attributes,omitempty"` // Attributes to set on the new item
+	ExportPath string            `json:"export_path,omitempty"` // Path for export commands
 }
 
 // Response represents the response from the server
@@ -16,5 +17,6 @@ type Response struct {
 
 // Command types
 const (
-	CommandAddNode = "add_node"
+	CommandAddNode        = "add_node"
+	CommandExportMarkdown = "export_markdown"
 )

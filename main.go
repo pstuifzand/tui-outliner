@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/pstuifzand/tui-outliner/internal/app"
+	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/socket"
+	"github.com/pstuifzand/tui-outliner/internal/storage"
 )
 
 func main() {
@@ -25,6 +27,9 @@ func main() {
 		switch os.Args[1] {
 		case "add":
 			handleAddCommand()
+			return
+		case "export":
+			handleExportCommand()
 			return
 		case "help", "--help", "-h":
 			printUsage()
@@ -139,12 +144,80 @@ func handleAddCommand() {
 	fmt.Println("Node added to inbox")
 }
 
+// handleExportCommand handles the 'export' subcommand
+func handleExportCommand() {
+	exportCmd := flag.NewFlagSet("export", flag.ExitOnError)
+	exportCmd.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: tuo export <input.json> [output.md]\n")
+		fmt.Fprintf(os.Stderr, "Export an outline file to markdown format\n\n")
+		fmt.Fprintf(os.Stderr, "Arguments:\n")
+		fmt.Fprintf(os.Stderr, "  <input.json>     Path to the input outline file\n")
+		fmt.Fprintf(os.Stderr, "  [output.md]      Path to the output markdown file (optional, defaults to stdout)\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  tuo export notes.json              # Output to stdout\n")
+		fmt.Fprintf(os.Stderr, "  tuo export notes.json notes.md     # Output to file\n")
+		fmt.Fprintf(os.Stderr, "  tuo export notes.json | less       # Pipe to pager\n")
+	}
+
+	if err := exportCmd.Parse(os.Args[2:]); err != nil {
+		os.Exit(1)
+	}
+
+	// Get input and optional output filename from remaining args
+	args := exportCmd.Args()
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, "Error: input filename required\n\n")
+		exportCmd.Usage()
+		os.Exit(1)
+	}
+
+	inputFile := strings.TrimSpace(args[0])
+	if inputFile == "" {
+		fmt.Fprintf(os.Stderr, "Error: input filename cannot be empty\n\n")
+		exportCmd.Usage()
+		os.Exit(1)
+	}
+
+	// Load the outline from the input file
+	store := storage.NewJSONStore(inputFile)
+	outline, err := store.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error loading outline: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Determine output destination
+	if len(args) >= 2 {
+		// Output to file
+		outputFile := strings.TrimSpace(args[1])
+		if outputFile == "" {
+			fmt.Fprintf(os.Stderr, "Error: output filename cannot be empty\n\n")
+			exportCmd.Usage()
+			os.Exit(1)
+		}
+
+		if err := export.ExportToMarkdown(outline, outputFile); err != nil {
+			fmt.Fprintf(os.Stderr, "Error exporting to markdown: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Fprintf(os.Stderr, "Exported %s to %s\n", inputFile, outputFile)
+	} else {
+		// Output to stdout
+		if err := export.ExportToMarkdownWriter(outline, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "Error exporting to markdown: %v\n", err)
+			os.Exit(1)
+		}
+	}
+}
+
 // printUsage prints the main usage information
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "tuo - TUI Outliner\n\n")
 	fmt.Fprintf(os.Stderr, "Usage:\n")
 	fmt.Fprintf(os.Stderr, "  tuo [options] [file]           Start tuo with optional file\n")
 	fmt.Fprintf(os.Stderr, "  tuo add <text>                 Add node to running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo export <input> [output]    Export outline to markdown\n")
 	fmt.Fprintf(os.Stderr, "  tuo help                       Show this help message\n\n")
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	fmt.Fprintf(os.Stderr, "  --debug                        Enable debug mode\n\n")
@@ -153,6 +226,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  tuo notes.json                 Open notes.json\n")
 	fmt.Fprintf(os.Stderr, "  tuo --debug test.json          Open test.json in debug mode\n")
 	fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"             Add item to running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo export notes.json          Export to stdout\n")
+	fmt.Fprintf(os.Stderr, "  tuo export notes.json notes.md Export to file\n")
 }
 
 // sendAddNode sends an add_node command to a running tuo instance
