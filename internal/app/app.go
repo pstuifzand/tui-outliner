@@ -17,6 +17,7 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/config"
 	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/history"
+	import_parser "github.com/pstuifzand/tui-outliner/internal/import"
 	"github.com/pstuifzand/tui-outliner/internal/links"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	search "github.com/pstuifzand/tui-outliner/internal/search"
@@ -1339,6 +1340,79 @@ func (a *App) handleCommand(cmd string) {
 		default:
 			a.SetStatus("Unknown export format: " + format + " (use 'markdown' or 'text')")
 		}
+	case "import":
+		if a.readOnly {
+			a.SetStatus("Cannot modify readonly file")
+			return
+		}
+		if len(parts) < 2 {
+			a.SetStatus("Usage: :import <filename> [format]")
+			return
+		}
+		filename := parts[1]
+		format := import_parser.FormatAuto
+		if len(parts) >= 3 {
+			switch parts[2] {
+			case "markdown", "md":
+				format = import_parser.FormatMarkdown
+			case "indented", "text", "txt":
+				format = import_parser.FormatIndentedText
+			default:
+				a.SetStatus("Unknown import format: " + parts[2] + " (use 'markdown' or 'indented')")
+				return
+			}
+		} else {
+			// Auto-detect format from extension
+			format = import_parser.DetectFormat(filename)
+		}
+
+		// Read file content
+		content, err := os.ReadFile(filename)
+		if err != nil {
+			a.SetStatus("Failed to read file: " + err.Error())
+			return
+		}
+
+		// Parse content
+		items, err := import_parser.ImportFile(string(content), format)
+		if err != nil {
+			a.SetStatus("Failed to import: " + err.Error())
+			return
+		}
+
+		if len(items) == 0 {
+			a.SetStatus("No items found in file")
+			return
+		}
+
+		// Add items to tree at current position
+		currentIdx := a.tree.GetSelectedIndex()
+		if currentIdx < 0 {
+			// No selection, add to root
+			for _, item := range items {
+				a.tree.AddItemAfter(item)
+			}
+		} else {
+			// Add as children of current item
+			selectedItem := a.tree.GetSelected()
+			if selectedItem != nil {
+				for _, item := range items {
+					selectedItem.Children = append(selectedItem.Children, item)
+					item.Parent = selectedItem
+				}
+				selectedItem.Expanded = true // Auto-expand to show imported items
+			}
+		}
+
+		// Sync outline and update tree
+		a.outline.Items = a.tree.GetItems()
+		a.tree.SetItems(a.outline.Items) // Update tree's items and rebuild view
+		a.dirty = true
+
+		// Force a complete redraw
+		a.screen.Clear()
+
+		a.SetStatus(fmt.Sprintf("Imported %d items from %s", len(items), filename))
 	case "dailynote":
 		if a.readOnly {
 			a.SetStatus("Cannot modify readonly file")
