@@ -1404,12 +1404,10 @@ func (a *App) handleCommand(cmd string) {
 			}
 		}
 
-		// Sync outline
+		// Sync outline and update tree
 		a.outline.Items = a.tree.GetItems()
+		a.tree.SetItems(a.outline.Items) // Update tree's items and rebuild view
 		a.dirty = true
-
-		// Rebuild the tree view to show imported items
-		a.tree.RebuildView()
 
 		// Force a complete redraw
 		a.screen.Clear()
