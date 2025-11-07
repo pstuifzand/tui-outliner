@@ -20,13 +20,13 @@ The application will create a socket at `~/.local/share/tui-outliner/tuo-<PID>.s
 
 ```bash
 # Add a node to the inbox
-./tuo --add "Buy milk"
+./tuo add "Buy milk"
 
 # Add another node
-./tuo --add "Call dentist"
+./tuo add "Call dentist"
 
 # Multi-word text is supported
-./tuo --add "Remember to check email"
+./tuo add "Remember to check email"
 ```
 
 ## Features
@@ -47,7 +47,7 @@ If you create an inbox node manually before sending commands, new items will be 
 Add a new item to the inbox of a running tuo instance:
 
 ```bash
-./tuo --add "Text for the new item"
+./tuo add "Text for the new item"
 ```
 
 **Behavior:**
@@ -64,9 +64,9 @@ Add a new item to the inbox of a running tuo instance:
 ./tuo notes.json
 
 # From another terminal, add items
-./tuo --add "Quick note 1"
-./tuo --add "Quick note 2"
-./tuo --add "Quick note 3"
+./tuo add "Quick note 1"
+./tuo add "Quick note 2"
+./tuo add "Quick note 3"
 
 # All three items will appear in the inbox node
 ```
@@ -118,7 +118,7 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-./tuo --add "$1"
+./tuo add "$1"
 ```
 
 Usage:
@@ -132,7 +132,7 @@ You can create quick capture workflows in launcher apps:
 
 ```bash
 # In Alfred, create a shell script action
-/path/to/tuo --add "$1"
+/path/to/tuo add "$1"
 ```
 
 ### Keyboard Shortcut
@@ -144,7 +144,7 @@ Using tools like `xbindkeys` or system keyboard shortcuts, you can trigger a scr
 # quick-capture.sh
 NOTE=$(zenity --entry --title="Quick Capture" --text="Enter note:")
 if [ -n "$NOTE" ]; then
-    /path/to/tuo --add "$NOTE"
+    /path/to/tuo add "$NOTE"
 fi
 ```
 

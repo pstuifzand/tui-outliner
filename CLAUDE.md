@@ -1000,7 +1000,7 @@ ls -la /home/peter/work/tui-outliner/
      - External command interface via Unix sockets
      - Add items to inbox from command line while app is running
      - Automatic inbox node creation and management
-     - Command syntax: `./tuo --add "Item text"`
+     - Command syntax: `./tuo add "Item text"` (subcommand structure)
    - Socket Implementation (internal/socket/):
      - `protocol.go` - Message and response structures, JSON-based protocol
      - `server.go` - Unix socket server, goroutine-based accept loop
@@ -1014,6 +1014,9 @@ ls -la /home/peter/work/tui-outliner/
      - `addToInbox()` - Adds new item as child of inbox node
      - Automatic expansion of inbox to show new items
      - Status messages for user feedback
+     - Clears search mode and hoisting to ensure visibility
+     - Updates TreeView items reference after modifications
+     - Forces immediate screen render
    - App Integration:
      - Added `socketServer` field to App struct
      - Server initialized in `NewApp()`, started in `Run()`
@@ -1021,9 +1024,11 @@ ls -la /home/peter/work/tui-outliner/
      - `handleSocketMessage()` in socket_handler.go processes commands
      - Server stopped in `Close()` with cleanup
    - CLI Command (main.go):
-     - `--add <text>` flag sends add_node command to running instance
+     - `add` subcommand sends add_node command to running instance
      - `sendAddNode()` finds running instance and sends message
      - Auto-discovery via `FindRunningInstance()` (uses most recent socket)
+     - Subcommand-based architecture for future extensibility
+     - `tuo help` shows usage information
      - Error handling and user feedback
    - Protocol:
      - Request: `{"command": "add_node", "text": "...", "target": "inbox"}`

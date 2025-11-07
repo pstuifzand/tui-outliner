@@ -13,7 +13,7 @@ A powerful, keyboard-driven outliner application for the terminal, built in Go. 
   - Main search mode (`/`) - persistent search bar with match navigation
   - Node search widget (`Ctrl+K`) - modal for quick node navigation with hoisting
 - **Socket Commands**: Send commands to running instances from the command line
-  - Quick capture: `./tuo --add "Note text"` adds items to inbox while app is running
+  - Quick capture: `./tuo add "Note text"` adds items to inbox while app is running
   - Perfect for keyboard shortcuts, scripts, and integrations
   - Automatic inbox node creation and management
 - **Keyboard-Driven**: Vim-style keybindings for efficient navigation and editing
@@ -158,15 +158,15 @@ While tuo is running with a file, you can add items to the inbox from another te
 ./tuo notes.json
 
 # From another terminal or script, add items
-./tuo --add "Buy milk"
-./tuo --add "Call dentist"
-./tuo --add "Meeting notes: discussed project timeline"
+./tuo add "Buy milk"
+./tuo add "Call dentist"
+./tuo add "Meeting notes: discussed project timeline"
 ```
 
 ### How It Works
 
 1. When tuo starts, it creates a Unix socket at `~/.local/share/tui-outliner/tuo-<PID>.sock`
-2. The `--add` command finds and connects to this socket
+2. The `add` subcommand finds and connects to this socket
 3. Items are added to a node marked with `@type=inbox` attribute
 4. If no inbox exists, one is automatically created at the root level
 
@@ -177,17 +177,17 @@ While tuo is running with a file, you can add items to the inbox from another te
 # Create a script triggered by a global hotkey
 NOTE=$(zenity --entry --title="Quick Capture" --text="Enter note:")
 if [ -n "$NOTE" ]; then
-    /path/to/tuo --add "$NOTE"
+    /path/to/tuo add "$NOTE"
 fi
 ```
 
 **Capture from other applications:**
 ```bash
 # From a shell script
-./tuo --add "Task: $(date) - Review PR #123"
+./tuo add "Task: $(date) - Review PR #123"
 
 # From a cron job
-./tuo --add "Daily reminder: Check backups"
+./tuo add "Daily reminder: Check backups"
 ```
 
 **Integration with launchers:**
