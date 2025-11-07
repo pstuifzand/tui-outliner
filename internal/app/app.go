@@ -1407,6 +1407,13 @@ func (a *App) handleCommand(cmd string) {
 		// Sync outline
 		a.outline.Items = a.tree.GetItems()
 		a.dirty = true
+
+		// Rebuild the tree view to show imported items
+		a.tree.RebuildView()
+
+		// Force a complete redraw
+		a.screen.Clear()
+
 		a.SetStatus(fmt.Sprintf("Imported %d items from %s", len(items), filename))
 	case "dailynote":
 		if a.readOnly {
