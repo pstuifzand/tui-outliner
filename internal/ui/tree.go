@@ -805,6 +805,77 @@ func (tv *TreeView) Outdent() bool {
 	return true
 }
 
+// SendItemToNode moves the currently selected item to be a child of the destination item
+// Returns true if successful, false if there's no selected item or destination is invalid
+func (tv *TreeView) SendItemToNode(destination *model.Item) bool {
+	if tv.selectedIdx >= len(tv.filteredView) || destination == nil {
+		return false
+	}
+
+	current := tv.filteredView[tv.selectedIdx].Item
+	if current == nil {
+		return false
+	}
+
+	// Prevent sending an item to itself
+	if current.ID == destination.ID {
+		return false
+	}
+
+	// Prevent creating circular references (sending parent to its own descendant)
+	if isDescendant(current, destination) {
+		return false
+	}
+
+	// Remember the item's ID so we can select it after rebuild
+	movedItemID := current.ID
+
+	// Remove from current parent or root
+	if current.Parent != nil {
+		current.Parent.RemoveChild(current)
+	} else {
+		// Remove from root
+		for idx, item := range tv.items {
+			if item.ID == current.ID {
+				tv.items = append(tv.items[:idx], tv.items[idx+1:]...)
+				break
+			}
+		}
+	}
+
+	// Add as child of destination
+	destination.AddChild(current)
+
+	// Expand destination to show the moved item
+	destination.Expanded = true
+
+	// Rebuild view and try to select the moved item
+	tv.RebuildView()
+
+	// Try to find and select the moved item in the new view
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.Item.ID == movedItemID {
+			tv.SelectItem(idx)
+			break
+		}
+	}
+
+	return true
+}
+
+// isDescendant checks if potentialDescendant is a descendant of ancestor
+func isDescendant(ancestor *model.Item, potentialDescendant *model.Item) bool {
+	for _, child := range ancestor.Children {
+		if child.ID == potentialDescendant.ID {
+			return true
+		}
+		if isDescendant(child, potentialDescendant) {
+			return true
+		}
+	}
+	return false
+}
+
 // MoveItemDown moves the selected item down to the next position in linear order
 // Positions cycle through all possible (parent, index) pairs in depth-first order
 func (tv *TreeView) MoveItemDown() bool {

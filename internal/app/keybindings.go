@@ -896,6 +896,26 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 				},
 			},
 		},
+		{
+			Prefix:      's',
+			Description: "Send... (s + key)",
+			Sequences: map[rune]KeyBinding{
+				's': {
+					Key:         's',
+					Description: "Send item to selected node (search)",
+					Handler: func(app *App) {
+						app.handleSendToNode()
+					},
+				},
+				'.': {
+					Key:         '.',
+					Description: "Send item to last destination",
+					Handler: func(app *App) {
+						app.handleSendToLastNode()
+					},
+				},
+			},
+		},
 	}
 }
 
