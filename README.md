@@ -165,6 +165,11 @@ While tuo is running with a file, you can add items to the inbox from another te
 # Add items with attributes (using short -a flag)
 ./tuo add -a type=task -a priority=high "Important task"
 ./tuo add -a type=meeting -a date=2025-11-07 "Team standup"
+
+# Add todo items (using -t flag)
+./tuo add -t "" "Call dentist"              # Sets type=todo
+./tuo add -t todo "Fix bug"                 # Sets type=todo, status=todo
+./tuo add -t done "Update docs"             # Sets type=todo, status=done
 ```
 
 ### How It Works
@@ -173,7 +178,8 @@ While tuo is running with a file, you can add items to the inbox from another te
 2. The `add` subcommand finds and connects to this socket
 3. Items are added to a node marked with `@type=inbox` attribute
 4. You can optionally set attributes with `-a` or `--attr` (can be used multiple times)
-5. If no inbox exists, one is automatically created at the root level
+5. Use `-t [status]` to quickly add todo items (sets type=todo, optionally with status)
+6. If no inbox exists, one is automatically created at the root level
 
 **Socket Location:**
 - Prefers `$XDG_RUNTIME_DIR/tui-outliner/` (standard for runtime files)
