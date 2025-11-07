@@ -160,6 +160,38 @@ Export functions are in `internal/export/markdown.go`:
 Commands in `app.go`:
 - `:export markdown <filename>` - Export current outline to markdown file
 
+### Import Functionality
+
+Import functions are in `internal/import/`:
+
+- `parser.go` - Common interface and format detection
+  - `ImportFile(content, format)` - Main entry point for importing
+  - `DetectFormat(filename)` - Auto-detect format from file extension
+- `markdown.go` - Markdown import parser
+  - Parses markdown headers (# ## ###) as hierarchy levels
+  - Parses unordered lists (- * +) with indentation
+  - Supports plain text lines
+- `indented.go` - Indented text import parser
+  - Uses indentation (tabs or spaces) to define hierarchy
+  - 2 spaces or 1 tab = 1 indentation level
+  - Simple format for plain text outlines
+
+Commands in `app.go`:
+- `:import <filename> [format]` - Import items from file
+  - Auto-detects format from extension (.md, .txt)
+  - Optional format: `markdown`, `md`, `indented`, `text`, `txt`
+  - Items imported as children of currently selected item
+  - If no item selected, items added to root level
+  - Automatically expands parent to show imported items
+
+Supported formats:
+- **Markdown** (.md) - Headers and lists with hierarchy
+- **Indented Text** (.txt) - Plain text with indentation
+
+Example files:
+- `examples/recipe_import.txt` - Indented text format
+- `examples/recipe_import.md` - Markdown format
+
 ## Common Development Tasks
 
 ### Add a New Keybinding
