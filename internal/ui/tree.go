@@ -807,6 +807,7 @@ func (tv *TreeView) Outdent() bool {
 
 // SendItemToNode moves the currently selected item to be a child of the destination item
 // Returns true if successful, false if there's no selected item or destination is invalid
+// After moving, the selection stays at the same position to facilitate moving multiple items
 func (tv *TreeView) SendItemToNode(destination *model.Item) bool {
 	if tv.selectedIdx >= len(tv.filteredView) || destination == nil {
 		return false
@@ -827,8 +828,8 @@ func (tv *TreeView) SendItemToNode(destination *model.Item) bool {
 		return false
 	}
 
-	// Remember the item's ID so we can select it after rebuild
-	movedItemID := current.ID
+	// Remember the current selection position
+	originalIdx := tv.selectedIdx
 
 	// Remove from current parent or root
 	if current.Parent != nil {
@@ -849,15 +850,15 @@ func (tv *TreeView) SendItemToNode(destination *model.Item) bool {
 	// Expand destination to show the moved item
 	destination.Expanded = true
 
-	// Rebuild view and try to select the moved item
+	// Rebuild view
 	tv.RebuildView()
 
-	// Try to find and select the moved item in the new view
-	for idx, dispItem := range tv.filteredView {
-		if dispItem.Item.ID == movedItemID {
-			tv.SelectItem(idx)
-			break
-		}
+	// Keep selection at the same position (or last item if we're now past the end)
+	// This allows easy sequential sending with s.s.s.
+	if originalIdx < len(tv.filteredView) {
+		tv.SelectItem(originalIdx)
+	} else if len(tv.filteredView) > 0 {
+		tv.SelectItem(len(tv.filteredView) - 1)
 	}
 
 	return true

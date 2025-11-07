@@ -1002,14 +1002,15 @@ ls -la /home/peter/work/tui-outliner/
      - Circular reference prevention (cannot send parent to its own descendant)
      - Cannot send item to itself
      - Destination node automatically expanded to show moved item
-     - Selection follows the moved item after operation
+     - Selection stays at same position after move, enabling batch operations with `s.s.s.`
    - Implementation:
      - New field `lastSendDestination *model.Item` in App struct (internal/app/app.go:72)
-     - New method `SendItemToNode(destination *model.Item) bool` in TreeView (internal/ui/tree.go:808-863)
-     - Helper function `isDescendant()` checks for circular references (internal/ui/tree.go:866-876)
+     - New method `SendItemToNode(destination *model.Item) bool` in TreeView (internal/ui/tree.go:808-865)
+     - Selection logic keeps cursor at same position for sequential moves
+     - Helper function `isDescendant()` checks for circular references (internal/ui/tree.go:867-877)
      - Handler `handleSendToNode()` opens node search widget (internal/app/app.go:2045-2082)
      - Handler `handleSendToLastNode()` repeats last send (internal/app/app.go:2084-2114)
-     - New pending keybinding group 's' with sequences 'ss' and 's.' (internal/app/keybindings.go:899-918)
+     - New pending keybinding group 's' with sequences 'ss' and 's.' (internal/app/keybindings.go:900-918)
    - Node Search Integration:
      - Uses existing NodeSearchWidget for destination selection
      - Supports advanced search filters (attributes, depth, text, etc.)
@@ -1022,6 +1023,7 @@ ls -la /home/peter/work/tui-outliner/
      - Graceful handling of deleted/invalid destinations
    - Use Cases:
      - Quickly reorganize items by moving them to different projects
+     - Batch move sequential items: use `ss` to select destination, then `s.s.s.` to send consecutive items
      - Move multiple items to same destination using `ss` once, then `s.` repeatedly
      - Refactor outline structure by moving items between sections
    - Example: `examples/send_node_demo.json` demonstrates the feature with sample projects
