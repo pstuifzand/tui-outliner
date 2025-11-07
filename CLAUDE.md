@@ -1028,6 +1028,62 @@ ls -la /home/peter/work/tui-outliner/
      - Refactor outline structure by moving items between sections
    - Example: `examples/send_node_demo.json` demonstrates the feature with sample projects
 
+35. **Socket Commands for External Integration**:
+   - Added Unix socket-based command system for sending commands to running tuo instances
+   - Features:
+     - External command interface via Unix sockets
+     - Add items to inbox from command line while app is running
+     - Automatic inbox node creation and management
+     - Command syntax: `./tuo add "Item text"` (subcommand structure)
+   - Socket Implementation (internal/socket/):
+     - `protocol.go` - Message and response structures, JSON-based protocol
+     - `server.go` - Unix socket server, goroutine-based accept loop
+     - `client.go` - Client for connecting and sending messages, auto-discovery
+     - Socket location: `~/.local/share/tui-outliner/tuo-<PID>.sock`
+     - Automatic cleanup on app exit
+     - Multiple instances supported (each has own socket)
+   - Inbox System (internal/app/inbox.go):
+     - `findInboxNode()` - Recursively searches for item with `@type=inbox`
+     - `getOrCreateInboxNode()` - Finds or creates inbox at root level
+     - `addToInbox()` - Adds new item as child of inbox node
+     - Automatic expansion of inbox to show new items
+     - Status messages for user feedback
+     - Clears search mode and hoisting to ensure visibility
+     - Updates TreeView items reference after modifications
+     - Forces immediate screen render
+   - App Integration:
+     - Added `socketServer` field to App struct
+     - Server initialized in `NewApp()`, started in `Run()`
+     - Event loop includes socket message channel
+     - `handleSocketMessage()` in socket_handler.go processes commands
+     - Server stopped in `Close()` with cleanup
+   - CLI Command (main.go):
+     - `add` subcommand sends add_node command to running instance
+     - `sendAddNode()` finds running instance and sends message
+     - Auto-discovery via `FindRunningInstance()` (uses most recent socket)
+     - Subcommand-based architecture for future extensibility
+     - `tuo help` shows usage information
+     - Error handling and user feedback
+   - Protocol:
+     - Request: `{"command": "add_node", "text": "...", "target": "inbox"}`
+     - Response: `{"success": true, "message": "..."}`
+     - Extensible design for future commands
+   - Testing:
+     - Comprehensive test suite in `internal/socket/socket_test.go`
+     - Tests for server/client communication, message passing, auto-discovery
+     - All tests passing with proper cleanup
+   - Use Cases:
+     - Quick capture from keyboard shortcuts
+     - Integration with Alfred, LaunchBar, Rofi, dmenu
+     - Scripting and automation
+     - Cron jobs and scheduled tasks
+     - Integration with other applications
+   - Documentation:
+     - `docs/socket-commands.md` - Complete guide with examples
+     - Updated README.md with Socket Commands section
+     - Integration examples and troubleshooting
+   - Example: `examples/socket_demo.json` - Demonstration outline
+
 ## Notes
 
 - The application uses the `tcell` library for terminal UI

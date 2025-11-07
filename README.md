@@ -12,6 +12,10 @@ A powerful, keyboard-driven outliner application for the terminal, built in Go. 
 - **Search & Filter**: Quickly find items with advanced filter syntax (text, depth, attributes, dates, etc.)
   - Main search mode (`/`) - persistent search bar with match navigation
   - Node search widget (`Ctrl+K`) - modal for quick node navigation with hoisting
+- **Socket Commands**: Send commands to running instances from the command line
+  - Quick capture: `./tuo add "Note text"` adds items to inbox while app is running
+  - Perfect for keyboard shortcuts, scripts, and integrations
+  - Automatic inbox node creation and management
 - **Keyboard-Driven**: Vim-style keybindings for efficient navigation and editing
 - **TUI Interface**: Full-featured terminal UI built with tcell
 
@@ -140,6 +144,74 @@ Examples:
 :q!                   # Force quit
 :help                 # Show keybindings
 ```
+
+## Socket Commands
+
+tuo supports sending commands to a running instance from the command line via Unix sockets. This is useful for quick capture, scripting, and integrations.
+
+### Quick Capture
+
+While tuo is running with a file, you can add items to the inbox from another terminal:
+
+```bash
+# Start tuo in one terminal
+./tuo notes.json
+
+# From another terminal or script, add items
+./tuo add "Buy milk"
+./tuo add "Call dentist"
+./tuo add "Meeting notes: discussed project timeline"
+
+# Add items with attributes (using short -a flag)
+./tuo add -a type=task -a priority=high "Important task"
+./tuo add -a type=meeting -a date=2025-11-07 "Team standup"
+
+# Add todo items (using -t flag)
+./tuo add -t "Call dentist"                        # Sets type=todo
+./tuo add -t -a status=todo "Fix bug"              # Sets type=todo, status=todo
+./tuo add -t -a status=done "Update docs"          # Sets type=todo, status=done
+```
+
+### How It Works
+
+1. When tuo starts, it creates a Unix socket for IPC (location follows XDG spec)
+2. The `add` subcommand finds and connects to this socket
+3. Items are added to a node marked with `@type=inbox` attribute
+4. You can optionally set attributes with `-a` or `--attr` (can be used multiple times)
+5. Use `-t` to quickly add todo items (sets type=todo)
+6. If no inbox exists, one is automatically created at the root level
+
+**Socket Location:**
+- Prefers `$XDG_RUNTIME_DIR/tui-outliner/` (standard for runtime files)
+- Falls back to `~/.local/share/tui-outliner/` if not set
+
+### Use Cases
+
+**Quick capture from keyboard shortcuts:**
+```bash
+# Create a script triggered by a global hotkey
+NOTE=$(zenity --entry --title="Quick Capture" --text="Enter note:")
+if [ -n "$NOTE" ]; then
+    /path/to/tuo add "$NOTE"
+fi
+```
+
+**Capture from other applications:**
+```bash
+# From a shell script
+./tuo add "Task: $(date) - Review PR #123"
+
+# From a cron job
+./tuo add "Daily reminder: Check backups"
+```
+
+**Integration with launchers:**
+- Alfred workflow
+- LaunchBar action
+- Rofi scripts
+- dmenu scripts
+
+For more details, see [docs/socket-commands.md](docs/socket-commands.md).
 
 ## Attributes
 
