@@ -20,6 +20,7 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/links"
 	"github.com/pstuifzand/tui-outliner/internal/model"
 	search "github.com/pstuifzand/tui-outliner/internal/search"
+	"github.com/pstuifzand/tui-outliner/internal/socket"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
 	tmpl "github.com/pstuifzand/tui-outliner/internal/template"
 	"github.com/pstuifzand/tui-outliner/internal/ui"
@@ -52,6 +53,7 @@ type App struct {
 	backupSelectorWidget   *ui.BackupSelectorWidget   // Backup selector with side-by-side diff preview
 	messageLogger          *ui.MessageLogger          // Message history for :messages command
 	historyManager         *history.Manager           // Manager for persisting command and search history
+	socketServer           *socket.Server             // Unix socket server for external commands
 	cfg                    *config.Config             // Application configuration
 	sessionID              string                     // 8-character session ID for backups
 	readOnly               bool                       // Whether the file is readonly (e.g., backup file)
@@ -394,6 +396,17 @@ func NewApp(filePath string) (*App, error) {
 	}
 	app.help.SetKeybindings(helpKeybindings)
 
+	// Initialize socket server for external commands
+	socketServer, err := socket.NewServer(os.Getpid())
+	if err != nil {
+		log.Printf("Warning: Failed to create socket server: %v", err)
+		// Don't fail app creation if socket server fails
+		app.socketServer = nil
+	} else {
+		app.socketServer = socketServer
+		log.Printf("Socket server initialized: %s", socketServer.SocketPath())
+	}
+
 	return app, nil
 }
 
@@ -415,9 +428,21 @@ func (a *App) Run() error {
 		}
 	}()
 
+	// Start socket server if available
+	if a.socketServer != nil {
+		a.socketServer.Start()
+		log.Printf("Socket server started")
+	}
+
 	// Create a ticker for rendering and auto-save checks
 	ticker := time.NewTicker(50 * time.Millisecond) // ~20 FPS
 	defer ticker.Stop()
+
+	// Get socket message channel (nil if no server)
+	var socketChan <-chan socket.Message
+	if a.socketServer != nil {
+		socketChan = a.socketServer.Messages()
+	}
 
 	for !a.quit {
 		select {
@@ -425,6 +450,8 @@ func (a *App) Run() error {
 			if ev != nil {
 				a.handleRawEvent(ev)
 			}
+		case msg := <-socketChan:
+			a.handleSocketMessage(msg)
 		case <-ticker.C:
 			a.render()
 
@@ -444,6 +471,12 @@ func (a *App) Run() error {
 
 // Close closes the application
 func (a *App) Close() error {
+	// Stop socket server if running
+	if a.socketServer != nil {
+		a.socketServer.Stop()
+		log.Printf("Socket server stopped")
+	}
+
 	if a.screen != nil {
 		return a.screen.Close()
 	}
