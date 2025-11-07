@@ -161,6 +161,10 @@ While tuo is running with a file, you can add items to the inbox from another te
 ./tuo add "Buy milk"
 ./tuo add "Call dentist"
 ./tuo add "Meeting notes: discussed project timeline"
+
+# Add items with attributes
+./tuo add --attr type=task --attr priority=high "Important task"
+./tuo add --attr type=meeting --attr date=2025-11-07 "Team standup"
 ```
 
 ### How It Works
@@ -168,7 +172,8 @@ While tuo is running with a file, you can add items to the inbox from another te
 1. When tuo starts, it creates a Unix socket at `~/.local/share/tui-outliner/tuo-<PID>.sock`
 2. The `add` subcommand finds and connects to this socket
 3. Items are added to a node marked with `@type=inbox` attribute
-4. If no inbox exists, one is automatically created at the root level
+4. You can optionally set attributes with `--attr key=value` (can be used multiple times)
+5. If no inbox exists, one is automatically created at the root level
 
 ### Use Cases
 

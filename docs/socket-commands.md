@@ -48,12 +48,20 @@ Add a new item to the inbox of a running tuo instance:
 
 ```bash
 ./tuo add "Text for the new item"
+
+# Add with attributes
+./tuo add --attr type=task --attr priority=high "Important task"
+./tuo add --attr type=todo --attr status=done "Completed item"
 ```
+
+**Options:**
+- `--attr key=value` - Set an attribute on the new item (can be used multiple times)
 
 **Behavior:**
 - Finds the item marked with `@type=inbox`
 - If no inbox exists, creates one at the root level
 - Adds the new item as a child of the inbox
+- Sets any specified attributes on the new item
 - Marks the outline as dirty (triggers auto-save after 5 seconds)
 - Sets a status message indicating the item was added
 
@@ -68,7 +76,12 @@ Add a new item to the inbox of a running tuo instance:
 ./tuo add "Quick note 2"
 ./tuo add "Quick note 3"
 
-# All three items will appear in the inbox node
+# Add items with attributes
+./tuo add --attr type=task --attr priority=high "Review PR #123"
+./tuo add --attr type=meeting --attr date=2025-11-07 "Team standup"
+./tuo add --attr url=https://example.com --attr type=bookmark "Useful resource"
+
+# All items will appear in the inbox node with their attributes
 ```
 
 ## Socket Protocol
@@ -82,7 +95,11 @@ The socket uses a JSON-based protocol for extensibility.
 {
   "command": "add_node",
   "text": "Item text here",
-  "target": "inbox"
+  "target": "inbox",
+  "attributes": {
+    "type": "task",
+    "priority": "high"
+  }
 }
 ```
 
@@ -104,6 +121,7 @@ Adds a new item to the specified target.
 - `command`: Must be `"add_node"`
 - `text`: The text content for the new item (required)
 - `target`: The target location (currently only `"inbox"` is supported)
+- `attributes`: Optional map of key-value pairs to set as attributes on the new item
 
 ## Integration Examples
 

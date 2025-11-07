@@ -110,7 +110,7 @@ func TestSendAddNode(t *testing.T) {
 	}
 
 	// Use the convenience method
-	response, err := client.SendAddNode("Test item", "inbox")
+	response, err := client.SendAddNode("Test item", "inbox", nil)
 	if err != nil {
 		t.Fatalf("Failed to send add_node: %v", err)
 	}
@@ -130,6 +130,72 @@ func TestSendAddNode(t *testing.T) {
 		}
 		if msg.Target != "inbox" {
 			t.Errorf("Expected target='inbox', got target='%s'", msg.Target)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for message")
+	}
+}
+
+func TestSendAddNodeWithAttributes(t *testing.T) {
+	// Create a server
+	pid := os.Getpid()
+	server, err := NewServer(pid)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+	defer server.Stop()
+
+	server.Start()
+
+	// Wait a bit for server to be ready
+	time.Sleep(100 * time.Millisecond)
+
+	// Create a client
+	client, err := NewClient(server.SocketPath())
+	if err != nil {
+		t.Fatalf("Failed to create client: %v", err)
+	}
+
+	// Create attributes
+	attributes := map[string]string{
+		"type":     "task",
+		"priority": "high",
+		"status":   "todo",
+	}
+
+	// Use the convenience method with attributes
+	response, err := client.SendAddNode("Test item with attributes", "inbox", attributes)
+	if err != nil {
+		t.Fatalf("Failed to send add_node: %v", err)
+	}
+
+	if !response.Success {
+		t.Errorf("Expected success=true, got success=false: %s", response.Message)
+	}
+
+	// Receive the message
+	select {
+	case msg := <-server.Messages():
+		if msg.Command != CommandAddNode {
+			t.Errorf("Expected command=%s, got command=%s", CommandAddNode, msg.Command)
+		}
+		if msg.Text != "Test item with attributes" {
+			t.Errorf("Expected text='Test item with attributes', got text='%s'", msg.Text)
+		}
+		if msg.Target != "inbox" {
+			t.Errorf("Expected target='inbox', got target='%s'", msg.Target)
+		}
+		if len(msg.Attributes) != 3 {
+			t.Errorf("Expected 3 attributes, got %d", len(msg.Attributes))
+		}
+		if msg.Attributes["type"] != "task" {
+			t.Errorf("Expected type='task', got type='%s'", msg.Attributes["type"])
+		}
+		if msg.Attributes["priority"] != "high" {
+			t.Errorf("Expected priority='high', got priority='%s'", msg.Attributes["priority"])
+		}
+		if msg.Attributes["status"] != "todo" {
+			t.Errorf("Expected status='todo', got status='%s'", msg.Attributes["status"])
 		}
 	case <-time.After(1 * time.Second):
 		t.Fatal("Timeout waiting for message")

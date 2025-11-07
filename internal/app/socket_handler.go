@@ -41,9 +41,12 @@ func (app *App) handleAddNodeCommand(msg socket.Message) {
 
 	log.Printf("Adding item to inbox: '%s'", msg.Text)
 	log.Printf("Search active: %v, Hoisted: %v", app.search.IsActive(), app.tree.IsHoisted())
+	if len(msg.Attributes) > 0 {
+		log.Printf("Attributes: %v", msg.Attributes)
+	}
 
 	// Add to inbox
-	if err := app.addToInbox(msg.Text); err != nil {
+	if err := app.addToInbox(msg.Text, msg.Attributes); err != nil {
 		log.Printf("Failed to add item to inbox: %v", err)
 		app.SetStatus("Error adding item to inbox")
 		return

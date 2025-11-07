@@ -117,15 +117,16 @@ func (c *Client) Send(msg Message) (*Response, error) {
 }
 
 // SendAddNode is a convenience method to send an add_node command
-func (c *Client) SendAddNode(text, target string) (*Response, error) {
+func (c *Client) SendAddNode(text, target string, attributes map[string]string) (*Response, error) {
 	if target == "" {
 		target = "inbox"
 	}
 
 	msg := Message{
-		Command: CommandAddNode,
-		Text:    text,
-		Target:  target,
+		Command:    CommandAddNode,
+		Text:       text,
+		Target:     target,
+		Attributes: attributes,
 	}
 
 	return c.Send(msg)

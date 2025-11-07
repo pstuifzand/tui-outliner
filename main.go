@@ -60,15 +60,33 @@ func main() {
 	}
 }
 
+// attrFlags allows multiple --attr flags
+type attrFlags []string
+
+func (a *attrFlags) String() string {
+	return strings.Join(*a, ", ")
+}
+
+func (a *attrFlags) Set(value string) error {
+	*a = append(*a, value)
+	return nil
+}
+
 // handleAddCommand handles the 'add' subcommand
 func handleAddCommand() {
+	var attrs attrFlags
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
+	addCmd.Var(&attrs, "attr", "Set an attribute (key=value, can be used multiple times)")
 	addCmd.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: tuo add <text>\n")
+		fmt.Fprintf(os.Stderr, "Usage: tuo add [options] <text>\n")
 		fmt.Fprintf(os.Stderr, "Add a node to the inbox of a running tuo instance\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "  --attr key=value    Set an attribute (can be used multiple times)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo add \"Meeting notes from standup\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo add --attr type=task --attr priority=high \"Important task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo add --attr type=todo --attr status=done \"Completed item\"\n")
 	}
 
 	if err := addCmd.Parse(os.Args[2:]); err != nil {
@@ -85,7 +103,26 @@ func handleAddCommand() {
 		os.Exit(1)
 	}
 
-	if err := sendAddNode(text); err != nil {
+	// Parse attributes
+	attributes := make(map[string]string)
+	for _, attr := range attrs {
+		parts := strings.SplitN(attr, "=", 2)
+		if len(parts) != 2 {
+			fmt.Fprintf(os.Stderr, "Error: invalid attribute format '%s' (expected key=value)\n\n", attr)
+			addCmd.Usage()
+			os.Exit(1)
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if key == "" {
+			fmt.Fprintf(os.Stderr, "Error: attribute key cannot be empty\n\n")
+			addCmd.Usage()
+			os.Exit(1)
+		}
+		attributes[key] = value
+	}
+
+	if err := sendAddNode(text, attributes); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
@@ -110,7 +147,7 @@ func printUsage() {
 }
 
 // sendAddNode sends an add_node command to a running tuo instance
-func sendAddNode(text string) error {
+func sendAddNode(text string, attributes map[string]string) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return fmt.Errorf("node text cannot be empty")
@@ -131,7 +168,7 @@ func sendAddNode(text string) error {
 	}
 
 	// Send add_node command
-	response, err := client.SendAddNode(text, "inbox")
+	response, err := client.SendAddNode(text, "inbox", attributes)
 	if err != nil {
 		return fmt.Errorf("failed to send command: %w", err)
 	}
@@ -141,5 +178,8 @@ func sendAddNode(text string) error {
 	}
 
 	log.Printf("Successfully sent add_node command: %s", text)
+	if len(attributes) > 0 {
+		log.Printf("Attributes: %v", attributes)
+	}
 	return nil
 }

@@ -56,7 +56,7 @@ func (app *App) getOrCreateInboxNode() (*model.Item, bool) {
 
 // addToInbox adds a new item to the inbox node
 // If no inbox exists, one will be created
-func (app *App) addToInbox(text string) error {
+func (app *App) addToInbox(text string, attributes map[string]string) error {
 	// Clear search mode if active to ensure inbox is visible
 	if app.search.IsActive() {
 		app.search.Stop()
@@ -76,6 +76,17 @@ func (app *App) addToInbox(text string) error {
 
 	// Create new item
 	newItem := model.NewItem(text)
+
+	// Set attributes if provided
+	if len(attributes) > 0 {
+		if newItem.Metadata.Attributes == nil {
+			newItem.Metadata.Attributes = make(map[string]string)
+		}
+		for key, value := range attributes {
+			newItem.Metadata.Attributes[key] = value
+		}
+	}
+
 	inbox.AddChild(newItem)
 
 	// Mark as dirty to trigger save
