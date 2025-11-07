@@ -69,10 +69,14 @@ func (p *MarkdownParser) Parse(content string) ([]*model.Item, error) {
 				stack = []*model.Item{item}
 			} else if listLevel < len(stack) {
 				// Outdented - pop stack
-				stack = stack[:listLevel+1]
-				parent := stack[len(stack)-1]
-				parent.Children = append(parent.Children, item)
-				item.Parent = parent
+				stack = stack[:listLevel]
+				if len(stack) > 0 {
+					parent := stack[len(stack)-1]
+					parent.Children = append(parent.Children, item)
+					item.Parent = parent
+				} else {
+					rootItems = append(rootItems, item)
+				}
 				stack = append(stack, item)
 			} else if listLevel == len(stack)-1 {
 				// Same level as previous - add as sibling
