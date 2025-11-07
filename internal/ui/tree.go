@@ -1790,10 +1790,12 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			}
 
 			// Truncate with ellipsis if text exceeds max width
+			// Use StringWidth for proper Unicode-aware truncation
 			text := displayLine.TextLine
-			if len(text) > maxTextWidth {
+			if StringWidth(text) > maxTextWidth {
+				// Reserve space for ellipsis (1 column)
 				if maxTextWidth > 1 {
-					text = text[:maxTextWidth-1] + "…"
+					text = TruncateToWidth(text, maxTextWidth-1) + "…"
 				} else {
 					text = "…"
 				}
@@ -1939,10 +1941,12 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			}
 
 			// Truncate with ellipsis if text exceeds max width
+			// Use StringWidth for proper Unicode-aware truncation
 			text := displayLine.TextLine
-			if len(text) > maxTextWidth {
+			if StringWidth(text) > maxTextWidth {
+				// Reserve space for ellipsis (1 column)
 				if maxTextWidth > 1 {
-					text = text[:maxTextWidth-1] + "…"
+					text = TruncateToWidth(text, maxTextWidth-1) + "…"
 				} else {
 					text = "…"
 				}
@@ -2624,11 +2628,11 @@ func (tv *TreeView) drawTextWithLinksAndSearch(screen *Screen, x int, y int, tex
 	if len(itemLinks) == 0 {
 		if searchQuery == "" {
 			screen.DrawString(x, y, text, defaultStyle)
-			return itemLinks, len(text)
+			return itemLinks, StringWidth(text)
 		}
 		// Draw with search highlighting only
 		tv.drawTextWithHighlight(screen, x, y, text, defaultStyle, highlightStyle, searchQuery)
-		return itemLinks, len(text)
+		return itemLinks, StringWidth(text)
 	}
 
 	// Build display text and track where links appear in display
@@ -2712,6 +2716,6 @@ func (tv *TreeView) drawTextWithLinksAndSearch(screen *Screen, x int, y int, tex
 		currentX++
 	}
 
-	// Return the display text length (shorter than original due to link compression)
-	return itemLinks, len(displayText)
+	// Return the display text width (accounting for wide characters like emoji and CJK)
+	return itemLinks, StringWidth(displayText)
 }
