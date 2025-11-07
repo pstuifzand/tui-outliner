@@ -19,6 +19,8 @@ func (p *MarkdownParser) Parse(content string) ([]*model.Item, error) {
 
 	var rootItems []*model.Item
 	var stack []*model.Item // Stack to track current parent at each level
+	var listStack []*model.Item // Separate stack for tracking list hierarchy
+	var inList bool // Track if we're currently processing list items
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -33,6 +35,10 @@ func (p *MarkdownParser) Parse(content string) ([]*model.Item, error) {
 			level, text := parseHeader(line)
 			if level >= 0 {
 				item := model.NewItem(text)
+
+				// Reset list context when we hit a header
+				inList = false
+				listStack = nil
 
 				// Add to appropriate parent based on level
 				if level == 0 {
@@ -62,14 +68,9 @@ func (p *MarkdownParser) Parse(content string) ([]*model.Item, error) {
 		if listLevel, text := parseListItem(line); listLevel >= 0 {
 			item := model.NewItem(text)
 
-			// Determine parent based on indentation
-			if listLevel == 0 && len(stack) == 0 {
-				// Root level list
-				rootItems = append(rootItems, item)
-				stack = []*model.Item{item}
-			} else if listLevel < len(stack) {
-				// Outdented - pop stack
-				stack = stack[:listLevel]
+			if !inList {
+				// First list item - add as child of current context (header or root)
+				inList = true
 				if len(stack) > 0 {
 					parent := stack[len(stack)-1]
 					parent.Children = append(parent.Children, item)
@@ -77,28 +78,51 @@ func (p *MarkdownParser) Parse(content string) ([]*model.Item, error) {
 				} else {
 					rootItems = append(rootItems, item)
 				}
-				stack = append(stack, item)
-			} else if listLevel == len(stack)-1 {
-				// Same level as previous - add as sibling
-				if len(stack) > 1 {
-					parent := stack[len(stack)-2]
-					parent.Children = append(parent.Children, item)
-					item.Parent = parent
-					stack[len(stack)-1] = item
-				} else {
-					rootItems = append(rootItems, item)
-					stack = []*model.Item{item}
-				}
+				listStack = []*model.Item{item}
 			} else {
-				// Indented - add as child of previous
-				if len(stack) > 0 {
-					parent := stack[len(stack)-1]
+				// Subsequent list items - use listStack for hierarchy
+				if listLevel >= len(listStack) {
+					// Indented deeper - child of previous list item
+					parent := listStack[len(listStack)-1]
 					parent.Children = append(parent.Children, item)
 					item.Parent = parent
-					stack = append(stack, item)
+					listStack = append(listStack, item)
+				} else if listLevel == len(listStack)-1 {
+					// Same level - sibling of previous
+					if len(listStack) > 1 {
+						parent := listStack[len(listStack)-2]
+						parent.Children = append(parent.Children, item)
+						item.Parent = parent
+						listStack[len(listStack)-1] = item
+					} else {
+						// Sibling at same level as first list item
+						if len(stack) > 0 {
+							parent := stack[len(stack)-1]
+							parent.Children = append(parent.Children, item)
+							item.Parent = parent
+						} else {
+							rootItems = append(rootItems, item)
+						}
+						listStack[0] = item
+					}
 				} else {
-					rootItems = append(rootItems, item)
-					stack = []*model.Item{item}
+					// Outdented - pop listStack to appropriate level
+					listStack = listStack[:listLevel]
+					if len(listStack) > 0 {
+						parent := listStack[len(listStack)-1]
+						parent.Children = append(parent.Children, item)
+						item.Parent = parent
+					} else {
+						// Back to header level
+						if len(stack) > 0 {
+							parent := stack[len(stack)-1]
+							parent.Children = append(parent.Children, item)
+							item.Parent = parent
+						} else {
+							rootItems = append(rootItems, item)
+						}
+					}
+					listStack = append(listStack, item)
 				}
 			}
 			continue
@@ -107,6 +131,10 @@ func (p *MarkdownParser) Parse(content string) ([]*model.Item, error) {
 		// Plain text - add as item at appropriate level
 		text := strings.TrimSpace(line)
 		if text != "" {
+			// Reset list context
+			inList = false
+			listStack = nil
+
 			item := model.NewItem(text)
 			if len(stack) > 0 {
 				parent := stack[len(stack)-1]
