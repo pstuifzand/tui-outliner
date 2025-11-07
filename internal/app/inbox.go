@@ -84,8 +84,8 @@ func (app *App) addToInbox(text string) error {
 	// Reset auto-save timer to save soon
 	app.autoSaveTime = time.Now()
 
-	// Rebuild the tree view to reflect changes
-	app.tree.RebuildView()
+	// Update tree view with current outline items (in case slice was reallocated)
+	app.tree.SetItems(app.outline.Items)
 
 	// Try to navigate to the inbox to make it visible
 	items := app.tree.GetDisplayItems()

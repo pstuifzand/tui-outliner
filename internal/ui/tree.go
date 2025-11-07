@@ -222,6 +222,12 @@ func NewTreeView(items []*model.Item) *TreeView {
 	return tv
 }
 
+// SetItems updates the tree view's items and rebuilds the view
+func (tv *TreeView) SetItems(items []*model.Item) {
+	tv.items = items
+	tv.RebuildView()
+}
+
 // wrapTextAtWidth wraps a single text line to the specified width
 // Returns a slice of wrapped text portions
 func wrapTextAtWidth(text string, maxWidth int) []string {
