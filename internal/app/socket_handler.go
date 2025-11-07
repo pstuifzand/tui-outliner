@@ -39,6 +39,9 @@ func (app *App) handleAddNodeCommand(msg socket.Message) {
 		return
 	}
 
+	log.Printf("Adding item to inbox: '%s'", msg.Text)
+	log.Printf("Search active: %v, Hoisted: %v", app.search.IsActive(), app.tree.IsHoisted())
+
 	// Add to inbox
 	if err := app.addToInbox(msg.Text); err != nil {
 		log.Printf("Failed to add item to inbox: %v", err)
@@ -47,4 +50,5 @@ func (app *App) handleAddNodeCommand(msg socket.Message) {
 	}
 
 	log.Printf("Successfully added item to inbox: %s", msg.Text)
+	log.Printf("Tree now has %d root items", len(app.outline.Items))
 }

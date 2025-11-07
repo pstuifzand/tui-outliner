@@ -55,6 +55,16 @@ func (app *App) getOrCreateInboxNode() (*model.Item, bool) {
 // addToInbox adds a new item to the inbox node
 // If no inbox exists, one will be created
 func (app *App) addToInbox(text string) error {
+	// Clear search mode if active to ensure inbox is visible
+	if app.search.IsActive() {
+		app.search.Stop()
+	}
+
+	// Clear hoisting to ensure inbox is visible
+	if app.tree.IsHoisted() {
+		app.tree.Unhoist()
+	}
+
 	inbox, created := app.getOrCreateInboxNode()
 
 	// Create new item
@@ -64,8 +74,17 @@ func (app *App) addToInbox(text string) error {
 	// Mark as dirty to trigger save
 	app.dirty = true
 
-	// Rebuild the tree view
+	// Rebuild the tree view to reflect changes
 	app.tree.RebuildView()
+
+	// Try to navigate to the inbox to make it visible
+	items := app.tree.GetDisplayItems()
+	for idx, item := range items {
+		if item.Item.ID == inbox.ID {
+			app.tree.SelectItem(idx)
+			break
+		}
+	}
 
 	// Set status message
 	if created {
