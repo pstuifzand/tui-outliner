@@ -77,15 +77,16 @@ func handleAddCommand() {
 	var attrs attrFlags
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addCmd.Var(&attrs, "attr", "Set an attribute (key=value, can be used multiple times)")
+	addCmd.Var(&attrs, "a", "Set an attribute (key=value, shorthand)")
 	addCmd.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: tuo add [options] <text>\n")
 		fmt.Fprintf(os.Stderr, "Add a node to the inbox of a running tuo instance\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
-		fmt.Fprintf(os.Stderr, "  --attr key=value    Set an attribute (can be used multiple times)\n\n")
+		fmt.Fprintf(os.Stderr, "  -a, --attr key=value    Set an attribute (can be used multiple times)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo add \"Meeting notes from standup\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo add --attr type=task --attr priority=high \"Important task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -a type=task -a priority=high \"Important task\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo add --attr type=todo --attr status=done \"Completed item\"\n")
 	}
 

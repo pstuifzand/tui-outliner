@@ -162,9 +162,9 @@ While tuo is running with a file, you can add items to the inbox from another te
 ./tuo add "Call dentist"
 ./tuo add "Meeting notes: discussed project timeline"
 
-# Add items with attributes
-./tuo add --attr type=task --attr priority=high "Important task"
-./tuo add --attr type=meeting --attr date=2025-11-07 "Team standup"
+# Add items with attributes (using short -a flag)
+./tuo add -a type=task -a priority=high "Important task"
+./tuo add -a type=meeting -a date=2025-11-07 "Team standup"
 ```
 
 ### How It Works
@@ -172,7 +172,7 @@ While tuo is running with a file, you can add items to the inbox from another te
 1. When tuo starts, it creates a Unix socket for IPC (location follows XDG spec)
 2. The `add` subcommand finds and connects to this socket
 3. Items are added to a node marked with `@type=inbox` attribute
-4. You can optionally set attributes with `--attr key=value` (can be used multiple times)
+4. You can optionally set attributes with `-a` or `--attr` (can be used multiple times)
 5. If no inbox exists, one is automatically created at the root level
 
 **Socket Location:**

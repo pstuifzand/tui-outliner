@@ -53,13 +53,15 @@ Add a new item to the inbox of a running tuo instance:
 ```bash
 ./tuo add "Text for the new item"
 
-# Add with attributes
-./tuo add --attr type=task --attr priority=high "Important task"
+# Add with attributes (using short flag)
+./tuo add -a type=task -a priority=high "Important task"
+
+# Or use long flag
 ./tuo add --attr type=todo --attr status=done "Completed item"
 ```
 
 **Options:**
-- `--attr key=value` - Set an attribute on the new item (can be used multiple times)
+- `-a, --attr key=value` - Set an attribute on the new item (can be used multiple times)
 
 **Behavior:**
 - Finds the item marked with `@type=inbox`
@@ -80,10 +82,10 @@ Add a new item to the inbox of a running tuo instance:
 ./tuo add "Quick note 2"
 ./tuo add "Quick note 3"
 
-# Add items with attributes
-./tuo add --attr type=task --attr priority=high "Review PR #123"
-./tuo add --attr type=meeting --attr date=2025-11-07 "Team standup"
-./tuo add --attr url=https://example.com --attr type=bookmark "Useful resource"
+# Add items with attributes (using short flag -a)
+./tuo add -a type=task -a priority=high "Review PR #123"
+./tuo add -a type=meeting -a date=2025-11-07 "Team standup"
+./tuo add -a url=https://example.com -a type=bookmark "Useful resource"
 
 # All items will appear in the inbox node with their attributes
 ```
