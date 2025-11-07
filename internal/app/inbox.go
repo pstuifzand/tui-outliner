@@ -56,17 +56,8 @@ func (app *App) getOrCreateInboxNode() (*model.Item, bool) {
 
 // addToInbox adds a new item to the inbox node
 // If no inbox exists, one will be created
+// The item is added quietly without disrupting the user's current view
 func (app *App) addToInbox(text string, attributes map[string]string) error {
-	// Clear search mode if active to ensure inbox is visible
-	if app.search.IsActive() {
-		app.search.Stop()
-	}
-
-	// Clear hoisting to ensure inbox is visible
-	if app.tree.IsHoisted() {
-		app.tree.Unhoist()
-	}
-
 	// Ensure Items is initialized (not nil)
 	if app.outline.Items == nil {
 		app.outline.Items = []*model.Item{}
@@ -98,15 +89,6 @@ func (app *App) addToInbox(text string, attributes map[string]string) error {
 	// Update tree view with current outline items (in case slice was reallocated)
 	app.tree.SetItems(app.outline.Items)
 
-	// Try to navigate to the inbox to make it visible
-	items := app.tree.GetDisplayItems()
-	for idx, item := range items {
-		if item.Item.ID == inbox.ID {
-			app.tree.SelectItem(idx)
-			break
-		}
-	}
-
 	// Set status message
 	if created {
 		app.SetStatus("Added to new inbox node")
@@ -114,7 +96,7 @@ func (app *App) addToInbox(text string, attributes map[string]string) error {
 		app.SetStatus("Added to inbox")
 	}
 
-	// Force immediate screen update
+	// Update screen to show new item if inbox is currently visible
 	app.render()
 
 	return nil
