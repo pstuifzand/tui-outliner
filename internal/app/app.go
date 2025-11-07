@@ -1684,7 +1684,9 @@ func (a *App) handleTreeMouseClick(mouseEv *tcell.EventMouse) {
 	}
 
 	// Calculate which display line was clicked
-	displayLineIdx := y - treeStartY
+	// Need to add viewport offset to account for scrolling
+	viewportOffset := a.tree.GetViewportOffset()
+	displayLineIdx := y - treeStartY + viewportOffset
 
 	// Check if we're in search mode
 	if a.search.IsActive() {
