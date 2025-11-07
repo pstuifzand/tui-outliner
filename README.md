@@ -169,11 +169,15 @@ While tuo is running with a file, you can add items to the inbox from another te
 
 ### How It Works
 
-1. When tuo starts, it creates a Unix socket at `~/.local/share/tui-outliner/tuo-<PID>.sock`
+1. When tuo starts, it creates a Unix socket for IPC (location follows XDG spec)
 2. The `add` subcommand finds and connects to this socket
 3. Items are added to a node marked with `@type=inbox` attribute
 4. You can optionally set attributes with `--attr key=value` (can be used multiple times)
 5. If no inbox exists, one is automatically created at the root level
+
+**Socket Location:**
+- Prefers `$XDG_RUNTIME_DIR/tui-outliner/` (standard for runtime files)
+- Falls back to `~/.local/share/tui-outliner/` if not set
 
 ### Use Cases
 

@@ -4,7 +4,11 @@ The tuo application includes a Unix socket-based command interface that allows y
 
 ## Overview
 
-When tuo starts, it automatically creates a Unix socket in `~/.local/share/tui-outliner/tuo-<PID>.sock`. Other processes can connect to this socket and send commands.
+When tuo starts, it automatically creates a Unix socket for inter-process communication. The socket location follows the XDG Base Directory specification:
+- If `$XDG_RUNTIME_DIR` is set: `$XDG_RUNTIME_DIR/tui-outliner/tuo-<PID>.sock`
+- Otherwise: `~/.local/share/tui-outliner/tuo-<PID>.sock`
+
+Other processes can connect to this socket and send commands.
 
 ## Quick Start
 
@@ -14,7 +18,7 @@ When tuo starts, it automatically creates a Unix socket in `~/.local/share/tui-o
 ./tuo myfile.json
 ```
 
-The application will create a socket at `~/.local/share/tui-outliner/tuo-<PID>.sock` where `<PID>` is the process ID.
+The application will create a socket where `<PID>` is the process ID. The exact location depends on your system configuration (see Overview).
 
 ### 2. Send commands from another terminal
 
@@ -170,16 +174,20 @@ fi
 
 ### Socket Location
 
-- Path: `~/.local/share/tui-outliner/tuo-<PID>.sock`
-- Created automatically when tuo starts
+Socket paths follow the XDG Base Directory specification:
+- **Primary**: `$XDG_RUNTIME_DIR/tui-outliner/tuo-<PID>.sock` (if `$XDG_RUNTIME_DIR` is set)
+- **Fallback**: `~/.local/share/tui-outliner/tuo-<PID>.sock` (if not set)
+- Created automatically when tuo starts with 0700 permissions
 - Automatically cleaned up when tuo exits
 - Multiple instances can run simultaneously (each has its own socket)
 
+The XDG_RUNTIME_DIR location is preferred as it's designed for runtime files like sockets and is typically tmpfs-backed for better performance.
+
 ### Finding Running Instances
 
-The `--add` command automatically finds the most recently started instance by:
-1. Scanning `~/.local/share/tui-outliner/` for socket files
-2. Checking modification times
+The `add` command automatically finds the most recently started instance by:
+1. Scanning socket directories (`$XDG_RUNTIME_DIR/tui-outliner/` and fallback)
+2. Checking modification times of all found sockets
 3. Connecting to the most recent socket
 
 ### Error Handling

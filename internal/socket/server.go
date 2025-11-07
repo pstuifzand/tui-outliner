@@ -20,9 +20,18 @@ type Server struct {
 
 // NewServer creates a new Unix socket server
 func NewServer(pid int) (*Server, error) {
-	// Create socket directory
-	socketDir := filepath.Join(os.Getenv("HOME"), ".local", "share", "tui-outliner")
-	if err := os.MkdirAll(socketDir, 0755); err != nil {
+	// Use XDG_RUNTIME_DIR if available, otherwise fall back to ~/.local/share
+	var socketDir string
+	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
+		// Use XDG_RUNTIME_DIR/tui-outliner for sockets
+		socketDir = filepath.Join(xdgRuntime, "tui-outliner")
+	} else {
+		// Fallback to ~/.local/share/tui-outliner
+		socketDir = filepath.Join(os.Getenv("HOME"), ".local", "share", "tui-outliner")
+	}
+
+	// Create socket directory if it doesn't exist
+	if err := os.MkdirAll(socketDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create socket directory: %w", err)
 	}
 

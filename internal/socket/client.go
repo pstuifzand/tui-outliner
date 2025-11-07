@@ -20,22 +20,30 @@ type Client struct {
 // FindRunningInstance finds the socket path for a running tuo instance
 // Returns the socket path and PID, or an error if not found
 func FindRunningInstance() (string, int, error) {
-	socketDir := filepath.Join(os.Getenv("HOME"), ".local", "share", "tui-outliner")
+	// Check both XDG_RUNTIME_DIR and fallback location
+	var socketDirs []string
+	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
+		socketDirs = append(socketDirs, filepath.Join(xdgRuntime, "tui-outliner"))
+	}
+	// Always check fallback location for compatibility
+	socketDirs = append(socketDirs, filepath.Join(os.Getenv("HOME"), ".local", "share", "tui-outliner"))
 
-	// Look for socket files
+	// Look for socket files in all directories
 	var sockets []string
-	err := filepath.WalkDir(socketDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil // Ignore errors, directory might not exist
-		}
-		if !d.IsDir() && strings.HasPrefix(d.Name(), "tuo-") && strings.HasSuffix(d.Name(), ".sock") {
-			sockets = append(sockets, path)
-		}
-		return nil
-	})
+	for _, socketDir := range socketDirs {
+		err := filepath.WalkDir(socketDir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil // Ignore errors, directory might not exist
+			}
+			if !d.IsDir() && strings.HasPrefix(d.Name(), "tuo-") && strings.HasSuffix(d.Name(), ".sock") {
+				sockets = append(sockets, path)
+			}
+			return nil
+		})
 
-	if err != nil && !os.IsNotExist(err) {
-		return "", 0, fmt.Errorf("error scanning socket directory: %w", err)
+		if err != nil && !os.IsNotExist(err) {
+			return "", 0, fmt.Errorf("error scanning socket directory %s: %w", socketDir, err)
+		}
 	}
 
 	if len(sockets) == 0 {
