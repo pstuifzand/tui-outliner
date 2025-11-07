@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/pstuifzand/tui-outliner/internal/model"
 )
 
@@ -65,6 +67,11 @@ func (app *App) addToInbox(text string) error {
 		app.tree.Unhoist()
 	}
 
+	// Ensure Items is initialized (not nil)
+	if app.outline.Items == nil {
+		app.outline.Items = []*model.Item{}
+	}
+
 	inbox, created := app.getOrCreateInboxNode()
 
 	// Create new item
@@ -73,6 +80,9 @@ func (app *App) addToInbox(text string) error {
 
 	// Mark as dirty to trigger save
 	app.dirty = true
+
+	// Reset auto-save timer to save soon
+	app.autoSaveTime = time.Now()
 
 	// Rebuild the tree view to reflect changes
 	app.tree.RebuildView()
@@ -92,6 +102,9 @@ func (app *App) addToInbox(text string) error {
 	} else {
 		app.SetStatus("Added to inbox")
 	}
+
+	// Force immediate screen update
+	app.render()
 
 	return nil
 }
