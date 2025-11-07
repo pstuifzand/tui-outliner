@@ -75,7 +75,7 @@ func (p *IndentedTextParser) Parse(content string) ([]*model.Item, error) {
 		} else {
 			// Outdented - go back to appropriate level
 			// Pop stack until we're at the right level
-			targetLevel := indent + 1
+			targetLevel := indent
 			if targetLevel > len(stack) {
 				targetLevel = len(stack)
 			}
