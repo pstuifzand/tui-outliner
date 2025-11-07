@@ -136,7 +136,7 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		e.text = e.text[:e.cursorPos]
 	default:
 		// Regular character input
-		if ch > 0 && ch < 127 { // Printable ASCII
+		if ch > 0 { // Accept all valid Unicode characters
 			e.text = e.text[:e.cursorPos] + string(ch) + e.text[e.cursorPos:]
 			e.cursorPos++
 		}

@@ -230,7 +230,7 @@ func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 	default:
 		// Regular character input
 		ch := ev.Rune()
-		if ch > 0 && ch < 127 && ch != 27 { // Printable ASCII (excluding Escape)
+		if ch > 0 && ch != 27 { // Accept all valid Unicode characters (excluding Escape)
 			w.query = w.query[:w.cursorPos] + string(ch) + w.query[w.cursorPos:]
 			w.cursorPos++
 			w.updateMatches()

@@ -156,7 +156,7 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 	default:
 		ch := ev.Rune()
 		// Regular character input (including '/')
-		if ch > 0 && ch < 127 {
+		if ch > 0 { // Accept all valid Unicode characters
 			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
 			s.cursorPos++
 			// Update results immediately as user types (incremental search)

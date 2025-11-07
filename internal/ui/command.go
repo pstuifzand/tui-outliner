@@ -146,7 +146,7 @@ func (c *CommandMode) HandleKey(ev *tcell.EventKey) (command string, done bool) 
 		c.input = c.input[:c.cursorPos]
 	default:
 		ch := ev.Rune()
-		if ch > 0 && ch < 127 {
+		if ch > 0 { // Accept all valid Unicode characters
 			c.input = c.input[:c.cursorPos] + string(ch) + c.input[c.cursorPos:]
 			c.cursorPos++
 		}

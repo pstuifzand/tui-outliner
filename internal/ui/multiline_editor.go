@@ -353,7 +353,7 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 		return true
 	default:
 		// Regular character input
-		if ch > 0 && ch < 127 { // Printable ASCII
+		if ch > 0 { // Accept all valid Unicode characters
 			mle.saveUndoState()
 			mle.text = mle.text[:mle.cursorPos] + string(ch) + mle.text[mle.cursorPos:]
 			mle.cursorPos++
