@@ -69,6 +69,7 @@ type App struct {
 	mode                   Mode                // Current editor mode (NormalMode, InsertMode, or VisualMode)
 	clipboard              *model.Item         // For cut/paste operations
 	visualAnchor           int                 // For visual mode selection (index in filteredView, -1 when not in visual mode)
+	lastSendDestination    *model.Item         // Last destination node used with 'ss' for repeat with 's.'
 	keybindings            []KeyBinding        // All keybindings
 	pendingKeybindings     []PendingKeyBinding // Pending key definitions (g, z, etc)
 	pendingKeySeq          rune                // Current pending key waiting for second character
@@ -2039,6 +2040,77 @@ func (a *App) handlePasteAsChildCommand() {
 	a.tree.AddItemAsChild(newItem)
 	a.dirty = true
 	a.SetStatus(fmt.Sprintf("Pasted as child: %s", newItem.Text))
+}
+
+// handleSendToNode opens the node search widget to select a destination and sends the current item there
+func (a *App) handleSendToNode() {
+	if a.readOnly {
+		a.SetStatus("File is readonly")
+		return
+	}
+
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Set up the node search widget
+	a.nodeSearchWidget.SetItems(a.outline.GetAllItems())
+	a.nodeSearchWidget.SetOnSelect(func(destination *model.Item) {
+		if destination == nil {
+			a.SetStatus("No destination selected")
+			return
+		}
+
+		// Attempt to send the item
+		if a.tree.SendItemToNode(destination) {
+			a.lastSendDestination = destination
+			a.dirty = true
+			// Truncate destination text if it's too long for status display
+			destText := destination.Text
+			if len(destText) > 40 {
+				destText = destText[:37] + "..."
+			}
+			a.SetStatus(fmt.Sprintf("Sent to: %s", destText))
+		} else {
+			a.SetStatus("Cannot send item (circular reference or invalid destination)")
+		}
+	})
+	a.nodeSearchWidget.Show()
+	a.SetStatus("Select destination node (Enter to select, Escape to cancel)")
+}
+
+// handleSendToLastNode sends the current item to the last destination used with 'ss'
+func (a *App) handleSendToLastNode() {
+	if a.readOnly {
+		a.SetStatus("File is readonly")
+		return
+	}
+
+	if a.lastSendDestination == nil {
+		a.SetStatus("No previous send destination (use 'ss' first)")
+		return
+	}
+
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Attempt to send the item
+	if a.tree.SendItemToNode(a.lastSendDestination) {
+		a.dirty = true
+		// Truncate destination text if it's too long for status display
+		destText := a.lastSendDestination.Text
+		if len(destText) > 40 {
+			destText = destText[:37] + "..."
+		}
+		a.SetStatus(fmt.Sprintf("Sent to: %s", destText))
+	} else {
+		a.SetStatus("Cannot send item (circular reference or destination no longer valid)")
+	}
 }
 
 // handleExternalEdit opens the current item in an external editor
