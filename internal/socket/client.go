@@ -139,3 +139,13 @@ func (c *Client) SendAddNode(text, target string, attributes map[string]string) 
 
 	return c.Send(msg)
 }
+
+// SendExportMarkdown is a convenience method to send an export_markdown command
+func (c *Client) SendExportMarkdown(exportPath string) (*Response, error) {
+	msg := Message{
+		Command:    CommandExportMarkdown,
+		ExportPath: exportPath,
+	}
+
+	return c.Send(msg)
+}
