@@ -14,6 +14,7 @@ import (
 	"github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/socket"
 	"github.com/pstuifzand/tui-outliner/internal/storage"
+	"github.com/pstuifzand/tui-outliner/internal/ui"
 )
 
 func main() {
@@ -253,28 +254,41 @@ func handleSearchCommand() {
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
 	runningFlag := searchCmd.Bool("r", false, "Search in running tuo instance")
 	fileFlag := searchCmd.String("f", "", "Search in file")
-	jsonFlag := searchCmd.Bool("json", false, "Output results as JSON")
+	jsonFlag := searchCmd.Bool("json", false, "Output results as JSON (legacy, use -ff json)")
+	ffFlag := searchCmd.String("ff", "", "Output format: text, fields, json, jsonl")
+	fieldsFlag := searchCmd.String("fields", "", "Comma-separated fields: id,text,created,etc")
 	searchCmd.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: tuo search [options] <query>\n")
+		fmt.Fprintf(os.Stderr, "Usage: tuo search -f|-r [options] <query>\n")
 		fmt.Fprintf(os.Stderr, "Search for nodes matching the query\n\n")
+		fmt.Fprintf(os.Stderr, "Note: flags must come before the query argument\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
-		fmt.Fprintf(os.Stderr, "  -r           Search in running tuo instance\n")
-		fmt.Fprintf(os.Stderr, "  -f file      Search in file\n")
-		fmt.Fprintf(os.Stderr, "  -json        Output results as JSON\n\n")
-		fmt.Fprintf(os.Stderr, "Query Syntax:\n")
-		fmt.Fprintf(os.Stderr, "  text         Simple text search\n")
-		fmt.Fprintf(os.Stderr, "  /regex/      Regular expression search\n")
-		fmt.Fprintf(os.Stderr, "  ~fuzzy       Fuzzy search\n")
-		fmt.Fprintf(os.Stderr, "  @attr=value  Attribute filter\n")
-		fmt.Fprintf(os.Stderr, "  d:5          Depth filter\n")
-		fmt.Fprintf(os.Stderr, "  term1 term2  AND (implicit)\n")
-		fmt.Fprintf(os.Stderr, "  term1 | term2 OR\n")
-		fmt.Fprintf(os.Stderr, "  -term        NOT\n\n")
+		fmt.Fprintf(os.Stderr, "  -r               Search in running tuo instance\n")
+		fmt.Fprintf(os.Stderr, "  -f file          Search in file\n")
+		fmt.Fprintf(os.Stderr, "  -ff format       Output format: text, fields, json, jsonl (default: text)\n")
+		fmt.Fprintf(os.Stderr, "  --fields list    Comma-separated fields (file search only)\n")
+		fmt.Fprintf(os.Stderr, "  -json            Output results as JSON (deprecated, use -ff json)\n\n")
+		fmt.Fprintf(os.Stderr, "Output Formats:\n")
+		fmt.Fprintf(os.Stderr, "  text   - Human-readable text format (default)\n")
+		fmt.Fprintf(os.Stderr, "  fields - Tab-separated values for piping to Unix tools (all sources)\n")
+		fmt.Fprintf(os.Stderr, "  json   - Pretty-printed JSON array (all sources)\n")
+		fmt.Fprintf(os.Stderr, "  jsonl  - JSON Lines format (all sources, one object per line)\n\n")
+		fmt.Fprintf(os.Stderr, "Available Fields (file search only):\n")
+		fmt.Fprintf(os.Stderr, "  id, text, attributes, created, modified, tags, depth, path, parent_id\n")
+		fmt.Fprintf(os.Stderr, "  Use attr:<name> for specific attributes (e.g., attr:status)\n\n")
+		fmt.Fprintf(os.Stderr, "Path Field:\n")
+		fmt.Fprintf(os.Stderr, "  In JSON/JSONL: array of node objects with {id, text, attributes}\n")
+		fmt.Fprintf(os.Stderr, "  In fields/text: formatted string with \" > \" separators\n\n")
+		fmt.Fprintf(os.Stderr, "Notes:\n")
+		fmt.Fprintf(os.Stderr, "  - Running instance search (-r) has limited field availability\n")
+		fmt.Fprintf(os.Stderr, "  - --fields option only works with file search (-f)\n")
+		fmt.Fprintf(os.Stderr, "  - Full node objects in path provide feature parity between file and remote searches\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"        # Search file for 'todo'\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"             # Search running instance for todos\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -r -json \"urgent\"           # JSON output from running instance\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f work.json \"project | task\" # Search for 'project' OR 'task'\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff json \"@type=todo\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff fields \"@priority=high\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff fields \"@status=done\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff jsonl \"task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff json --fields id,text,created \"task\"\n")
 	}
 
 	if err := searchCmd.Parse(os.Args[2:]); err != nil {
@@ -302,15 +316,25 @@ func handleSearchCommand() {
 		os.Exit(1)
 	}
 
+	// Determine output format (support both legacy -json and new -ff)
+	var outputFormat string
+	if *ffFlag != "" {
+		outputFormat = *ffFlag
+	} else if *jsonFlag {
+		outputFormat = "json"
+	} else {
+		outputFormat = "text"
+	}
+
 	if *runningFlag {
 		// Search in running instance
-		if err := searchRunningInstance(query, *jsonFlag); err != nil {
+		if err := searchRunningInstance(query, outputFormat, *fieldsFlag); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	} else {
 		// Search in file
-		if err := searchFile(query, *fileFlag, *jsonFlag); err != nil {
+		if err := searchFile(query, *fileFlag, outputFormat, *fieldsFlag); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -318,7 +342,7 @@ func handleSearchCommand() {
 }
 
 // searchRunningInstance searches in a running tuo instance via socket
-func searchRunningInstance(query string, jsonOutput bool) error {
+func searchRunningInstance(query string, outputFormat string, fieldsStr string) error {
 	// Find running instance
 	socketPath, pid, err := socket.FindRunningInstance()
 	if err != nil {
@@ -343,14 +367,64 @@ func searchRunningInstance(query string, jsonOutput bool) error {
 		return fmt.Errorf("search failed: %s", response.Message)
 	}
 
-	// Output results
-	if jsonOutput {
+	// Output results based on format
+	switch outputFormat {
+	case "fields":
+		// Tab-separated format with available fields
+		if len(response.Results) == 0 {
+			fmt.Println("No matches found")
+		} else {
+			for _, result := range response.Results {
+				var parts []string
+				parts = append(parts, result.Text)
+				if len(result.Path) > 0 {
+					// Extract text from node objects in path
+					var pathTexts []string
+					for _, p := range result.Path {
+						if node, ok := p.(map[string]interface{}); ok {
+							if text, ok := node["text"].(string); ok {
+								pathTexts = append(pathTexts, text)
+							}
+						}
+					}
+					if len(pathTexts) > 0 {
+						parts = append(parts, strings.Join(pathTexts, " > "))
+					}
+				}
+				if len(result.Attributes) > 0 {
+					var attrs []string
+					for k, v := range result.Attributes {
+						attrs = append(attrs, fmt.Sprintf("@%s=%s", k, v))
+					}
+					parts = append(parts, strings.Join(attrs, " "))
+				}
+				fmt.Println(strings.Join(parts, "\t"))
+			}
+		}
+
+	case "json":
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(response.Results); err != nil {
 			return fmt.Errorf("failed to encode results: %w", err)
 		}
-	} else {
+
+	case "jsonl":
+		// JSON Lines format - one result per line
+		if len(response.Results) == 0 {
+			fmt.Println("No matches found")
+		} else {
+			for _, result := range response.Results {
+				data, err := json.Marshal(result)
+				if err != nil {
+					return fmt.Errorf("failed to encode result: %w", err)
+				}
+				fmt.Println(string(data))
+			}
+		}
+
+	default:
+		// text format (default)
 		if len(response.Results) == 0 {
 			fmt.Println("No matches found")
 		} else {
@@ -358,12 +432,23 @@ func searchRunningInstance(query string, jsonOutput bool) error {
 			for i, result := range response.Results {
 				fmt.Printf("%d. %s\n", i+1, result.Text)
 				if len(result.Path) > 0 {
-					fmt.Printf("   Path: %s\n", strings.Join(result.Path, " > "))
+					// Extract text from node objects in path
+					var pathTexts []string
+					for _, p := range result.Path {
+						if node, ok := p.(map[string]interface{}); ok {
+							if text, ok := node["text"].(string); ok {
+								pathTexts = append(pathTexts, text)
+							}
+						}
+					}
+					if len(pathTexts) > 0 {
+						fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
+					}
 				}
-				if len(result.Attrs) > 0 {
+				if len(result.Attributes) > 0 {
 					fmt.Printf("   Attributes: ")
 					first := true
-					for k, v := range result.Attrs {
+					for k, v := range result.Attributes {
 						if !first {
 							fmt.Printf(", ")
 						}
@@ -381,7 +466,7 @@ func searchRunningInstance(query string, jsonOutput bool) error {
 }
 
 // searchFile searches in an outline file
-func searchFile(query, filePath string, jsonOutput bool) error {
+func searchFile(query, filePath string, outputFormat string, fieldsStr string) error {
 	// Load the outline file
 	store := storage.NewJSONStore(filePath)
 	outline, err := store.Load()
@@ -401,50 +486,96 @@ func searchFile(query, filePath string, jsonOutput bool) error {
 		return fmt.Errorf("search failed: %w", err)
 	}
 
-	// Build results
-	results := make([]socket.SearchResult, 0, len(matches))
-	for _, item := range matches {
-		result := socket.SearchResult{
-			Text: item.Text,
-			Path: buildItemPathForCLI(item),
-		}
-		if item.Metadata != nil && item.Metadata.Attributes != nil {
-			result.Attrs = item.Metadata.Attributes
-		}
-		results = append(results, result)
+	if len(matches) == 0 {
+		fmt.Println("No matches found")
+		return nil
 	}
 
-	// Output results
-	if jsonOutput {
-		encoder := json.NewEncoder(os.Stdout)
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(results); err != nil {
-			return fmt.Errorf("failed to encode results: %w", err)
+	// Ensure outline has indexed items for proper parent references
+	outline.BuildIndex()
+
+	// Determine output format
+	switch outputFormat {
+	case "fields":
+		// Use SearchOutputFormatter for fields format
+		formatter := ui.NewSearchOutputFormatter()
+		fields := ui.ParseFieldsFlag(fieldsStr)
+		output, err := formatter.FormatResults(matches, ui.OutputFormatFields, fields, outline)
+		if err != nil {
+			return fmt.Errorf("failed to format results: %w", err)
 		}
-	} else {
-		if len(results) == 0 {
-			fmt.Println("No matches found")
-		} else {
-			fmt.Printf("Found %d match(es):\n\n", len(results))
-			for i, result := range results {
-				fmt.Printf("%d. %s\n", i+1, result.Text)
-				if len(result.Path) > 0 {
-					fmt.Printf("   Path: %s\n", strings.Join(result.Path, " > "))
-				}
-				if len(result.Attrs) > 0 {
-					fmt.Printf("   Attributes: ")
-					first := true
-					for k, v := range result.Attrs {
-						if !first {
-							fmt.Printf(", ")
+		if output != "" {
+			fmt.Println(output)
+		}
+
+	case "json":
+		// Use SearchOutputFormatter for JSON format
+		formatter := ui.NewSearchOutputFormatter()
+		fields := ui.ParseFieldsFlag(fieldsStr)
+		output, err := formatter.FormatResults(matches, ui.OutputFormatJSON, fields, outline)
+		if err != nil {
+			return fmt.Errorf("failed to format results: %w", err)
+		}
+		if output != "" {
+			fmt.Println(output)
+		}
+
+	case "jsonl":
+		// Use SearchOutputFormatter for JSON Lines format
+		formatter := ui.NewSearchOutputFormatter()
+		fields := ui.ParseFieldsFlag(fieldsStr)
+		output, err := formatter.FormatResults(matches, ui.OutputFormatJSONL, fields, outline)
+		if err != nil {
+			return fmt.Errorf("failed to format results: %w", err)
+		}
+		if output != "" {
+			fmt.Println(output)
+		}
+
+	default:
+		// text format (default) - use SearchResult objects for backward compatibility
+		results := make([]socket.SearchResult, 0, len(matches))
+		for _, item := range matches {
+			result := socket.SearchResult{
+				Text: item.Text,
+				Path: buildItemPathForCLI(item),
+			}
+			if item.Metadata != nil && item.Metadata.Attributes != nil {
+				result.Attributes = item.Metadata.Attributes
+			}
+			results = append(results, result)
+		}
+
+		fmt.Printf("Found %d match(es):\n\n", len(results))
+		for i, result := range results {
+			fmt.Printf("%d. %s\n", i+1, result.Text)
+			if len(result.Path) > 0 {
+				// Extract text from node objects in path
+				var pathTexts []string
+				for _, p := range result.Path {
+					if node, ok := p.(map[string]interface{}); ok {
+						if text, ok := node["text"].(string); ok {
+							pathTexts = append(pathTexts, text)
 						}
-						fmt.Printf("%s=%s", k, v)
-						first = false
 					}
-					fmt.Println()
+				}
+				if len(pathTexts) > 0 {
+					fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
+				}
+			}
+			if len(result.Attributes) > 0 {
+				fmt.Printf("   Attributes: ")
+				first := true
+				for k, v := range result.Attributes {
+					if !first {
+						fmt.Printf(", ")
+					}
+					fmt.Printf("%s=%s", k, v)
+					first = false
 				}
 				fmt.Println()
 			}
+			fmt.Println()
 		}
 	}
 
@@ -454,12 +585,19 @@ func searchFile(query, filePath string, jsonOutput bool) error {
 	return nil
 }
 
-// buildItemPathForCLI constructs a path array for an item showing its hierarchy
-func buildItemPathForCLI(item *model.Item) []string {
-	var path []string
+// buildItemPathForCLI constructs a path array for an item showing its hierarchy with full node objects
+func buildItemPathForCLI(item *model.Item) []interface{} {
+	var path []interface{}
 	current := item
 	for current != nil {
-		path = append([]string{current.Text}, path...)
+		node := map[string]interface{}{
+			"id":   current.ID,
+			"text": current.Text,
+		}
+		if current.Metadata != nil && current.Metadata.Attributes != nil {
+			node["attributes"] = current.Metadata.Attributes
+		}
+		path = append([]interface{}{node}, path...)
 		current = current.Parent
 	}
 	return path
@@ -469,23 +607,26 @@ func buildItemPathForCLI(item *model.Item) []string {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "tuo - TUI Outliner\n\n")
 	fmt.Fprintf(os.Stderr, "Usage:\n")
-	fmt.Fprintf(os.Stderr, "  tuo [options] [file]                  Start tuo with optional file\n")
-	fmt.Fprintf(os.Stderr, "  tuo add -r|-f <file> [options] <text> Add node to running instance or file\n")
-	fmt.Fprintf(os.Stderr, "  tuo export -f <file> [-o output]      Export outline to markdown\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -r|-f <file> <query>       Search for nodes\n")
-	fmt.Fprintf(os.Stderr, "  tuo help                              Show this help message\n\n")
+	fmt.Fprintf(os.Stderr, "  tuo [options] [file]                      Start tuo with optional file\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -r|-f <file> [options] <text>     Add node to running instance or file\n")
+	fmt.Fprintf(os.Stderr, "  tuo export -f <file> [-o output]          Export outline to markdown\n")
+	fmt.Fprintf(os.Stderr, "  tuo search [options] <query>              Search for nodes (outputs to stdout)\n")
+	fmt.Fprintf(os.Stderr, "  tuo help                                  Show this help message\n\n")
 	fmt.Fprintf(os.Stderr, "Options:\n")
-	fmt.Fprintf(os.Stderr, "  --debug                               Enable debug mode\n\n")
+	fmt.Fprintf(os.Stderr, "  --debug                                   Enable debug mode\n\n")
 	fmt.Fprintf(os.Stderr, "Examples:\n")
-	fmt.Fprintf(os.Stderr, "  tuo                                   Start with empty outline\n")
-	fmt.Fprintf(os.Stderr, "  tuo notes.json                        Open notes.json\n")
-	fmt.Fprintf(os.Stderr, "  tuo --debug test.json                 Open test.json in debug mode\n")
-	fmt.Fprintf(os.Stderr, "  tuo add -r \"Buy milk\"                 Add item to running instance\n")
-	fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"      Add item to file\n")
-	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json              Export to stdout\n")
-	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json -o notes.md  Export to file\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"       Search for 'todo' in file\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"            Search running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo                                       Start with empty outline\n")
+	fmt.Fprintf(os.Stderr, "  tuo notes.json                            Open notes.json\n")
+	fmt.Fprintf(os.Stderr, "  tuo --debug test.json                     Open test.json in debug mode\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -r \"Buy milk\"                     Add item to running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"          Add item to file\n")
+	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json                  Export to stdout\n")
+	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json -o notes.md      Export to file\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"           Search file for 'todo'\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff fields \"@status=done\"  Tab-separated output\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -r -ff json \"@type=todo\"       JSON output from running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff jsonl \"task\" Search with JSONL format (full node objects in path)\n\n")
+	fmt.Fprintf(os.Stderr, "For more info on search, run: tuo search -h\n")
 }
 
 // addToFile adds a node directly to a file's inbox

@@ -121,6 +121,10 @@ Press `:` to enter command mode, then type a command and press Enter:
 | `:w` | `:write` | Save the outline to current file |
 | `:w <file>` | `:write <file>` | Save the outline to a specific file |
 | `:export markdown <file>` | | Export outline as markdown (unordered list format) |
+| `:search <query>` | | Create a search node with results (default text format) |
+| `:search <query> -ff fields` | | Output search results as tab-separated fields |
+| `:search <query> -ff json` | | Output search results as JSON array |
+| `:search <query> -ff jsonl` | | Output search results as JSON Lines (streaming format) |
 | `:q` | `:quit` | Quit (warns if unsaved) |
 | `:q!` | `:quit!` | Force quit without saving |
 | `:wq` | | Save and quit |
@@ -415,7 +419,7 @@ m:>-7d -@archived             # Modified this week, not archived
 @start>=-7d @due<-7d          # Recently started, due soon
 ```
 
-See `docs/search-syntax.md` for complete documentation.
+See `docs/search-syntax.md` for complete documentation, including **output format options** for scripting (JSON, tab-separated fields, etc.).
 
 ### Node Search Widget
 
