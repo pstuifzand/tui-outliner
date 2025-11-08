@@ -101,6 +101,14 @@ func (h *HelpScreen) GetKeybindings() []string {
 	result = append(result, "  Parent/Ancestor: p:d:0  a:@type=project")
 	result = append(result, "  Boolean ops:     task | project (OR)  -task (NOT)")
 	result = append(result, "  Groups:          (task | project) d:>0")
+	result = append(result, "")
+	result = append(result, "Output Formats (for scripting):")
+	result = append(result, "  :search query                    - Default: interactive search node")
+	result = append(result, "  :search query -ff fields         - Tab-separated output for Unix tools")
+	result = append(result, "  :search query -ff json           - Pretty-printed JSON array")
+	result = append(result, "  :search query -ff jsonl          - JSON Lines format (one per line)")
+	result = append(result, "  --fields id,text,created         - Customize output fields")
+	result = append(result, "")
 	result = append(result, "  Use ':help search' for full documentation")
 
 	return result
