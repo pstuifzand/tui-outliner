@@ -61,15 +61,15 @@ type TextExpr struct {
 }
 
 func NewTextExpr(term string) *TextExpr {
-	return &TextExpr{term: term}
+	normalizedTerm := normalizeForMatching(strings.ToLower(term))
+	return &TextExpr{term: normalizedTerm}
 }
 
 func (e *TextExpr) Matches(item *model.Item) bool {
 	// Normalize both term and text to remove accents and convert to lowercase
 	// Then perform substring matching (like strings.Contains)
-	normalizedTerm := normalizeForMatching(strings.ToLower(e.term))
 	normalizedText := normalizeForMatching(strings.ToLower(item.Text))
-	return strings.Contains(normalizedText, normalizedTerm)
+	return strings.Contains(normalizedText, e.term)
 }
 
 func (e *TextExpr) String() string {
@@ -88,9 +88,7 @@ func NewFuzzyExpr(term string) *FuzzyExpr {
 func (e *FuzzyExpr) Matches(item *model.Item) bool {
 	// Normalize both term and text to remove accents, then use fuzzy matching
 	// This provides accent-insensitive fuzzy matching
-	normalizedTerm := normalizeForMatching(strings.ToLower(e.term))
-	normalizedText := normalizeForMatching(strings.ToLower(item.Text))
-	return fuzzy.Match(normalizedTerm, normalizedText)
+	return fuzzy.MatchNormalizedFold(e.term, item.Text)
 }
 
 func (e *FuzzyExpr) String() string {
