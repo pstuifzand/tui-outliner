@@ -355,8 +355,9 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 		// Regular character input
 		if ch > 0 { // Accept all valid Unicode characters
 			mle.saveUndoState()
-			mle.text = mle.text[:mle.cursorPos] + string(ch) + mle.text[mle.cursorPos:]
-			mle.cursorPos++
+			s := string(ch)
+			mle.text = mle.text[:mle.cursorPos] + s + mle.text[mle.cursorPos:]
+			mle.cursorPos += len(s) // Increment by byte length, not character count
 
 			// Check for [[ trigger for link autocomplete
 			if ch == '[' && mle.cursorPos >= 2 && mle.text[mle.cursorPos-2] == '[' {

@@ -157,8 +157,9 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		ch := ev.Rune()
 		// Regular character input (including '/')
 		if ch > 0 { // Accept all valid Unicode characters
-			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
-			s.cursorPos++
+			str := string(ch)
+			s.query = s.query[:s.cursorPos] + str + s.query[s.cursorPos:]
+			s.cursorPos += len(str) // Increment by byte length, not character count
 			// Update results immediately as user types (incremental search)
 			s.updateResults()
 		}

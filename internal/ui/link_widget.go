@@ -231,8 +231,9 @@ func (w *LinkAutocompleteWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 		// Regular character input
 		ch := ev.Rune()
 		if ch > 0 && ch != 27 { // Accept all valid Unicode characters (excluding Escape)
-			w.query = w.query[:w.cursorPos] + string(ch) + w.query[w.cursorPos:]
-			w.cursorPos++
+			s := string(ch)
+			w.query = w.query[:w.cursorPos] + s + w.query[w.cursorPos:]
+			w.cursorPos += len(s) // Increment by byte length, not character count
 			w.updateMatches()
 			return true
 		}
