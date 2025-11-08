@@ -2,6 +2,7 @@ package app
 
 import (
 	"log"
+	"strings"
 
 	"github.com/pstuifzand/tui-outliner/internal/export"
 	"github.com/pstuifzand/tui-outliner/internal/model"
@@ -102,7 +103,7 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 		return
 	}
 
-	log.Printf("Searching with query: '%s'", msg.Query)
+	log.Printf("Searching with query: '%s', fields: %v", msg.Query, msg.Fields)
 
 	// Parse the search query
 	filterExpr, err := search.ParseQuery(msg.Query)
@@ -121,16 +122,17 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 	matches := search.GetMatchingItems(app.outline, filterExpr)
 	log.Printf("Found %d matches", len(matches))
 
-	// Build results
+	// Determine fields to include (defaults based on backward compatibility)
+	fields := msg.Fields
+	if len(fields) == 0 {
+		// Default to legacy fields for backward compatibility
+		fields = []string{"text", "path", "attributes"}
+	}
+
+	// Build results with requested fields
 	results := make([]socket.SearchResult, 0, len(matches))
 	for _, item := range matches {
-		result := socket.SearchResult{
-			Text: item.Text,
-			Path: buildItemPath(item),
-		}
-		if item.Metadata != nil && item.Metadata.Attributes != nil {
-			result.Attributes = item.Metadata.Attributes
-		}
+		result := buildSearchResult(item, fields)
 		results = append(results, result)
 	}
 
@@ -162,4 +164,77 @@ func buildItemPath(item *model.Item) []interface{} {
 		current = current.Parent
 	}
 	return path
+}
+
+// buildSearchResult builds a search result with the requested fields
+func buildSearchResult(item *model.Item, fields []string) socket.SearchResult {
+	result := make(socket.SearchResult)
+
+	for _, field := range fields {
+		// Handle special attr:name syntax
+		if strings.HasPrefix(field, "attr:") {
+			attrName := strings.TrimPrefix(field, "attr:")
+			if item.Metadata != nil && item.Metadata.Attributes != nil {
+				result[field] = item.Metadata.Attributes[attrName]
+			} else {
+				result[field] = ""
+			}
+			continue
+		}
+
+		// Handle standard fields
+		switch field {
+		case "id":
+			result["id"] = item.ID
+		case "text":
+			result["text"] = item.Text
+		case "attributes":
+			if item.Metadata == nil || item.Metadata.Attributes == nil {
+				result["attributes"] = make(map[string]string)
+			} else {
+				result["attributes"] = item.Metadata.Attributes
+			}
+		case "created":
+			if item.Metadata == nil {
+				result["created"] = ""
+			} else {
+				result["created"] = item.Metadata.Created.Format("2006-01-02T15:04:05Z07:00")
+			}
+		case "modified":
+			if item.Metadata == nil {
+				result["modified"] = ""
+			} else {
+				result["modified"] = item.Metadata.Modified.Format("2006-01-02T15:04:05Z07:00")
+			}
+		case "tags":
+			if item.Metadata == nil || item.Metadata.Tags == nil {
+				result["tags"] = []string{}
+			} else {
+				result["tags"] = item.Metadata.Tags
+			}
+		case "depth":
+			result["depth"] = getItemDepth(item)
+		case "path":
+			result["path"] = buildItemPath(item)
+		case "parent_id":
+			if item.Parent == nil {
+				result["parent_id"] = ""
+			} else {
+				result["parent_id"] = item.Parent.ID
+			}
+		}
+	}
+
+	return result
+}
+
+// getItemDepth calculates the depth of an item in the tree
+func getItemDepth(item *model.Item) int {
+	depth := 0
+	current := item.Parent
+	for current != nil {
+		depth++
+		current = current.Parent
+	}
+	return depth
 }

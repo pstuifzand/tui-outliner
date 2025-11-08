@@ -151,10 +151,11 @@ func (c *Client) SendExportMarkdown(exportPath string) (*Response, error) {
 }
 
 // SendSearch is a convenience method to send a search command
-func (c *Client) SendSearch(query string) (*Response, error) {
+func (c *Client) SendSearch(query string, fields []string) (*Response, error) {
 	msg := Message{
 		Command: CommandSearch,
 		Query:   query,
+		Fields:  fields,
 	}
 
 	return c.Send(msg)
