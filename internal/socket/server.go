@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Server represents a Unix socket server for accepting external commands
@@ -115,15 +116,34 @@ func (s *Server) handleConnection(conn net.Conn) {
 		return
 	}
 
+	// For synchronous commands (like search), create a response channel
+	if msg.Command == CommandSearch {
+		msg.ResponseChan = make(chan *Response, 1)
+	}
+
 	// Send message to channel for processing
 	select {
 	case s.msgChan <- msg:
-		// Message queued successfully
-		response := Response{
-			Success: true,
-			Message: "Command queued",
+		// For synchronous commands, wait for response
+		if msg.ResponseChan != nil {
+			select {
+			case response := <-msg.ResponseChan:
+				encoder.Encode(response)
+			case <-time.After(10 * time.Second):
+				response := Response{
+					Success: false,
+					Message: "Command timed out",
+				}
+				encoder.Encode(response)
+			}
+		} else {
+			// For async commands, acknowledge immediately
+			response := Response{
+				Success: true,
+				Message: "Command queued",
+			}
+			encoder.Encode(response)
 		}
-		encoder.Encode(response)
 	case <-s.stopChan:
 		response := Response{
 			Success: false,
