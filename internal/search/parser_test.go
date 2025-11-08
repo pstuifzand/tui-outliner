@@ -2759,3 +2759,42 @@ func TestRegexExprString(t *testing.T) {
 		})
 	}
 }
+
+func TestAccentInsensitiveSearch(t *testing.T) {
+	tests := []struct {
+		query   string
+		text    string
+		matches bool
+	}{
+		// Text search with accents
+		{"ingredienten", "Ingrediënten", true},  // umlaut ë should match e
+		{"ingredienten", "ingrediënten", true},  // case-insensitive and accent-insensitive
+		{"Ingredienten", "ingrediënten", true},  // case-insensitive
+		{"café", "Cafe", true},                   // é should match e
+		{"cafe", "café", true},                   // reverse direction
+		{"naive", "naïve", true},                 // ï should match i
+		{"resume", "résumé", true},               // é should match e
+		{"Sänger", "singer", false},              // doesn't match without accent match
+		{"deja", "déjà", true},                   // accents should be ignored
+		// Fuzzy search with accents
+		{"~ingredienten", "Ingrediënten", true}, // fuzzy with accents
+		{"~tsk", "tësk", true},                   // fuzzy with accent
+		{"~cafe", "café", true},                  // fuzzy accent-insensitive
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s_matches_%s", tt.query, tt.text), func(t *testing.T) {
+			expr, err := ParseQuery(tt.query)
+			if err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			item := createModelItemWithText(tt.text, 0)
+			matches := expr.Matches(item)
+
+			if matches != tt.matches {
+				t.Errorf("query %s with text %q: expected %v, got %v", tt.query, tt.text, tt.matches, matches)
+			}
+		})
+	}
+}
