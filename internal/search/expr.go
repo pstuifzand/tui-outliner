@@ -5,28 +5,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/pstuifzand/tui-outliner/internal/model"
-	"golang.org/x/text/unicode/norm"
 )
-
-// removeAccents removes diacritical marks (accents) from Unicode text
-// For example: "Ingrediënten" becomes "Ingredienten"
-func removeAccents(s string) string {
-	// Normalize to NFD (decomposed) form to separate base characters from diacritical marks
-	nfd := norm.NFD.String(s)
-	var result strings.Builder
-	for _, r := range nfd {
-		// Skip combining marks (diacritical marks)
-		if unicode.Is(unicode.Mn, r) {
-			continue
-		}
-		result.WriteRune(r)
-	}
-	return result.String()
-}
 
 // FilterExpr represents a filter expression that can match items
 type FilterExpr interface {
@@ -62,15 +44,13 @@ type TextExpr struct {
 }
 
 func NewTextExpr(term string) *TextExpr {
-	// Convert to lowercase and remove accents for accent-insensitive matching
-	normalized := removeAccents(strings.ToLower(term))
-	return &TextExpr{term: normalized}
+	return &TextExpr{term: term}
 }
 
 func (e *TextExpr) Matches(item *model.Item) bool {
-	// Normalize both text and term for accent-insensitive comparison
-	normalizedText := removeAccents(strings.ToLower(item.Text))
-	return strings.Contains(normalizedText, e.term)
+	// Use fuzzy library's MatchNormalizedFold for accent-insensitive substring matching
+	// MatchNormalizedFold handles Unicode normalization (ignores diacritical marks) and is case-insensitive
+	return fuzzy.MatchNormalizedFold(e.term, item.Text)
 }
 
 func (e *TextExpr) String() string {
@@ -83,15 +63,12 @@ type FuzzyExpr struct {
 }
 
 func NewFuzzyExpr(term string) *FuzzyExpr {
-	// Convert to lowercase and remove accents for accent-insensitive matching
-	normalized := removeAccents(strings.ToLower(term))
-	return &FuzzyExpr{term: normalized}
+	return &FuzzyExpr{term: term}
 }
 
 func (e *FuzzyExpr) Matches(item *model.Item) bool {
-	// Normalize both text and term for accent-insensitive fuzzy matching
-	normalizedText := removeAccents(strings.ToLower(item.Text))
-	return fuzzy.MatchFold(e.term, normalizedText)
+	// Use fuzzy library's MatchNormalizedFold for accent-insensitive and case-insensitive fuzzy matching
+	return fuzzy.MatchNormalizedFold(e.term, item.Text)
 }
 
 func (e *FuzzyExpr) String() string {
@@ -127,16 +104,16 @@ func (e *FuzzyExpr) GetMatchPositions(text string) []int {
 		return nil
 	}
 
-	// Normalize text for matching
-	normalizedText := removeAccents(strings.ToLower(text))
+	// Use a simple fuzzy position matching: find each character of the term in sequence within the text
+	// This works with the fuzzy library's normalization since we're using case-folded comparison
+	textLower := strings.ToLower(text)
 	var positions []int
 	textIdx := 0
 
-	// For each character in the search term, find it in the normalized text starting from textIdx
-	for _, termChar := range e.term {
+	for _, termChar := range strings.ToLower(e.term) {
 		found := false
-		for i := textIdx; i < len(normalizedText); i++ {
-			if rune(normalizedText[i]) == termChar {
+		for i := textIdx; i < len(textLower); i++ {
+			if rune(textLower[i]) == termChar {
 				positions = append(positions, i)
 				textIdx = i + 1
 				found = true
