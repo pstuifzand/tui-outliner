@@ -87,18 +87,22 @@ func (a *attrFlags) Set(value string) error {
 func handleAddCommand() {
 	var attrs attrFlags
 	var todoFlag bool
+	var fileFlag string
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addCmd.Var(&attrs, "attr", "Set an attribute (key=value, can be used multiple times)")
 	addCmd.Var(&attrs, "a", "Set an attribute (key=value, shorthand)")
 	addCmd.BoolVar(&todoFlag, "t", false, "Add as a todo item (sets type=todo)")
+	addCmd.StringVar(&fileFlag, "f", "", "Add to file instead of running instance")
 	addCmd.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: tuo add [options] <text>\n")
-		fmt.Fprintf(os.Stderr, "Add a node to the inbox of a running tuo instance\n\n")
+		fmt.Fprintf(os.Stderr, "Add a node to the inbox of a running tuo instance or to a file\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fmt.Fprintf(os.Stderr, "  -a, --attr key=value    Set an attribute (can be used multiple times)\n")
-		fmt.Fprintf(os.Stderr, "  -t                      Add as todo item (sets type=todo)\n\n")
+		fmt.Fprintf(os.Stderr, "  -t                      Add as todo item (sets type=todo)\n")
+		fmt.Fprintf(os.Stderr, "  -f file                 Add to file instead of running instance\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"                            # Add to running instance\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"              # Add to file\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -t \"Call dentist\"                     # Add as todo\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -t -a status=done \"Completed task\"    # Add as done todo\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -a priority=high \"Important task\"\n")
@@ -142,12 +146,22 @@ func handleAddCommand() {
 		attributes["type"] = "todo"
 	}
 
-	if err := sendAddNode(text, attributes); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	// Check if we should add to a file or running instance
+	if fileFlag != "" {
+		// Add to file
+		if err := addToFile(fileFlag, text, attributes); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Node added to %s\n", fileFlag)
+	} else {
+		// Add to running instance (default)
+		if err := sendAddNode(text, attributes); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Node added to inbox")
 	}
-
-	fmt.Println("Node added to inbox")
 }
 
 // handleExportCommand handles the 'export' subcommand
@@ -434,7 +448,7 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "tuo - TUI Outliner\n\n")
 	fmt.Fprintf(os.Stderr, "Usage:\n")
 	fmt.Fprintf(os.Stderr, "  tuo [options] [file]           Start tuo with optional file\n")
-	fmt.Fprintf(os.Stderr, "  tuo add <text>                 Add node to running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo add [options] <text>       Add node to running instance or file\n")
 	fmt.Fprintf(os.Stderr, "  tuo export <input> [output]    Export outline to markdown\n")
 	fmt.Fprintf(os.Stderr, "  tuo search <query> [file]      Search for nodes\n")
 	fmt.Fprintf(os.Stderr, "  tuo help                       Show this help message\n\n")
@@ -445,10 +459,81 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  tuo notes.json                 Open notes.json\n")
 	fmt.Fprintf(os.Stderr, "  tuo --debug test.json          Open test.json in debug mode\n")
 	fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"             Add item to running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\" Add item to file\n")
 	fmt.Fprintf(os.Stderr, "  tuo export notes.json          Export to stdout\n")
 	fmt.Fprintf(os.Stderr, "  tuo export notes.json notes.md Export to file\n")
 	fmt.Fprintf(os.Stderr, "  tuo search \"todo\" notes.json   Search for 'todo' in file\n")
 	fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"     Search running instance\n")
+}
+
+// addToFile adds a node directly to a file's inbox
+func addToFile(filePath, text string, attributes map[string]string) error {
+	// Load the outline from file
+	store := storage.NewJSONStore(filePath)
+	outline, err := store.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load outline: %w", err)
+	}
+
+	// Ensure items is initialized
+	if outline.Items == nil {
+		outline.Items = []*model.Item{}
+	}
+
+	// Find or create inbox node
+	inbox := findInboxInOutline(outline)
+	if inbox == nil {
+		// Create new inbox at root level
+		inbox = model.NewItem("Inbox")
+		if inbox.Metadata.Attributes == nil {
+			inbox.Metadata.Attributes = make(map[string]string)
+		}
+		inbox.Metadata.Attributes["type"] = "inbox"
+		inbox.Expanded = true
+		outline.Items = append(outline.Items, inbox)
+	}
+
+	// Create new item
+	newItem := model.NewItem(text)
+	if len(attributes) > 0 {
+		if newItem.Metadata.Attributes == nil {
+			newItem.Metadata.Attributes = make(map[string]string)
+		}
+		for key, value := range attributes {
+			newItem.Metadata.Attributes[key] = value
+		}
+	}
+
+	// Add to inbox
+	inbox.AddChild(newItem)
+
+	// Save the file
+	if err := store.Save(outline); err != nil {
+		return fmt.Errorf("failed to save outline: %w", err)
+	}
+
+	return nil
+}
+
+// findInboxInOutline searches for a node marked with type=inbox attribute
+func findInboxInOutline(outline *model.Outline) *model.Item {
+	var search func([]*model.Item) *model.Item
+	search = func(items []*model.Item) *model.Item {
+		for _, item := range items {
+			if item.Metadata != nil && item.Metadata.Attributes != nil {
+				if typeVal, ok := item.Metadata.Attributes["type"]; ok && typeVal == "inbox" {
+					return item
+				}
+			}
+			if len(item.Children) > 0 {
+				if found := search(item.Children); found != nil {
+					return found
+				}
+			}
+		}
+		return nil
+	}
+	return search(outline.Items)
 }
 
 // sendAddNode sends an add_node command to a running tuo instance
