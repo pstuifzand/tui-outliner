@@ -87,25 +87,28 @@ func (a *attrFlags) Set(value string) error {
 func handleAddCommand() {
 	var attrs attrFlags
 	var todoFlag bool
+	var runningFlag bool
 	var fileFlag string
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	addCmd.Var(&attrs, "attr", "Set an attribute (key=value, can be used multiple times)")
 	addCmd.Var(&attrs, "a", "Set an attribute (key=value, shorthand)")
 	addCmd.BoolVar(&todoFlag, "t", false, "Add as a todo item (sets type=todo)")
-	addCmd.StringVar(&fileFlag, "f", "", "Add to file instead of running instance")
+	addCmd.BoolVar(&runningFlag, "r", false, "Add to running tuo instance")
+	addCmd.StringVar(&fileFlag, "f", "", "Add to file")
 	addCmd.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: tuo add [options] <text>\n")
 		fmt.Fprintf(os.Stderr, "Add a node to the inbox of a running tuo instance or to a file\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "  -r                      Add to running tuo instance\n")
+		fmt.Fprintf(os.Stderr, "  -f file                 Add to file\n")
 		fmt.Fprintf(os.Stderr, "  -a, --attr key=value    Set an attribute (can be used multiple times)\n")
-		fmt.Fprintf(os.Stderr, "  -t                      Add as todo item (sets type=todo)\n")
-		fmt.Fprintf(os.Stderr, "  -f file                 Add to file instead of running instance\n\n")
+		fmt.Fprintf(os.Stderr, "  -t                      Add as todo item (sets type=todo)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"                            # Add to running instance\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -r \"Buy milk\"                         # Add to running instance\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"              # Add to file\n")
-		fmt.Fprintf(os.Stderr, "  tuo add -t \"Call dentist\"                     # Add as todo\n")
-		fmt.Fprintf(os.Stderr, "  tuo add -t -a status=done \"Completed task\"    # Add as done todo\n")
-		fmt.Fprintf(os.Stderr, "  tuo add -a priority=high \"Important task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -r -t \"Call dentist\"                  # Add as todo to running instance\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -f notes.json -t \"Call dentist\"       # Add as todo to file\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -r -a priority=high \"Important task\"\n")
 	}
 
 	if err := addCmd.Parse(os.Args[2:]); err != nil {
@@ -118,6 +121,18 @@ func handleAddCommand() {
 
 	if text == "" {
 		fmt.Fprintf(os.Stderr, "Error: node text cannot be empty\n\n")
+		addCmd.Usage()
+		os.Exit(1)
+	}
+
+	// Validate that exactly one of -r or -f is specified
+	if runningFlag && fileFlag != "" {
+		fmt.Fprintf(os.Stderr, "Error: cannot specify both -r and -f\n\n")
+		addCmd.Usage()
+		os.Exit(1)
+	}
+	if !runningFlag && fileFlag == "" {
+		fmt.Fprintf(os.Stderr, "Error: must specify either -r or -f\n\n")
 		addCmd.Usage()
 		os.Exit(1)
 	}
@@ -155,7 +170,7 @@ func handleAddCommand() {
 		}
 		fmt.Printf("Node added to %s\n", fileFlag)
 	} else {
-		// Add to running instance (default)
+		// Add to running instance
 		if err := sendAddNode(text, attributes); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -167,31 +182,32 @@ func handleAddCommand() {
 // handleExportCommand handles the 'export' subcommand
 func handleExportCommand() {
 	exportCmd := flag.NewFlagSet("export", flag.ExitOnError)
+	fileFlag := exportCmd.String("f", "", "Input outline file to export")
+	outputFlag := exportCmd.String("o", "", "Output file (defaults to stdout)")
 	exportCmd.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: tuo export <input.json> [output.md]\n")
+		fmt.Fprintf(os.Stderr, "Usage: tuo export -f <input.json> [-o output.md]\n")
 		fmt.Fprintf(os.Stderr, "Export an outline file to markdown format\n\n")
-		fmt.Fprintf(os.Stderr, "Arguments:\n")
-		fmt.Fprintf(os.Stderr, "  <input.json>     Path to the input outline file\n")
-		fmt.Fprintf(os.Stderr, "  [output.md]      Path to the output markdown file (optional, defaults to stdout)\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fmt.Fprintf(os.Stderr, "  -f file      Input outline file to export\n")
+		fmt.Fprintf(os.Stderr, "  -o file      Output file (defaults to stdout)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  tuo export notes.json              # Output to stdout\n")
-		fmt.Fprintf(os.Stderr, "  tuo export notes.json notes.md     # Output to file\n")
-		fmt.Fprintf(os.Stderr, "  tuo export notes.json | less       # Pipe to pager\n")
+		fmt.Fprintf(os.Stderr, "  tuo export -f notes.json              # Output to stdout\n")
+		fmt.Fprintf(os.Stderr, "  tuo export -f notes.json -o notes.md  # Output to file\n")
+		fmt.Fprintf(os.Stderr, "  tuo export -f notes.json | less       # Pipe to pager\n")
 	}
 
 	if err := exportCmd.Parse(os.Args[2:]); err != nil {
 		os.Exit(1)
 	}
 
-	// Get input and optional output filename from remaining args
-	args := exportCmd.Args()
-	if len(args) < 1 {
-		fmt.Fprintf(os.Stderr, "Error: input filename required\n\n")
+	// Validate that -f is specified
+	if *fileFlag == "" {
+		fmt.Fprintf(os.Stderr, "Error: -f flag is required\n\n")
 		exportCmd.Usage()
 		os.Exit(1)
 	}
 
-	inputFile := strings.TrimSpace(args[0])
+	inputFile := strings.TrimSpace(*fileFlag)
 	if inputFile == "" {
 		fmt.Fprintf(os.Stderr, "Error: input filename cannot be empty\n\n")
 		exportCmd.Usage()
@@ -207,9 +223,9 @@ func handleExportCommand() {
 	}
 
 	// Determine output destination
-	if len(args) >= 2 {
+	if *outputFlag != "" {
 		// Output to file
-		outputFile := strings.TrimSpace(args[1])
+		outputFile := strings.TrimSpace(*outputFlag)
 		if outputFile == "" {
 			fmt.Fprintf(os.Stderr, "Error: output filename cannot be empty\n\n")
 			exportCmd.Usage()
@@ -234,17 +250,16 @@ func handleExportCommand() {
 // handleSearchCommand handles the 'search' subcommand
 func handleSearchCommand() {
 	searchCmd := flag.NewFlagSet("search", flag.ExitOnError)
-	runningFlag := searchCmd.Bool("r", false, "Search in running tuo instance instead of file")
+	runningFlag := searchCmd.Bool("r", false, "Search in running tuo instance")
+	fileFlag := searchCmd.String("f", "", "Search in file")
 	jsonFlag := searchCmd.Bool("json", false, "Output results as JSON")
 	searchCmd.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: tuo search [options] <query> [file]\n")
+		fmt.Fprintf(os.Stderr, "Usage: tuo search [options] <query>\n")
 		fmt.Fprintf(os.Stderr, "Search for nodes matching the query\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fmt.Fprintf(os.Stderr, "  -r           Search in running tuo instance\n")
+		fmt.Fprintf(os.Stderr, "  -f file      Search in file\n")
 		fmt.Fprintf(os.Stderr, "  -json        Output results as JSON\n\n")
-		fmt.Fprintf(os.Stderr, "Arguments:\n")
-		fmt.Fprintf(os.Stderr, "  <query>      Search query (supports filters, regex, etc.)\n")
-		fmt.Fprintf(os.Stderr, "  [file]       Outline file to search (required if -r not used)\n\n")
 		fmt.Fprintf(os.Stderr, "Query Syntax:\n")
 		fmt.Fprintf(os.Stderr, "  text         Simple text search\n")
 		fmt.Fprintf(os.Stderr, "  /regex/      Regular expression search\n")
@@ -255,10 +270,10 @@ func handleSearchCommand() {
 		fmt.Fprintf(os.Stderr, "  term1 | term2 OR\n")
 		fmt.Fprintf(os.Stderr, "  -term        NOT\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  tuo search \"todo\" notes.json           # Search file for 'todo'\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"        # Search file for 'todo'\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"             # Search running instance for todos\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -r -json \"urgent\"           # JSON output from running instance\n")
-		fmt.Fprintf(os.Stderr, "  tuo search \"project | task\" work.json # Search for 'project' OR 'task'\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json \"project | task\" # Search for 'project' OR 'task'\n")
 	}
 
 	if err := searchCmd.Parse(os.Args[2:]); err != nil {
@@ -274,6 +289,18 @@ func handleSearchCommand() {
 
 	query := args[0]
 
+	// Validate that exactly one of -r or -f is specified
+	if *runningFlag && *fileFlag != "" {
+		fmt.Fprintf(os.Stderr, "Error: cannot specify both -r and -f\n\n")
+		searchCmd.Usage()
+		os.Exit(1)
+	}
+	if !*runningFlag && *fileFlag == "" {
+		fmt.Fprintf(os.Stderr, "Error: must specify either -r or -f\n\n")
+		searchCmd.Usage()
+		os.Exit(1)
+	}
+
 	if *runningFlag {
 		// Search in running instance
 		if err := searchRunningInstance(query, *jsonFlag); err != nil {
@@ -282,13 +309,7 @@ func handleSearchCommand() {
 		}
 	} else {
 		// Search in file
-		if len(args) < 2 {
-			fmt.Fprintf(os.Stderr, "Error: file required when -r is not used\n\n")
-			searchCmd.Usage()
-			os.Exit(1)
-		}
-		filePath := args[1]
-		if err := searchFile(query, filePath, *jsonFlag); err != nil {
+		if err := searchFile(query, *fileFlag, *jsonFlag); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -447,23 +468,23 @@ func buildItemPathForCLI(item *model.Item) []string {
 func printUsage() {
 	fmt.Fprintf(os.Stderr, "tuo - TUI Outliner\n\n")
 	fmt.Fprintf(os.Stderr, "Usage:\n")
-	fmt.Fprintf(os.Stderr, "  tuo [options] [file]           Start tuo with optional file\n")
-	fmt.Fprintf(os.Stderr, "  tuo add [options] <text>       Add node to running instance or file\n")
-	fmt.Fprintf(os.Stderr, "  tuo export <input> [output]    Export outline to markdown\n")
-	fmt.Fprintf(os.Stderr, "  tuo search <query> [file]      Search for nodes\n")
-	fmt.Fprintf(os.Stderr, "  tuo help                       Show this help message\n\n")
+	fmt.Fprintf(os.Stderr, "  tuo [options] [file]                  Start tuo with optional file\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -r|-f <file> [options] <text> Add node to running instance or file\n")
+	fmt.Fprintf(os.Stderr, "  tuo export -f <file> [-o output]      Export outline to markdown\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -r|-f <file> <query>       Search for nodes\n")
+	fmt.Fprintf(os.Stderr, "  tuo help                              Show this help message\n\n")
 	fmt.Fprintf(os.Stderr, "Options:\n")
-	fmt.Fprintf(os.Stderr, "  --debug                        Enable debug mode\n\n")
+	fmt.Fprintf(os.Stderr, "  --debug                               Enable debug mode\n\n")
 	fmt.Fprintf(os.Stderr, "Examples:\n")
-	fmt.Fprintf(os.Stderr, "  tuo                            Start with empty outline\n")
-	fmt.Fprintf(os.Stderr, "  tuo notes.json                 Open notes.json\n")
-	fmt.Fprintf(os.Stderr, "  tuo --debug test.json          Open test.json in debug mode\n")
-	fmt.Fprintf(os.Stderr, "  tuo add \"Buy milk\"             Add item to running instance\n")
-	fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\" Add item to file\n")
-	fmt.Fprintf(os.Stderr, "  tuo export notes.json          Export to stdout\n")
-	fmt.Fprintf(os.Stderr, "  tuo export notes.json notes.md Export to file\n")
-	fmt.Fprintf(os.Stderr, "  tuo search \"todo\" notes.json   Search for 'todo' in file\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"     Search running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo                                   Start with empty outline\n")
+	fmt.Fprintf(os.Stderr, "  tuo notes.json                        Open notes.json\n")
+	fmt.Fprintf(os.Stderr, "  tuo --debug test.json                 Open test.json in debug mode\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -r \"Buy milk\"                 Add item to running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"      Add item to file\n")
+	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json              Export to stdout\n")
+	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json -o notes.md  Export to file\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"       Search for 'todo' in file\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"            Search running instance\n")
 }
 
 // addToFile adds a node directly to a file's inbox
