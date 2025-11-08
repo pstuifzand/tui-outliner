@@ -146,22 +146,13 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 	log.Printf("Search completed with %d results", len(results))
 }
 
-// buildItemPath constructs a path string for an item showing its hierarchy
-func buildItemPath(item *model.Item) string {
+// buildItemPath constructs a path array for an item showing its hierarchy
+func buildItemPath(item *model.Item) []string {
 	var path []string
 	current := item
 	for current != nil {
 		path = append([]string{current.Text}, path...)
 		current = current.Parent
 	}
-
-	// Join path elements with " > "
-	result := ""
-	for i, p := range path {
-		if i > 0 {
-			result += " > "
-		}
-		result += p
-	}
-	return result
+	return path
 }

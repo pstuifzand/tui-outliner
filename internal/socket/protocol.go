@@ -16,7 +16,7 @@ type Message struct {
 // SearchResult represents a single search result item
 type SearchResult struct {
 	Text  string            `json:"text"`
-	Path  string            `json:"path"`  // Path to the item in the tree
+	Path  []string          `json:"path"`  // Path to the item in the tree
 	Attrs map[string]string `json:"attrs,omitempty"`
 }
 

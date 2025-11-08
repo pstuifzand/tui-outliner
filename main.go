@@ -321,8 +321,8 @@ func searchRunningInstance(query string, jsonOutput bool) error {
 			fmt.Printf("Found %d match(es):\n\n", len(response.Results))
 			for i, result := range response.Results {
 				fmt.Printf("%d. %s\n", i+1, result.Text)
-				if result.Path != "" {
-					fmt.Printf("   Path: %s\n", result.Path)
+				if len(result.Path) > 0 {
+					fmt.Printf("   Path: %s\n", strings.Join(result.Path, " > "))
 				}
 				if len(result.Attrs) > 0 {
 					fmt.Printf("   Attributes: ")
@@ -392,8 +392,8 @@ func searchFile(query, filePath string, jsonOutput bool) error {
 			fmt.Printf("Found %d match(es):\n\n", len(results))
 			for i, result := range results {
 				fmt.Printf("%d. %s\n", i+1, result.Text)
-				if result.Path != "" {
-					fmt.Printf("   Path: %s\n", result.Path)
+				if len(result.Path) > 0 {
+					fmt.Printf("   Path: %s\n", strings.Join(result.Path, " > "))
 				}
 				if len(result.Attrs) > 0 {
 					fmt.Printf("   Attributes: ")
@@ -418,24 +418,15 @@ func searchFile(query, filePath string, jsonOutput bool) error {
 	return nil
 }
 
-// buildItemPathForCLI constructs a path string for an item showing its hierarchy
-func buildItemPathForCLI(item *model.Item) string {
+// buildItemPathForCLI constructs a path array for an item showing its hierarchy
+func buildItemPathForCLI(item *model.Item) []string {
 	var path []string
 	current := item
 	for current != nil {
 		path = append([]string{current.Text}, path...)
 		current = current.Parent
 	}
-
-	// Join path elements with " > "
-	result := ""
-	for i, p := range path {
-		if i > 0 {
-			result += " > "
-		}
-		result += p
-	}
-	return result
+	return path
 }
 
 // printUsage prints the main usage information
