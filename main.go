@@ -106,8 +106,8 @@ func handleAddCommand() {
 		fmt.Fprintf(os.Stderr, "  -t                      Add as todo item (sets type=todo)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -r \"Buy milk\"                         # Add to running instance\n")
-		fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"              # Add to file\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -r -t \"Call dentist\"                  # Add as todo to running instance\n")
+		fmt.Fprintf(os.Stderr, "  tuo add -f notes.json \"Buy milk\"              # Add to file\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -f notes.json -t \"Call dentist\"       # Add as todo to file\n")
 		fmt.Fprintf(os.Stderr, "  tuo add -r -a priority=high \"Important task\"\n")
 	}
