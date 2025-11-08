@@ -45,6 +45,7 @@ func main() {
 
 	// Parse flags for main app
 	debug := flag.Bool("debug", false, "Enable debug mode (shows key events in status)")
+	flag.Usage = printUsage
 	flag.Parse()
 
 	args := flag.Args()
