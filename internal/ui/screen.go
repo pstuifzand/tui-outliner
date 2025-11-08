@@ -12,10 +12,11 @@ import (
 
 // Screen manages the tcell screen and rendering
 type Screen struct {
-	tcellScreen tcell.Screen
-	width       int
-	height      int
-	Theme       *theme.Theme
+	tcellScreen               tcell.Screen
+	width                     int
+	height                    int
+	Theme                     *theme.Theme
+	kittyKeyboardProtocolEnabled bool // Track if Kitty keyboard protocol was enabled
 }
 
 // NewScreen creates a new Screen instance with the configured theme
@@ -24,17 +25,17 @@ func NewScreen() (*Screen, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		// If config fails to load, use Default as fallback
-		return NewScreenWithTheme(theme.Default())
+		return NewScreenWithTheme(theme.Default(), nil)
 	}
 
 	// Load the theme based on config
 	// Try to load from TOML files first, fall back to built-in Default
 	t := theme.LoadThemeOrDefault(cfg.Theme)
-	return NewScreenWithTheme(t)
+	return NewScreenWithTheme(t, cfg)
 }
 
 // NewScreenWithTheme creates a new Screen instance with a specific theme
-func NewScreenWithTheme(t *theme.Theme) (*Screen, error) {
+func NewScreenWithTheme(t *theme.Theme, cfg *config.Config) (*Screen, error) {
 	tcellScreen, err := tcell.NewScreen()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create screen: %w", err)
@@ -46,22 +47,30 @@ func NewScreenWithTheme(t *theme.Theme) (*Screen, error) {
 
 	width, height := tcellScreen.Size()
 	screen := &Screen{
-		tcellScreen: tcellScreen,
-		width:       width,
-		height:      height,
-		Theme:       t,
+		tcellScreen:                  tcellScreen,
+		width:                        width,
+		height:                       height,
+		Theme:                        t,
+		kittyKeyboardProtocolEnabled: false,
 	}
 
-	// Enable Kitty keyboard protocol for enhanced key reporting
-	screen.enableKittyKeyboardProtocol()
+	// Enable Kitty keyboard protocol if configured
+	// Note: This is disabled by default because tcell v2.9.0 may not fully support
+	// parsing the enhanced escape sequences, which can break Escape and Shift-Tab
+	if cfg != nil && cfg.Get("kitty_keyboard_protocol") == "true" {
+		screen.enableKittyKeyboardProtocol()
+		screen.kittyKeyboardProtocolEnabled = true
+	}
 
 	return screen, nil
 }
 
 // Close closes the screen
 func (s *Screen) Close() error {
-	// Disable Kitty keyboard protocol before closing
-	s.disableKittyKeyboardProtocol()
+	// Disable Kitty keyboard protocol before closing (if it was enabled)
+	if s.kittyKeyboardProtocolEnabled {
+		s.disableKittyKeyboardProtocol()
+	}
 	s.tcellScreen.Fini()
 	return nil
 }

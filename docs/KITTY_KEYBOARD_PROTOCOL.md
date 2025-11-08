@@ -2,15 +2,33 @@
 
 ## Overview
 
-The TUI Outliner (`tuo`) now supports the Kitty keyboard protocol for enhanced key reporting. This modern terminal protocol provides better keyboard input handling, including:
+The TUI Outliner (`tuo`) supports the Kitty keyboard protocol for enhanced key reporting. This modern terminal protocol provides better keyboard input handling, including:
 
 - **Key disambiguation**: Distinguish between keys that traditionally have the same escape codes (e.g., Tab vs Ctrl-I, Enter vs Ctrl-M)
 - **Better modifier support**: More accurate reporting of modifier keys (Ctrl, Shift, Alt, Super)
 - **Enhanced key events**: Support for press, repeat, and release events
 
+## Status: Experimental & Disabled by Default
+
+⚠️ **Important**: The Kitty keyboard protocol support is **disabled by default** because tcell v2.9.0 does not yet fully support parsing the enhanced escape sequences. Enabling it may cause issues with keys like Escape and Shift-Tab.
+
+Only enable this feature if:
+1. You are using a terminal that supports the Kitty keyboard protocol (Kitty, WezTerm, foot, etc.)
+2. You have verified that it works correctly with your setup
+3. You are willing to troubleshoot any keyboard input issues
+
+## Enabling the Protocol
+
+To enable the Kitty keyboard protocol, add the following to your config file at `~/.config/tui-outliner/config.toml`:
+
+```toml
+[settings]
+kitty_keyboard_protocol = "true"
+```
+
 ## Implementation
 
-The Kitty keyboard protocol is implemented in `internal/ui/screen.go` and is automatically enabled when the application starts and disabled when it exits.
+The Kitty keyboard protocol is implemented in `internal/ui/screen.go`. When enabled, it activates when the application starts and properly disables when it exits.
 
 ### Enabling the Protocol
 
@@ -36,10 +54,11 @@ This pops the keyboard flags from the stack, restoring the terminal's previous s
 
 ### Backward Compatibility
 
-The Kitty keyboard protocol is **backward compatible**:
+The Kitty keyboard protocol is **backward compatible** at the terminal level:
 - Terminals that support the protocol will enable enhanced key reporting
 - Terminals that don't support it will silently ignore the escape sequences
-- The application works normally in both cases
+
+**However**, the application layer (tcell library) may not yet fully support parsing the enhanced sequences, which is why this feature is disabled by default. Future versions of tcell may improve support.
 
 ## Technical Details
 
@@ -94,11 +113,27 @@ Unsupported terminals will continue to work normally with standard keyboard inpu
 - [Terminal Protocol Extensions](https://sw.kovidgoyal.net/kitty/protocol-extensions/)
 - [CSI u - iTerm2 Documentation](https://iterm2.com/documentation-csiu.html)
 
+## Troubleshooting
+
+If you enable the protocol and experience issues:
+
+1. **Escape key not working**: The enhanced protocol may change how Escape is encoded
+2. **Shift-Tab not working**: Enhanced key codes may not be parsed correctly by tcell
+3. **Other key combinations broken**: Some modifier combinations may behave unexpectedly
+
+**Solution**: Disable the protocol by removing or setting to "false" in your config:
+
+```toml
+[settings]
+kitty_keyboard_protocol = "false"
+```
+
 ## Future Enhancements
 
 Potential future improvements:
 
-1. **Query terminal support**: Send `CSI ? u` to detect protocol support before enabling
-2. **Higher enhancement levels**: Enable levels 2+ for additional features
-3. **Configuration option**: Allow users to disable the protocol if needed
+1. **Wait for tcell support**: Monitor tcell Issue #671 for native protocol support
+2. **Query terminal support**: Send `CSI ? u` to detect protocol support before enabling
+3. **Higher enhancement levels**: Enable levels 2+ for additional features once tcell supports them
 4. **Enhanced key event handling**: Leverage press/release events for advanced features
+5. **Auto-detection**: Automatically enable when both terminal and tcell support is detected

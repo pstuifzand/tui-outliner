@@ -288,7 +288,7 @@ ls -la /home/peter/work/tui-outliner/
 - The application includes auto-save (5 seconds of inactivity)
 - When adding docs, add these to the ./docs/ directory.
 - always create test outlines in examples/ directory
-- **Kitty Keyboard Protocol**: The app enables the Kitty keyboard protocol for enhanced key reporting (see `docs/KITTY_KEYBOARD_PROTOCOL.md`)
+- **Kitty Keyboard Protocol**: Optional support for the Kitty keyboard protocol (disabled by default, see `docs/KITTY_KEYBOARD_PROTOCOL.md`)
 
 ### MoveUp and MoveDown
 
