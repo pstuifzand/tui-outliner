@@ -124,15 +124,30 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 		return false
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if s.cursorPos > 0 {
-			s.query = s.query[:s.cursorPos-1] + s.query[s.cursorPos:]
-			s.cursorPos--
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			before := s.query[:s.cursorPos]
+			runes := []rune(before)
+			if len(runes) > 0 {
+				runes = runes[:len(runes)-1] // Remove last rune/character
+				newBefore := string(runes)
+				deletedBytes := len(before) - len(newBefore)
+				s.query = newBefore + s.query[s.cursorPos:]
+				s.cursorPos -= deletedBytes
+			}
 			// Update results immediately as user deletes characters (incremental search)
 			s.updateResults()
 		}
 		return false
 	case tcell.KeyDelete:
 		if s.cursorPos < len(s.query) {
-			s.query = s.query[:s.cursorPos] + s.query[s.cursorPos+1:]
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			after := s.query[s.cursorPos:]
+			runes := []rune(after)
+			if len(runes) > 0 {
+				// Calculate bytes to delete (the first rune)
+				deletedBytes := len(string(runes[:1]))
+				s.query = s.query[:s.cursorPos] + s.query[s.cursorPos+deletedBytes:]
+			}
 			// Update results immediately as user deletes characters (incremental search)
 			s.updateResults()
 		}
@@ -156,9 +171,10 @@ func (s *Search) HandleKey(ev *tcell.EventKey) bool {
 	default:
 		ch := ev.Rune()
 		// Regular character input (including '/')
-		if ch > 0 && ch < 127 {
-			s.query = s.query[:s.cursorPos] + string(ch) + s.query[s.cursorPos:]
-			s.cursorPos++
+		if ch > 0 { // Accept all valid Unicode characters
+			str := string(ch)
+			s.query = s.query[:s.cursorPos] + str + s.query[s.cursorPos:]
+			s.cursorPos += len(str) // Increment by byte length, not character count
 			// Update results immediately as user types (incremental search)
 			s.updateResults()
 		}

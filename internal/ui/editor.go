@@ -100,8 +100,16 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		return false // Signal to exit edit mode and perform outdent
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if e.cursorPos > 0 {
-			e.text = e.text[:e.cursorPos-1] + e.text[e.cursorPos:]
-			e.cursorPos--
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			before := e.text[:e.cursorPos]
+			runes := []rune(before)
+			if len(runes) > 0 {
+				runes = runes[:len(runes)-1] // Remove last rune/character
+				newBefore := string(runes)
+				deletedBytes := len(before) - len(newBefore)
+				e.text = newBefore + e.text[e.cursorPos:]
+				e.cursorPos -= deletedBytes
+			}
 		} else if e.cursorPos == 0 && e.text == "" {
 			// Backspace pressed on empty item - signal to merge with previous item
 			e.backspaceOnEmpty = true
@@ -109,7 +117,14 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		}
 	case tcell.KeyDelete:
 		if e.cursorPos < len(e.text) {
-			e.text = e.text[:e.cursorPos] + e.text[e.cursorPos+1:]
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			after := e.text[e.cursorPos:]
+			runes := []rune(after)
+			if len(runes) > 0 {
+				// Calculate bytes to delete (the first rune)
+				deletedBytes := len(string(runes[:1]))
+				e.text = e.text[:e.cursorPos] + e.text[e.cursorPos+deletedBytes:]
+			}
 		}
 	case tcell.KeyLeft:
 		if e.cursorPos > 0 {
@@ -136,9 +151,10 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		e.text = e.text[:e.cursorPos]
 	default:
 		// Regular character input
-		if ch > 0 && ch < 127 { // Printable ASCII
-			e.text = e.text[:e.cursorPos] + string(ch) + e.text[e.cursorPos:]
-			e.cursorPos++
+		if ch > 0 { // Accept all valid Unicode characters
+			s := string(ch)
+			e.text = e.text[:e.cursorPos] + s + e.text[e.cursorPos:]
+			e.cursorPos += len(s) // Increment by byte length, not character count
 		}
 	}
 
@@ -150,47 +166,106 @@ func (e *Editor) Render(screen *Screen, x, y int, maxWidth int) {
 	textStyle := screen.EditorStyle()
 	cursorStyle := screen.EditorCursorStyle()
 
-	// Determine which portion of text to display
+	// Determine which portion of text to display, accounting for character widths
 	displayText := e.text
 	startIdx := 0
-	if len(displayText) > maxWidth {
-		// Show portion around cursor
-		startIdx = e.cursorPos - maxWidth/2
-		if startIdx < 0 {
-			startIdx = 0
+
+	// If text is wider than maxWidth, pan the viewport
+	textWidth := StringWidth(displayText)
+	if textWidth > maxWidth {
+		// Calculate cursor position in display columns (up to byte position e.cursorPos)
+		// Find display width at cursor position
+		cursorDisplayWidth := 0
+		for i, r := range displayText {
+			if i >= e.cursorPos {
+				break
+			}
+			cursorDisplayWidth += RuneWidth(r)
 		}
-		if startIdx+maxWidth > len(displayText) {
-			startIdx = len(displayText) - maxWidth
+
+		// Pan to show cursor at approximately center of viewport
+		targetStartWidth := cursorDisplayWidth - maxWidth/2
+		if targetStartWidth < 0 {
+			targetStartWidth = 0
 		}
-		if startIdx < 0 {
-			startIdx = 0
+
+		// Find byte offset for target display width
+		targetStartIdx := 0
+		displayWidth := 0
+		for i, r := range displayText {
+			if displayWidth >= targetStartWidth {
+				targetStartIdx = i
+				break
+			}
+			displayWidth += RuneWidth(r)
 		}
+		startIdx = targetStartIdx
+
+		// Ensure we don't pan past the end
+		if startIdx > 0 {
+			endDisplayWidth := StringWidth(displayText[startIdx:])
+			if endDisplayWidth < maxWidth && startIdx > 0 {
+				// We have less than maxWidth of text remaining, pan back
+				for startIdx > 0 {
+					startIdx--
+					endDisplayWidth = StringWidth(displayText[startIdx:])
+					if endDisplayWidth <= maxWidth {
+						break
+					}
+				}
+			}
+		}
+
 		displayText = displayText[startIdx:]
 	}
 
-	// Draw the text
-	for i, r := range displayText {
-		screen.SetCell(x+i, y, r, textStyle)
+	// Draw the text with proper character width handling
+	screenCol := 0
+	cursorScreenCol := -1
+	for byteIdx, r := range displayText {
+		charWidth := RuneWidth(r)
+		// Find if cursor is at this position
+		if startIdx+byteIdx == e.cursorPos {
+			cursorScreenCol = screenCol
+		}
+
+		// Draw character(s)
+		screen.SetCell(x+screenCol, y, r, textStyle)
+		screenCol += charWidth
+
+		// For wide characters that take 2 columns, fill second column
+		if charWidth == 2 && screenCol < maxWidth {
+			// Wide character fills 2 columns, second is handled by tcell
+		}
 	}
 
-	// Clear remainder (except cursor position if it's at the end)
-	cursorScreenX := e.cursorPos - startIdx
-	for i := len(displayText); i < maxWidth; i++ {
-		if x+i < screen.GetWidth() {
-			// Show cursor as a block at the end
-			if i == cursorScreenX && e.cursorPos == len(e.text) {
-				screen.SetCell(x+i, y, ' ', cursorStyle)
+	// Draw cursor at end of text if needed
+	if e.cursorPos == len(e.text) && screenCol <= maxWidth {
+		cursorScreenCol = screenCol
+	}
+
+	// Clear remainder of line
+	for col := screenCol; col < maxWidth; col++ {
+		if x+col < screen.GetWidth() {
+			if col == cursorScreenCol {
+				screen.SetCell(x+col, y, ' ', cursorStyle)
 			} else {
-				screen.SetCell(x+i, y, ' ', textStyle)
+				screen.SetCell(x+col, y, ' ', textStyle)
 			}
 		}
 	}
 
 	// Draw cursor on character if it's within the displayed text
-	if cursorScreenX >= 0 && cursorScreenX < len(displayText) {
-		// Cursor is on a character - highlight it in reverse
-		r := rune(displayText[cursorScreenX])
-		screen.SetCell(x+cursorScreenX, y, r, cursorStyle)
+	if cursorScreenCol >= 0 && cursorScreenCol < screenCol {
+		// Re-draw character at cursor position with cursor style
+		col := 0
+		for _, r := range displayText {
+			if col == cursorScreenCol {
+				screen.SetCell(x+col, y, r, cursorStyle)
+				break
+			}
+			col += RuneWidth(r)
+		}
 	}
 }
 

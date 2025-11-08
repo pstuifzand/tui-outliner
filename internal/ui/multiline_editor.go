@@ -253,8 +253,16 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if mle.cursorPos > 0 {
 			mle.saveUndoState()
-			mle.text = mle.text[:mle.cursorPos-1] + mle.text[mle.cursorPos:]
-			mle.cursorPos--
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			before := mle.text[:mle.cursorPos]
+			runes := []rune(before)
+			if len(runes) > 0 {
+				runes = runes[:len(runes)-1] // Remove last rune/character
+				newBefore := string(runes)
+				deletedBytes := len(before) - len(newBefore)
+				mle.text = newBefore + mle.text[mle.cursorPos:]
+				mle.cursorPos -= deletedBytes
+			}
 			mle.calculateWrappedLines()
 		} else if mle.cursorPos == 0 && mle.text == "" {
 			mle.backspaceOnEmpty = true
@@ -269,7 +277,14 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 		} else {
 			if mle.cursorPos < len(mle.text) {
 				mle.saveUndoState()
-				mle.text = mle.text[:mle.cursorPos] + mle.text[mle.cursorPos+1:]
+				// Delete entire character (which may be multiple bytes for UTF-8)
+				after := mle.text[mle.cursorPos:]
+				runes := []rune(after)
+				if len(runes) > 0 {
+					// Calculate bytes to delete (the first rune)
+					deletedBytes := len(string(runes[:1]))
+					mle.text = mle.text[:mle.cursorPos] + mle.text[mle.cursorPos+deletedBytes:]
+				}
 				mle.calculateWrappedLines()
 			}
 		}
@@ -353,10 +368,11 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 		return true
 	default:
 		// Regular character input
-		if ch > 0 && ch < 127 { // Printable ASCII
+		if ch > 0 { // Accept all valid Unicode characters
 			mle.saveUndoState()
-			mle.text = mle.text[:mle.cursorPos] + string(ch) + mle.text[mle.cursorPos:]
-			mle.cursorPos++
+			s := string(ch)
+			mle.text = mle.text[:mle.cursorPos] + s + mle.text[mle.cursorPos:]
+			mle.cursorPos += len(s) // Increment by byte length, not character count
 
 			// Check for [[ trigger for link autocomplete
 			if ch == '[' && mle.cursorPos >= 2 && mle.text[mle.cursorPos-2] == '[' {
@@ -389,29 +405,36 @@ func (mle *MultiLineEditor) Render(screen *Screen, x, y int, maxWidth int) {
 			break
 		}
 
-		// Display the line
-		for i, r := range line {
-			if x+i < screenWidth {
+		// Display the line with proper character width handling
+		screenCol := 0
+		for byteIdx, r := range line {
+			if x+screenCol < screenWidth {
+				charWidth := RuneWidth(r)
 				charStyle := textStyle
-				if lineIdx == cursorRow && i == cursorCol {
+				// Check if cursor is at this byte position
+				if lineIdx == cursorRow && byteIdx == cursorCol {
 					charStyle = cursorStyle
 				}
-				screen.SetCell(x+i, screenY, r, charStyle)
+				screen.SetCell(x+screenCol, screenY, r, charStyle)
+				screenCol += charWidth
 			}
 		}
+
+		// Calculate display width of line
+		lineDisplayWidth := StringWidth(line)
 
 		// Show cursor at end if cursor is at end of this line
 		cursorAtEnd := lineIdx == cursorRow && cursorCol == len(line)
 		if cursorAtEnd {
-			if x+len(line) < screenWidth {
-				screen.SetCell(x+len(line), screenY, ' ', cursorStyle)
+			if x+lineDisplayWidth < screenWidth {
+				screen.SetCell(x+lineDisplayWidth, screenY, ' ', cursorStyle)
 			}
 		}
 
 		// Clear remainder of line (skip cursor position if it's at the end)
-		clearStart := len(line)
+		clearStart := lineDisplayWidth
 		if cursorAtEnd {
-			clearStart = len(line) + 1
+			clearStart = lineDisplayWidth + 1
 		}
 		for i := clearStart; i < maxWidth; i++ {
 			if x+i < screenWidth {
