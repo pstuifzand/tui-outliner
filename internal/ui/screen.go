@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
@@ -44,16 +45,23 @@ func NewScreenWithTheme(t *theme.Theme) (*Screen, error) {
 	}
 
 	width, height := tcellScreen.Size()
-	return &Screen{
+	screen := &Screen{
 		tcellScreen: tcellScreen,
 		width:       width,
 		height:      height,
 		Theme:       t,
-	}, nil
+	}
+
+	// Enable Kitty keyboard protocol for enhanced key reporting
+	screen.enableKittyKeyboardProtocol()
+
+	return screen, nil
 }
 
 // Close closes the screen
 func (s *Screen) Close() error {
+	// Disable Kitty keyboard protocol before closing
+	s.disableKittyKeyboardProtocol()
 	s.tcellScreen.Fini()
 	return nil
 }
@@ -359,4 +367,29 @@ func (s *Screen) CalendarInactiveDayStyle() tcell.Style {
 // CalendarDayIndicatorStyle returns the style for indicator dots with indicator foreground and day background
 func (s *Screen) CalendarDayIndicatorStyle() tcell.Style {
 	return theme.ColorPairToStyle(s.Theme.Colors.TreeAttributeIndicator, s.Theme.Colors.CalendarDayBg)
+}
+
+// enableKittyKeyboardProtocol enables the Kitty keyboard protocol for enhanced key reporting
+// This uses progressive enhancement to enable better modifier key handling and key disambiguation
+// The protocol is backward compatible - terminals that don't support it will ignore these sequences
+func (s *Screen) enableKittyKeyboardProtocol() {
+	// CSI > 1 u - Push current flags and enable level 1 (basic disambiguation)
+	// This allows distinguishing between keys like Tab/Ctrl-I, Enter/Ctrl-M, etc.
+	// Using push (>) allows us to restore the previous state when we're done
+	s.writeEscapeSequence("\x1b[>1u")
+}
+
+// disableKittyKeyboardProtocol disables the Kitty keyboard protocol
+// This pops the previous keyboard flags from the stack, restoring the state before we enabled it
+func (s *Screen) disableKittyKeyboardProtocol() {
+	// CSI < u - Pop keyboard flags from stack
+	s.writeEscapeSequence("\x1b[<u")
+}
+
+// writeEscapeSequence writes a raw escape sequence to the terminal
+// This bypasses tcell's normal handling and sends the sequence directly
+func (s *Screen) writeEscapeSequence(seq string) {
+	// Write directly to stdout/stderr
+	// tcell manages the terminal but we can send raw sequences
+	_, _ = os.Stdout.Write([]byte(seq))
 }
