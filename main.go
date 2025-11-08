@@ -258,8 +258,9 @@ func handleSearchCommand() {
 	ffFlag := searchCmd.String("ff", "", "Output format: text, fields, json, jsonl")
 	fieldsFlag := searchCmd.String("fields", "", "Comma-separated fields: id,text,created,etc")
 	searchCmd.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: tuo search [options] <query>\n")
+		fmt.Fprintf(os.Stderr, "Usage: tuo search -f|-r [options] <query>\n")
 		fmt.Fprintf(os.Stderr, "Search for nodes matching the query\n\n")
+		fmt.Fprintf(os.Stderr, "Note: flags must come before the query argument\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fmt.Fprintf(os.Stderr, "  -r               Search in running tuo instance\n")
 		fmt.Fprintf(os.Stderr, "  -f file          Search in file\n")
@@ -274,15 +275,20 @@ func handleSearchCommand() {
 		fmt.Fprintf(os.Stderr, "Available Fields (file search only):\n")
 		fmt.Fprintf(os.Stderr, "  id, text, attributes, created, modified, tags, depth, path, parent_id\n")
 		fmt.Fprintf(os.Stderr, "  Use attr:<name> for specific attributes (e.g., attr:status)\n\n")
+		fmt.Fprintf(os.Stderr, "Path Field:\n")
+		fmt.Fprintf(os.Stderr, "  In JSON/JSONL: array of node objects with {id, text, attributes}\n")
+		fmt.Fprintf(os.Stderr, "  In fields/text: formatted string with \" > \" separators\n\n")
 		fmt.Fprintf(os.Stderr, "Notes:\n")
 		fmt.Fprintf(os.Stderr, "  - Running instance search (-r) has limited field availability\n")
-		fmt.Fprintf(os.Stderr, "  - --fields option only works with file search (-f)\n\n")
+		fmt.Fprintf(os.Stderr, "  - --fields option only works with file search (-f)\n")
+		fmt.Fprintf(os.Stderr, "  - Full node objects in path provide feature parity between file and remote searches\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\" -ff json\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -r \"@priority=high\" -ff fields\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f work.json \"@status=done\" -ff fields\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f work.json \"task\" -ff json --fields id,text,created\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff json \"@type=todo\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff fields \"@priority=high\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff fields \"@status=done\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff jsonl \"task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff json --fields id,text,created \"task\"\n")
 	}
 
 	if err := searchCmd.Parse(os.Args[2:]); err != nil {
@@ -362,8 +368,6 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 	}
 
 	// Output results based on format
-	// Note: socket response has limited metadata compared to file search
-	// (no item IDs, only text-based paths)
 	switch outputFormat {
 	case "fields":
 		// Tab-separated format with available fields
@@ -374,7 +378,18 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 				var parts []string
 				parts = append(parts, result.Text)
 				if len(result.Path) > 0 {
-					parts = append(parts, strings.Join(result.Path, " > "))
+					// Extract text from node objects in path
+					var pathTexts []string
+					for _, p := range result.Path {
+						if node, ok := p.(map[string]interface{}); ok {
+							if text, ok := node["text"].(string); ok {
+								pathTexts = append(pathTexts, text)
+							}
+						}
+					}
+					if len(pathTexts) > 0 {
+						parts = append(parts, strings.Join(pathTexts, " > "))
+					}
 				}
 				if len(result.Attrs) > 0 {
 					var attrs []string
@@ -417,7 +432,18 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 			for i, result := range response.Results {
 				fmt.Printf("%d. %s\n", i+1, result.Text)
 				if len(result.Path) > 0 {
-					fmt.Printf("   Path: %s\n", strings.Join(result.Path, " > "))
+					// Extract text from node objects in path
+					var pathTexts []string
+					for _, p := range result.Path {
+						if node, ok := p.(map[string]interface{}); ok {
+							if text, ok := node["text"].(string); ok {
+								pathTexts = append(pathTexts, text)
+							}
+						}
+					}
+					if len(pathTexts) > 0 {
+						fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
+					}
 				}
 				if len(result.Attrs) > 0 {
 					fmt.Printf("   Attributes: ")
@@ -524,7 +550,18 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 		for i, result := range results {
 			fmt.Printf("%d. %s\n", i+1, result.Text)
 			if len(result.Path) > 0 {
-				fmt.Printf("   Path: %s\n", strings.Join(result.Path, " > "))
+				// Extract text from node objects in path
+				var pathTexts []string
+				for _, p := range result.Path {
+					if node, ok := p.(map[string]interface{}); ok {
+						if text, ok := node["text"].(string); ok {
+							pathTexts = append(pathTexts, text)
+						}
+					}
+				}
+				if len(pathTexts) > 0 {
+					fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
+				}
 			}
 			if len(result.Attrs) > 0 {
 				fmt.Printf("   Attributes: ")
@@ -548,12 +585,19 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 	return nil
 }
 
-// buildItemPathForCLI constructs a path array for an item showing its hierarchy
-func buildItemPathForCLI(item *model.Item) []string {
-	var path []string
+// buildItemPathForCLI constructs a path array for an item showing its hierarchy with full node objects
+func buildItemPathForCLI(item *model.Item) []interface{} {
+	var path []interface{}
 	current := item
 	for current != nil {
-		path = append([]string{current.Text}, path...)
+		node := map[string]interface{}{
+			"id":   current.ID,
+			"text": current.Text,
+		}
+		if current.Metadata != nil && current.Metadata.Attributes != nil {
+			node["attributes"] = current.Metadata.Attributes
+		}
+		path = append([]interface{}{node}, path...)
 		current = current.Parent
 	}
 	return path
@@ -579,8 +623,9 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json                  Export to stdout\n")
 	fmt.Fprintf(os.Stderr, "  tuo export -f notes.json -o notes.md      Export to file\n")
 	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"           Search file for 'todo'\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"@status=done\" -ff fields  Tab-separated output\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\" -ff json       JSON output from running instance\n\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff fields \"@status=done\"  Tab-separated output\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -r -ff json \"@type=todo\"       JSON output from running instance\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff jsonl \"task\" Search with JSONL format (full node objects in path)\n\n")
 	fmt.Fprintf(os.Stderr, "For more info on search, run: tuo search -h\n")
 }
 
