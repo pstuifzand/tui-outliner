@@ -303,23 +303,27 @@ func TestGetItemPath(t *testing.T) {
 	outline := &model.Outline{}
 
 	tests := []struct {
-		item     *model.Item
-		expected []string
+		item         *model.Item
+		expectedIDs  []string
+		expectedText []string
 	}{
-		{root, []string{"Root"}},
-		{level1, []string{"Root", "Level1"}},
-		{level2, []string{"Root", "Level1", "Level2"}},
+		{root, []string{"root"}, []string{"Root"}},
+		{level1, []string{"root", "level1"}, []string{"Root", "Level1"}},
+		{level2, []string{"root", "level1", "level2"}, []string{"Root", "Level1", "Level2"}},
 	}
 
 	for _, tt := range tests {
 		result := formatter.getItemPath(tt.item, outline)
-		if len(result) != len(tt.expected) {
-			t.Errorf("item %q: expected %d path elements, got %d", tt.item.ID, len(tt.expected), len(result))
+		if len(result) != len(tt.expectedIDs) {
+			t.Errorf("item %q: expected %d path elements, got %d", tt.item.ID, len(tt.expectedIDs), len(result))
 			continue
 		}
 		for i, elem := range result {
-			if elem != tt.expected[i] {
-				t.Errorf("item %q: expected path element %d to be %q, got %q", tt.item.ID, i, tt.expected[i], elem)
+			if id, ok := elem["id"].(string); !ok || id != tt.expectedIDs[i] {
+				t.Errorf("item %q: expected path element %d id to be %q, got %v", tt.item.ID, i, tt.expectedIDs[i], elem["id"])
+			}
+			if text, ok := elem["text"].(string); !ok || text != tt.expectedText[i] {
+				t.Errorf("item %q: expected path element %d text to be %q, got %v", tt.item.ID, i, tt.expectedText[i], elem["text"])
 			}
 		}
 	}

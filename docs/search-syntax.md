@@ -500,7 +500,7 @@ This format is useful for piping to `grep`, `awk`, `sed`, or other Unix tools:
 :search @type=project -ff json
 :search task -ff json --fields id,text,attributes,created,path
 ```
-Outputs results as a pretty-printed JSON array.
+Outputs results as a pretty-printed JSON array. The `path` field includes full node objects with their IDs and attributes.
 
 **Example output:**
 ```json
@@ -514,7 +514,11 @@ Outputs results as a pretty-printed JSON array.
       "priority": "high"
     },
     "created": "2024-11-08T14:30:00Z",
-    "path": ["Projects", "Work", "Important"]
+    "path": [
+      {"id": "id_proj", "text": "Projects"},
+      {"id": "id_work", "text": "Work", "attributes": {"type": "section"}},
+      {"id": "id_imp", "text": "Important"}
+    ]
   }
 ]
 ```
@@ -524,12 +528,12 @@ Outputs results as a pretty-printed JSON array.
 :search @type=day -ff jsonl
 :search -@archived -ff jsonl --fields id,text,depth,path
 ```
-Outputs results as JSON Lines format (one JSON object per line), useful for streaming large result sets.
+Outputs results as JSON Lines format (one JSON object per line), useful for streaming large result sets. The `path` field includes full node objects with their IDs and attributes.
 
 **Example output:**
 ```
-{"id":"id_abc","text":"Buy groceries","attributes":{"type":"task","status":"done"},"path":["Projects","Groceries"]}
-{"id":"id_def","text":"Review proposal","attributes":{"type":"task","status":"inprogress"},"path":["Work","Proposals"]}
+{"id":"id_abc","text":"Buy groceries","attributes":{"type":"task","status":"done"},"path":[{"id":"id_proj","text":"Projects"},{"id":"id_groc","text":"Groceries"}]}
+{"id":"id_def","text":"Review proposal","attributes":{"type":"task","status":"inprogress"},"path":[{"id":"id_work","text":"Work"},{"id":"id_prop","text":"Proposals"}]}
 ```
 
 ### Available Fields
@@ -544,7 +548,7 @@ Outputs results as JSON Lines format (one JSON object per line), useful for stre
 | `modified` | Modification timestamp (ISO 8601) | `2024-11-08T15:45:30Z` |
 | `tags` | Tags list | `["urgent","work"]` or `urgent,work` |
 | `depth` | Nesting level (0 = root) | `2` |
-| `path` | Hierarchical path (array in JSON, string in fields format) | `["Projects", "Work", "Important"]` or `Projects > Work > Important` |
+| `path` | Hierarchical path (full node objects in JSON/JSONL, formatted string in fields) | `[{"id":"...", "text":"Projects"}, ...]` or `Projects > Work > Important` |
 | `parent_id` | ID of parent item | `parent123` |
 
 ### Default Fields
@@ -554,9 +558,6 @@ Outputs results as JSON Lines format (one JSON object per line), useful for stre
 - **JSON format**: `id`, `text`, `attributes`, `created`, `modified`, `tags`, `depth`, `path`
 - **JSONL format**: `id`, `text`, `attributes`, `created`, `modified`, `tags`, `depth`, `path`
 
-### Clipboard Integration
-
-When using non-text formats (`fields`, `json`, `jsonl`), results are automatically copied to the system clipboard for easy pasting into other applications or terminal commands.
 
 ### Examples
 

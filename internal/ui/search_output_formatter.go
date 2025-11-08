@@ -18,6 +18,7 @@ const (
 	OutputFormatJSONL
 )
 
+
 // SearchOutputFormatter handles formatting search results in different formats
 type SearchOutputFormatter struct{}
 
@@ -74,13 +75,18 @@ func (f *SearchOutputFormatter) formatItemAsFields(item *model.Item, fields []st
 		val := f.getFieldValue(item, field, outline)
 		// Handle multi-value fields
 		switch v := val.(type) {
-		case []string:
-			// For path, join with " > "; for tags, join with comma
-			if field == "path" {
-				values = append(values, strings.Join(v, " > "))
-			} else {
-				values = append(values, strings.Join(v, ","))
+		case []map[string]interface{}:
+			// For path, extract text and join with " > "
+			var pathTexts []string
+			for _, node := range v {
+				if text, ok := node["text"].(string); ok {
+					pathTexts = append(pathTexts, text)
+				}
 			}
+			values = append(values, strings.Join(pathTexts, " > "))
+		case []string:
+			// For tags, join with comma
+			values = append(values, strings.Join(v, ","))
 		case map[string]string:
 			// For attributes, format as @key=value space-separated
 			var attrs []string
@@ -201,12 +207,21 @@ func (f *SearchOutputFormatter) getItemDepth(item *model.Item) int {
 	return depth
 }
 
-// getItemPath builds the hierarchical path to an item as an array
-func (f *SearchOutputFormatter) getItemPath(item *model.Item, outline *model.Outline) []string {
-	var parts []string
+// getItemPath builds the hierarchical path to an item as an array of node objects
+func (f *SearchOutputFormatter) getItemPath(item *model.Item, outline *model.Outline) []map[string]interface{} {
+	var parts []map[string]interface{}
 	current := item
 	for current != nil {
-		parts = append([]string{current.Text}, parts...)
+		// Build a node object with key fields
+		node := map[string]interface{}{
+			"id":   current.ID,
+			"text": current.Text,
+		}
+		// Include attributes if present
+		if current.Metadata != nil && current.Metadata.Attributes != nil {
+			node["attributes"] = current.Metadata.Attributes
+		}
+		parts = append([]map[string]interface{}{node}, parts...)
 		current = current.Parent
 	}
 	return parts
