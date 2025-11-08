@@ -458,6 +458,139 @@ p:d:0 -children:0        # Top-level children that themselves have children
 d:>3 +parent*:@type=project -parent*:@archived
 ```
 
+## Output Formats
+
+By default, search results are displayed as an interactive search node that can be expanded. For scripting and integration with other tools, you can specify alternative output formats using the `-ff` flag.
+
+### Command Syntax
+
+```
+:search <query> [-ff format] [--fields field1,field2,...]
+```
+
+### Formats
+
+#### Text Format (default)
+```
+:search task
+```
+Creates an interactive search node with expandable results (current behavior).
+
+#### Fields Format (tab-separated)
+```
+:search @status=done -ff fields
+:search @type=task -ff fields --fields id,text,created
+```
+Outputs results as tab-separated values, one result per line. Default fields are: `id`, `text`, `attributes`.
+
+**Example output:**
+```
+id_abc	Buy groceries	@type=task @status=done @priority=high
+id_def	Review proposal	@type=task @status=inprogress
+```
+
+This format is useful for piping to `grep`, `awk`, `sed`, or other Unix tools:
+```
+:search @status=done -ff fields | grep "priority=high"
+:search @type=task -ff fields --fields text | sort
+```
+
+#### JSON Format
+```
+:search @type=project -ff json
+:search task -ff json --fields id,text,attributes,created
+```
+Outputs results as a pretty-printed JSON array.
+
+**Example output:**
+```json
+[
+  {
+    "id": "id_abc",
+    "text": "Buy groceries",
+    "attributes": {
+      "type": "task",
+      "status": "done",
+      "priority": "high"
+    },
+    "created": "2024-11-08T14:30:00Z"
+  }
+]
+```
+
+#### JSONL Format (JSON Lines)
+```
+:search @type=day -ff jsonl
+:search -@archived -ff jsonl --fields id,text,depth
+```
+Outputs results as JSON Lines format (one JSON object per line), useful for streaming large result sets.
+
+**Example output:**
+```
+{"id":"id_abc","text":"Buy groceries","attributes":{"type":"task","status":"done"}}
+{"id":"id_def","text":"Review proposal","attributes":{"type":"task","status":"inprogress"}}
+```
+
+### Available Fields
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `id` | Item unique identifier | `item_abc123` |
+| `text` | Item text content | `Buy groceries` |
+| `attributes` | All attributes as object or @key=value | `{"type":"task"}` or `@type=task` |
+| `attr:<name>` | Specific attribute value | `attr:status` → `done` |
+| `created` | Creation timestamp (ISO 8601) | `2024-11-08T14:30:00Z` |
+| `modified` | Modification timestamp (ISO 8601) | `2024-11-08T15:45:30Z` |
+| `tags` | Tags list | `["urgent","work"]` or `urgent,work` |
+| `depth` | Nesting level (0 = root) | `2` |
+| `path` | Hierarchical path | `Projects > Work > Important` |
+| `parent_id` | ID of parent item | `parent123` |
+
+### Default Fields
+
+- **Text format**: N/A (uses interactive display)
+- **Fields format**: `id`, `text`, `attributes`
+- **JSON format**: `id`, `text`, `attributes`, `created`, `modified`, `tags`, `depth`, `path`
+- **JSONL format**: `id`, `text`, `attributes`, `created`, `modified`, `tags`, `depth`, `path`
+
+### Clipboard Integration
+
+When using non-text formats (`fields`, `json`, `jsonl`), results are automatically copied to the system clipboard for easy pasting into other applications or terminal commands.
+
+### Examples
+
+**Find all completed tasks and copy results for processing:**
+```
+:search @status=done -ff fields
+```
+
+**Export recent changes as JSON:**
+```
+:search m:>-7d -ff json --fields id,text,modified
+```
+
+**Get task IDs for scripting:**
+```
+:search @type=task -ff fields --fields id
+```
+
+**Stream large result sets:**
+```
+:search @type=day -ff jsonl
+```
+
+**Combine with Unix tools:**
+```
+# Find all high-priority items
+:search @priority=high -ff fields | grep "@status=done"
+
+# Count items by type
+:search -ff fields --fields attr:type | sort | uniq -c
+
+# Extract creation dates
+:search c:>-30d -ff json --fields id,text,created
+```
+
 ## Notes
 
 - Text searches are **case-insensitive** substring matches
@@ -465,3 +598,4 @@ d:>3 +parent*:@type=project -parent*:@archived
 - Comparisons: `>`, `>=`, `<`, `<=`, `=`, `!=`
 - Invalid syntax will display an error message; the search will not execute
 - Empty search matches all nodes
+- When using output formats other than text, results are copied to clipboard if a clipboard tool is available (xclip, xsel, or pbcopy)
