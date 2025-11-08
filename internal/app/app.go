@@ -2336,106 +2336,26 @@ func (a *App) handleSetCommand(parts []string) {
 	}
 }
 
-// handleSearchCommand creates a new search node with the given query or outputs results
-// Usage:
-//   :search <query>                                  - Create search node (text format)
-//   :search <query> -ff fields                       - Output as tab-separated fields
-//   :search <query> -ff json                         - Output as JSON array
-//   :search <query> -ff jsonl                        - Output as JSON Lines
-//   :search <query> -ff fields --fields id,text      - Output specific fields
+// handleSearchCommand creates a new search node with the given query
+// Usage: :search <query>
 func (a *App) handleSearchCommand(parts []string) {
 	if len(parts) < 2 {
-		a.SetStatus("Usage: :search <query> [-ff format] [--fields field1,field2,...]")
+		a.SetStatus("Usage: :search <query>")
 		return
 	}
 
-	// Parse flags: -ff format and --fields
-	format := ui.OutputFormatText
-	var fieldsStr string
-	var queryParts []string
+	// Combine all parts after the command to form the query
+	query := strings.Join(parts[1:], " ")
 
-	for i := 1; i < len(parts); i++ {
-		part := parts[i]
-		if part == "-ff" && i+1 < len(parts) {
-			var err error
-			format, err = ui.ParseFormatFlag(parts[i+1])
-			if err != nil {
-				a.SetStatus(fmt.Sprintf("Error: %s", err.Error()))
-				return
-			}
-			i++ // Skip the next part as it's the format value
-		} else if part == "--fields" && i+1 < len(parts) {
-			fieldsStr = parts[i+1]
-			i++ // Skip the next part as it's the fields value
-		} else {
-			queryParts = append(queryParts, part)
-		}
-	}
+	// Create a new search node
+	searchNode := model.NewItem("[Search] " + query)
+	searchNode.Metadata.Attributes["type"] = "search"
+	searchNode.Metadata.Attributes["query"] = query
 
-	if len(queryParts) == 0 {
-		a.SetStatus("Error: no query provided")
-		return
-	}
-
-	query := strings.Join(queryParts, " ")
-
-	// For text format, use the traditional search node behavior
-	if format == ui.OutputFormatText {
-		// Create a new search node
-		searchNode := model.NewItem("[Search] " + query)
-		searchNode.Metadata.Attributes["type"] = "search"
-		searchNode.Metadata.Attributes["query"] = query
-
-		a.tree.AddItemAfter(searchNode)
-		a.refreshSearchNodes()
-		a.SetStatus(fmt.Sprintf("Created search node for: %s (use l to expand)", query))
-		a.dirty = true
-		return
-	}
-
-	// For other formats, execute the search and output results directly
-	a.executeSearchFormatted(query, format, fieldsStr)
-}
-
-// executeSearchFormatted executes a search and outputs results in the specified format
-func (a *App) executeSearchFormatted(query string, format ui.OutputFormat, fieldsStr string) {
-	// Parse the search query
-	filterExpr, err := search.ParseQuery(query)
-	if err != nil {
-		a.SetStatus(fmt.Sprintf("Error: invalid search query: %s", err.Error()))
-		return
-	}
-
-	// Find matching items
-	var matchingItems []*model.Item
-	for _, candidate := range a.outline.GetAllItems() {
-		if filterExpr.Matches(candidate) {
-			matchingItems = append(matchingItems, candidate)
-		}
-	}
-
-	if len(matchingItems) == 0 {
-		a.SetStatus("No results found")
-		return
-	}
-
-	// Parse fields flag
-	fields := ui.ParseFieldsFlag(fieldsStr)
-
-	// Format the results
-	formatter := ui.NewSearchOutputFormatter()
-	output, err := formatter.FormatResults(matchingItems, format, fields, a.outline)
-	if err != nil {
-		a.SetStatus(fmt.Sprintf("Error: %s", err.Error()))
-		return
-	}
-
-	// Copy to clipboard
-	if output != "" {
-		// Try to copy to clipboard using xclip or pbpaste
-		a.copyToClipboard(output)
-		a.SetStatus(fmt.Sprintf("Search results (%d items) copied to clipboard", len(matchingItems)))
-	}
+	a.tree.AddItemAfter(searchNode)
+	a.refreshSearchNodes()
+	a.SetStatus(fmt.Sprintf("Created search node for: %s (use l to expand)", query))
+	a.dirty = true
 }
 
 // populateSearchNode updates a single search node with current matching results
@@ -2519,36 +2439,4 @@ func (a *App) handleCalendarCommand(parts []string) {
 	}
 
 	a.SetStatus("Usage: :calendar or :calendar attr <name>")
-}
-
-// copyToClipboard attempts to copy text to the system clipboard
-// Tries multiple clipboard tools (xclip, xsel, pbcopy)
-func (a *App) copyToClipboard(text string) {
-	// Try xclip first (Linux)
-	if cmd := exec.Command("xclip", "-selection", "clipboard"); cmd != nil {
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err == nil {
-			return
-		}
-	}
-
-	// Try xsel (Linux alternative)
-	if cmd := exec.Command("xsel", "--clipboard", "--input"); cmd != nil {
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err == nil {
-			return
-		}
-	}
-
-	// Try pbcopy (macOS)
-	if cmd := exec.Command("pbcopy"); cmd != nil {
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err == nil {
-			return
-		}
-	}
-
-	// If all clipboard tools fail, just log a warning but don't show an error to the user
-	// The formatted output is still available, just not in system clipboard
-	log.Printf("Warning: could not copy to clipboard - no clipboard tool available")
 }
