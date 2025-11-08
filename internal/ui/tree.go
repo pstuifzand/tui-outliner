@@ -1695,6 +1695,15 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		// Select style based on selection, visual selection, and new item status
 		style := defaultStyle
 
+		// Check if item is a header (type=header) and apply header style
+		isHeader := displayLine.Item.Metadata != nil &&
+			displayLine.Item.Metadata.Attributes != nil &&
+			displayLine.Item.Metadata.Attributes["type"] == "header"
+		if isHeader && !isLinePartOfSelected {
+			// Apply header style for unselected headers
+			style = screen.HeaderStyle().Background(bgColor)
+		}
+
 		// Check if in visual selection range
 		inVisualRange := hasVisualSelection && i >= visualStart && i <= visualEnd
 

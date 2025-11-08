@@ -961,6 +961,22 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					editedItem.Metadata.Modified = time.Now()
 				}
 
+				// Auto-detect header pattern "# "
+				if strings.HasPrefix(editedItem.Text, "# ") {
+					// Initialize metadata if needed
+					if editedItem.Metadata == nil {
+						editedItem.Metadata = &model.Metadata{
+							Attributes: make(map[string]string),
+							Created:    time.Now(),
+							Modified:   time.Now(),
+						}
+					}
+					// Set type attribute, strip prefix from text
+					editedItem.Metadata.Attributes["type"] = "header"
+					editedItem.Text = strings.TrimPrefix(editedItem.Text, "# ")
+					editedItem.Metadata.Modified = time.Now()
+				}
+
 				// If Escape was pressed and item is empty (and has no children), delete it
 				if escapePressed && editedItem.Text == "" && len(editedItem.Children) == 0 {
 					// Move to previous item before deleting
