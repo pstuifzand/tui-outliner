@@ -129,7 +129,7 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 			Path: buildItemPath(item),
 		}
 		if item.Metadata != nil && item.Metadata.Attributes != nil {
-			result.Attrs = item.Metadata.Attributes
+			result.Attributes = item.Metadata.Attributes
 		}
 		results = append(results, result)
 	}

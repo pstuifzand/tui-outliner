@@ -391,9 +391,9 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 						parts = append(parts, strings.Join(pathTexts, " > "))
 					}
 				}
-				if len(result.Attrs) > 0 {
+				if len(result.Attributes) > 0 {
 					var attrs []string
-					for k, v := range result.Attrs {
+					for k, v := range result.Attributes {
 						attrs = append(attrs, fmt.Sprintf("@%s=%s", k, v))
 					}
 					parts = append(parts, strings.Join(attrs, " "))
@@ -445,10 +445,10 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 						fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
 					}
 				}
-				if len(result.Attrs) > 0 {
+				if len(result.Attributes) > 0 {
 					fmt.Printf("   Attributes: ")
 					first := true
-					for k, v := range result.Attrs {
+					for k, v := range result.Attributes {
 						if !first {
 							fmt.Printf(", ")
 						}
@@ -541,7 +541,7 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 				Path: buildItemPathForCLI(item),
 			}
 			if item.Metadata != nil && item.Metadata.Attributes != nil {
-				result.Attrs = item.Metadata.Attributes
+				result.Attributes = item.Metadata.Attributes
 			}
 			results = append(results, result)
 		}
@@ -563,10 +563,10 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 					fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
 				}
 			}
-			if len(result.Attrs) > 0 {
+			if len(result.Attributes) > 0 {
 				fmt.Printf("   Attributes: ")
 				first := true
-				for k, v := range result.Attrs {
+				for k, v := range result.Attributes {
 					if !first {
 						fmt.Printf(", ")
 					}
