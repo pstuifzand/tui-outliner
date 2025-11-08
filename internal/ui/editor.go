@@ -151,47 +151,106 @@ func (e *Editor) Render(screen *Screen, x, y int, maxWidth int) {
 	textStyle := screen.EditorStyle()
 	cursorStyle := screen.EditorCursorStyle()
 
-	// Determine which portion of text to display
+	// Determine which portion of text to display, accounting for character widths
 	displayText := e.text
 	startIdx := 0
-	if len(displayText) > maxWidth {
-		// Show portion around cursor
-		startIdx = e.cursorPos - maxWidth/2
-		if startIdx < 0 {
-			startIdx = 0
+
+	// If text is wider than maxWidth, pan the viewport
+	textWidth := StringWidth(displayText)
+	if textWidth > maxWidth {
+		// Calculate cursor position in display columns (up to byte position e.cursorPos)
+		// Find display width at cursor position
+		cursorDisplayWidth := 0
+		for i, r := range displayText {
+			if i >= e.cursorPos {
+				break
+			}
+			cursorDisplayWidth += RuneWidth(r)
 		}
-		if startIdx+maxWidth > len(displayText) {
-			startIdx = len(displayText) - maxWidth
+
+		// Pan to show cursor at approximately center of viewport
+		targetStartWidth := cursorDisplayWidth - maxWidth/2
+		if targetStartWidth < 0 {
+			targetStartWidth = 0
 		}
-		if startIdx < 0 {
-			startIdx = 0
+
+		// Find byte offset for target display width
+		targetStartIdx := 0
+		displayWidth := 0
+		for i, r := range displayText {
+			if displayWidth >= targetStartWidth {
+				targetStartIdx = i
+				break
+			}
+			displayWidth += RuneWidth(r)
 		}
+		startIdx = targetStartIdx
+
+		// Ensure we don't pan past the end
+		if startIdx > 0 {
+			endDisplayWidth := StringWidth(displayText[startIdx:])
+			if endDisplayWidth < maxWidth && startIdx > 0 {
+				// We have less than maxWidth of text remaining, pan back
+				for startIdx > 0 {
+					startIdx--
+					endDisplayWidth = StringWidth(displayText[startIdx:])
+					if endDisplayWidth <= maxWidth {
+						break
+					}
+				}
+			}
+		}
+
 		displayText = displayText[startIdx:]
 	}
 
-	// Draw the text
-	for i, r := range displayText {
-		screen.SetCell(x+i, y, r, textStyle)
+	// Draw the text with proper character width handling
+	screenCol := 0
+	cursorScreenCol := -1
+	for byteIdx, r := range displayText {
+		charWidth := RuneWidth(r)
+		// Find if cursor is at this position
+		if startIdx+byteIdx == e.cursorPos {
+			cursorScreenCol = screenCol
+		}
+
+		// Draw character(s)
+		screen.SetCell(x+screenCol, y, r, textStyle)
+		screenCol += charWidth
+
+		// For wide characters that take 2 columns, fill second column
+		if charWidth == 2 && screenCol < maxWidth {
+			// Wide character fills 2 columns, second is handled by tcell
+		}
 	}
 
-	// Clear remainder (except cursor position if it's at the end)
-	cursorScreenX := e.cursorPos - startIdx
-	for i := len(displayText); i < maxWidth; i++ {
-		if x+i < screen.GetWidth() {
-			// Show cursor as a block at the end
-			if i == cursorScreenX && e.cursorPos == len(e.text) {
-				screen.SetCell(x+i, y, ' ', cursorStyle)
+	// Draw cursor at end of text if needed
+	if e.cursorPos == len(e.text) && screenCol <= maxWidth {
+		cursorScreenCol = screenCol
+	}
+
+	// Clear remainder of line
+	for col := screenCol; col < maxWidth; col++ {
+		if x+col < screen.GetWidth() {
+			if col == cursorScreenCol {
+				screen.SetCell(x+col, y, ' ', cursorStyle)
 			} else {
-				screen.SetCell(x+i, y, ' ', textStyle)
+				screen.SetCell(x+col, y, ' ', textStyle)
 			}
 		}
 	}
 
 	// Draw cursor on character if it's within the displayed text
-	if cursorScreenX >= 0 && cursorScreenX < len(displayText) {
-		// Cursor is on a character - highlight it in reverse
-		r := rune(displayText[cursorScreenX])
-		screen.SetCell(x+cursorScreenX, y, r, cursorStyle)
+	if cursorScreenCol >= 0 && cursorScreenCol < screenCol {
+		// Re-draw character at cursor position with cursor style
+		col := 0
+		for _, r := range displayText {
+			if col == cursorScreenCol {
+				screen.SetCell(x+col, y, r, cursorStyle)
+				break
+			}
+			col += RuneWidth(r)
+		}
 	}
 }
 

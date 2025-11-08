@@ -390,29 +390,36 @@ func (mle *MultiLineEditor) Render(screen *Screen, x, y int, maxWidth int) {
 			break
 		}
 
-		// Display the line
-		for i, r := range line {
-			if x+i < screenWidth {
+		// Display the line with proper character width handling
+		screenCol := 0
+		for byteIdx, r := range line {
+			if x+screenCol < screenWidth {
+				charWidth := RuneWidth(r)
 				charStyle := textStyle
-				if lineIdx == cursorRow && i == cursorCol {
+				// Check if cursor is at this byte position
+				if lineIdx == cursorRow && byteIdx == cursorCol {
 					charStyle = cursorStyle
 				}
-				screen.SetCell(x+i, screenY, r, charStyle)
+				screen.SetCell(x+screenCol, screenY, r, charStyle)
+				screenCol += charWidth
 			}
 		}
+
+		// Calculate display width of line
+		lineDisplayWidth := StringWidth(line)
 
 		// Show cursor at end if cursor is at end of this line
 		cursorAtEnd := lineIdx == cursorRow && cursorCol == len(line)
 		if cursorAtEnd {
-			if x+len(line) < screenWidth {
-				screen.SetCell(x+len(line), screenY, ' ', cursorStyle)
+			if x+lineDisplayWidth < screenWidth {
+				screen.SetCell(x+lineDisplayWidth, screenY, ' ', cursorStyle)
 			}
 		}
 
 		// Clear remainder of line (skip cursor position if it's at the end)
-		clearStart := len(line)
+		clearStart := lineDisplayWidth
 		if cursorAtEnd {
-			clearStart = len(line) + 1
+			clearStart = lineDisplayWidth + 1
 		}
 		for i := clearStart; i < maxWidth; i++ {
 			if x+i < screenWidth {
