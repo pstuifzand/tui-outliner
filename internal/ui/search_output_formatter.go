@@ -75,8 +75,12 @@ func (f *SearchOutputFormatter) formatItemAsFields(item *model.Item, fields []st
 		// Handle multi-value fields
 		switch v := val.(type) {
 		case []string:
-			// For tags, join with comma
-			values = append(values, strings.Join(v, ","))
+			// For path, join with " > "; for tags, join with comma
+			if field == "path" {
+				values = append(values, strings.Join(v, " > "))
+			} else {
+				values = append(values, strings.Join(v, ","))
+			}
 		case map[string]string:
 			// For attributes, format as @key=value space-separated
 			var attrs []string
@@ -197,15 +201,15 @@ func (f *SearchOutputFormatter) getItemDepth(item *model.Item) int {
 	return depth
 }
 
-// getItemPath builds the hierarchical path to an item
-func (f *SearchOutputFormatter) getItemPath(item *model.Item, outline *model.Outline) string {
+// getItemPath builds the hierarchical path to an item as an array
+func (f *SearchOutputFormatter) getItemPath(item *model.Item, outline *model.Outline) []string {
 	var parts []string
 	current := item
 	for current != nil {
 		parts = append([]string{current.Text}, parts...)
 		current = current.Parent
 	}
-	return strings.Join(parts, " > ")
+	return parts
 }
 
 // ParseFormatFlag parses the format flag and returns the corresponding OutputFormat

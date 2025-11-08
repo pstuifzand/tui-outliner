@@ -498,7 +498,7 @@ This format is useful for piping to `grep`, `awk`, `sed`, or other Unix tools:
 #### JSON Format
 ```
 :search @type=project -ff json
-:search task -ff json --fields id,text,attributes,created
+:search task -ff json --fields id,text,attributes,created,path
 ```
 Outputs results as a pretty-printed JSON array.
 
@@ -513,7 +513,8 @@ Outputs results as a pretty-printed JSON array.
       "status": "done",
       "priority": "high"
     },
-    "created": "2024-11-08T14:30:00Z"
+    "created": "2024-11-08T14:30:00Z",
+    "path": ["Projects", "Work", "Important"]
   }
 ]
 ```
@@ -521,14 +522,14 @@ Outputs results as a pretty-printed JSON array.
 #### JSONL Format (JSON Lines)
 ```
 :search @type=day -ff jsonl
-:search -@archived -ff jsonl --fields id,text,depth
+:search -@archived -ff jsonl --fields id,text,depth,path
 ```
 Outputs results as JSON Lines format (one JSON object per line), useful for streaming large result sets.
 
 **Example output:**
 ```
-{"id":"id_abc","text":"Buy groceries","attributes":{"type":"task","status":"done"}}
-{"id":"id_def","text":"Review proposal","attributes":{"type":"task","status":"inprogress"}}
+{"id":"id_abc","text":"Buy groceries","attributes":{"type":"task","status":"done"},"path":["Projects","Groceries"]}
+{"id":"id_def","text":"Review proposal","attributes":{"type":"task","status":"inprogress"},"path":["Work","Proposals"]}
 ```
 
 ### Available Fields
@@ -543,7 +544,7 @@ Outputs results as JSON Lines format (one JSON object per line), useful for stre
 | `modified` | Modification timestamp (ISO 8601) | `2024-11-08T15:45:30Z` |
 | `tags` | Tags list | `["urgent","work"]` or `urgent,work` |
 | `depth` | Nesting level (0 = root) | `2` |
-| `path` | Hierarchical path | `Projects > Work > Important` |
+| `path` | Hierarchical path (array in JSON, string in fields format) | `["Projects", "Work", "Important"]` or `Projects > Work > Important` |
 | `parent_id` | ID of parent item | `parent123` |
 
 ### Default Fields

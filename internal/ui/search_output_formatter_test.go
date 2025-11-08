@@ -304,17 +304,23 @@ func TestGetItemPath(t *testing.T) {
 
 	tests := []struct {
 		item     *model.Item
-		expected string
+		expected []string
 	}{
-		{root, "Root"},
-		{level1, "Root > Level1"},
-		{level2, "Root > Level1 > Level2"},
+		{root, []string{"Root"}},
+		{level1, []string{"Root", "Level1"}},
+		{level2, []string{"Root", "Level1", "Level2"}},
 	}
 
 	for _, tt := range tests {
 		result := formatter.getItemPath(tt.item, outline)
-		if result != tt.expected {
-			t.Errorf("item %q: expected path %q, got %q", tt.item.ID, tt.expected, result)
+		if len(result) != len(tt.expected) {
+			t.Errorf("item %q: expected %d path elements, got %d", tt.item.ID, len(tt.expected), len(result))
+			continue
+		}
+		for i, elem := range result {
+			if elem != tt.expected[i] {
+				t.Errorf("item %q: expected path element %d to be %q, got %q", tt.item.ID, i, tt.expected[i], elem)
+			}
 		}
 	}
 }
