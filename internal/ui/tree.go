@@ -1692,14 +1692,14 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 		// This prevents multiple references to the same item from all being highlighted
 		isLinePartOfSelected := selectedItem != nil && displayLine.Item.ID == selectedItem.ID && displayLine.ParentDisplayItem == selectedDisplayItem
 
-		// Select style based on selection, visual selection, and new item status
-		style := defaultStyle
-
-		// Check if item is a header (type=header) and apply header style
+		// Check if item is a header (type=header)
 		isHeader := displayLine.Item.Metadata != nil &&
 			displayLine.Item.Metadata.Attributes != nil &&
 			displayLine.Item.Metadata.Attributes["type"] == "header"
-		if isHeader && !isLinePartOfSelected {
+
+		// Select style based on selection, visual selection, and new item status
+		style := defaultStyle
+		if isHeader {
 			// Apply header style for unselected headers
 			style = screen.HeaderStyle().Background(bgColor)
 		}
@@ -1719,12 +1719,20 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 			} else {
 				style = visualStyle
 			}
+			// Apply bold to headers even in visual selection
+			if isHeader {
+				style = style.Bold(true)
+			}
 		} else if isLinePartOfSelected {
 			style = selectedStyle
 			// Use selected background color for all elements on this line
 			lineBackgroundColor = screen.Theme.Colors.TreeSelectedBg
 			leafArrowStyle = screen.TreeLeafArrowStyle().Background(lineBackgroundColor)
 			expandableArrowStyle = screen.TreeExpandableArrowStyle().Background(lineBackgroundColor)
+			// Apply bold to headers even when selected
+			if isHeader {
+				style = style.Bold(true)
+			}
 		} else {
 			// Normal unselected line
 			leafArrowStyle = screen.TreeLeafArrowStyle().Background(bgColor)
