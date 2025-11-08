@@ -7,16 +7,29 @@ type Message struct {
 	Target     string            `json:"target,omitempty"`     // Default: "inbox"
 	Attributes map[string]string `json:"attributes,omitempty"` // Attributes to set on the new item
 	ExportPath string            `json:"export_path,omitempty"` // Path for export commands
+	Query      string            `json:"query,omitempty"`      // Search query
+
+	// Internal field for synchronous responses (not sent over the wire)
+	ResponseChan chan *Response `json:"-"`
+}
+
+// SearchResult represents a single search result item
+type SearchResult struct {
+	Text  string            `json:"text"`
+	Path  []string          `json:"path"`  // Path to the item in the tree
+	Attrs map[string]string `json:"attrs,omitempty"`
 }
 
 // Response represents the response from the server
 type Response struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success bool           `json:"success"`
+	Message string         `json:"message"`
+	Results []SearchResult `json:"results,omitempty"` // For search commands
 }
 
 // Command types
 const (
 	CommandAddNode        = "add_node"
 	CommandExportMarkdown = "export_markdown"
+	CommandSearch         = "search"
 )

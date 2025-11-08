@@ -4,6 +4,8 @@ import (
 	"log"
 
 	"github.com/pstuifzand/tui-outliner/internal/export"
+	"github.com/pstuifzand/tui-outliner/internal/model"
+	"github.com/pstuifzand/tui-outliner/internal/search"
 	"github.com/pstuifzand/tui-outliner/internal/socket"
 )
 
@@ -16,6 +18,8 @@ func (app *App) handleSocketMessage(msg socket.Message) {
 		app.handleAddNodeCommand(msg)
 	case socket.CommandExportMarkdown:
 		app.handleExportMarkdownCommand(msg)
+	case socket.CommandSearch:
+		app.handleSocketSearchCommand(msg)
 	default:
 		log.Printf("Unknown socket command: %s", msg.Command)
 	}
@@ -82,4 +86,73 @@ func (app *App) handleExportMarkdownCommand(msg socket.Message) {
 
 	log.Printf("Successfully exported to: %s", msg.ExportPath)
 	app.SetStatus("Exported to " + msg.ExportPath)
+}
+
+// handleSocketSearchCommand processes a search command from socket
+func (app *App) handleSocketSearchCommand(msg socket.Message) {
+	// Validate query
+	if msg.Query == "" {
+		log.Printf("Search command missing query")
+		if msg.ResponseChan != nil {
+			msg.ResponseChan <- &socket.Response{
+				Success: false,
+				Message: "Query required",
+			}
+		}
+		return
+	}
+
+	log.Printf("Searching with query: '%s'", msg.Query)
+
+	// Parse the search query
+	filterExpr, err := search.ParseQuery(msg.Query)
+	if err != nil {
+		log.Printf("Failed to parse search query: %v", err)
+		if msg.ResponseChan != nil {
+			msg.ResponseChan <- &socket.Response{
+				Success: false,
+				Message: "Parse error: " + err.Error(),
+			}
+		}
+		return
+	}
+
+	// Get matching items
+	matches := search.GetMatchingItems(app.outline, filterExpr)
+	log.Printf("Found %d matches", len(matches))
+
+	// Build results
+	results := make([]socket.SearchResult, 0, len(matches))
+	for _, item := range matches {
+		result := socket.SearchResult{
+			Text: item.Text,
+			Path: buildItemPath(item),
+		}
+		if item.Metadata != nil && item.Metadata.Attributes != nil {
+			result.Attrs = item.Metadata.Attributes
+		}
+		results = append(results, result)
+	}
+
+	// Send results through response channel
+	if msg.ResponseChan != nil {
+		msg.ResponseChan <- &socket.Response{
+			Success: true,
+			Message: "Search completed",
+			Results: results,
+		}
+	}
+
+	log.Printf("Search completed with %d results", len(results))
+}
+
+// buildItemPath constructs a path array for an item showing its hierarchy
+func buildItemPath(item *model.Item) []string {
+	var path []string
+	current := item
+	for current != nil {
+		path = append([]string{current.Text}, path...)
+		current = current.Parent
+	}
+	return path
 }
