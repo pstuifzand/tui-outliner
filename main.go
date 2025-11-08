@@ -265,30 +265,30 @@ func handleSearchCommand() {
 		fmt.Fprintf(os.Stderr, "  -r               Search in running tuo instance\n")
 		fmt.Fprintf(os.Stderr, "  -f file          Search in file\n")
 		fmt.Fprintf(os.Stderr, "  -ff format       Output format: text, fields, json, jsonl (default: text)\n")
-		fmt.Fprintf(os.Stderr, "  --fields list    Comma-separated fields (file search only)\n")
+		fmt.Fprintf(os.Stderr, "  --fields list    Comma-separated fields to include in results\n")
 		fmt.Fprintf(os.Stderr, "  -json            Output results as JSON (deprecated, use -ff json)\n\n")
 		fmt.Fprintf(os.Stderr, "Output Formats:\n")
 		fmt.Fprintf(os.Stderr, "  text   - Human-readable text format (default)\n")
-		fmt.Fprintf(os.Stderr, "  fields - Tab-separated values for piping to Unix tools (all sources)\n")
-		fmt.Fprintf(os.Stderr, "  json   - Pretty-printed JSON array (all sources)\n")
-		fmt.Fprintf(os.Stderr, "  jsonl  - JSON Lines format (all sources, one object per line)\n\n")
-		fmt.Fprintf(os.Stderr, "Available Fields (file search only):\n")
+		fmt.Fprintf(os.Stderr, "  fields - Tab-separated values for piping to Unix tools\n")
+		fmt.Fprintf(os.Stderr, "  json   - Pretty-printed JSON array\n")
+		fmt.Fprintf(os.Stderr, "  jsonl  - JSON Lines format (one object per line)\n\n")
+		fmt.Fprintf(os.Stderr, "Available Fields:\n")
 		fmt.Fprintf(os.Stderr, "  id, text, attributes, created, modified, tags, depth, path, parent_id\n")
-		fmt.Fprintf(os.Stderr, "  Use attr:<name> for specific attributes (e.g., attr:status)\n\n")
+		fmt.Fprintf(os.Stderr, "  Use attr:<name> for specific attributes (e.g., attr:status, attr:priority)\n\n")
 		fmt.Fprintf(os.Stderr, "Path Field:\n")
 		fmt.Fprintf(os.Stderr, "  In JSON/JSONL: array of node objects with {id, text, attributes}\n")
 		fmt.Fprintf(os.Stderr, "  In fields/text: formatted string with \" > \" separators\n\n")
-		fmt.Fprintf(os.Stderr, "Notes:\n")
-		fmt.Fprintf(os.Stderr, "  - Running instance search (-r) has limited field availability\n")
-		fmt.Fprintf(os.Stderr, "  - --fields option only works with file search (-f)\n")
-		fmt.Fprintf(os.Stderr, "  - Full node objects in path provide feature parity between file and remote searches\n\n")
+		fmt.Fprintf(os.Stderr, "Default Fields:\n")
+		fmt.Fprintf(os.Stderr, "  When --fields is not specified:\n")
+		fmt.Fprintf(os.Stderr, "    - File search (-f) with fields/json/jsonl: context-appropriate defaults\n")
+		fmt.Fprintf(os.Stderr, "    - Running instance (-r): text, path, attributes (for backward compatibility)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -r -ff json \"@type=todo\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -r -ff fields \"@priority=high\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff fields \"@status=done\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff jsonl \"task\"\n")
-		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff json --fields id,text,created \"task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff json --fields id,text,created \"@priority=high\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff fields --fields id,text,depth \"@status=done\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff jsonl --fields text,tags,attr:priority \"task\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff json --fields id,text,path,parent_id \"feature\"\n")
 	}
 
 	if err := searchCmd.Parse(os.Args[2:]); err != nil {
@@ -357,8 +357,11 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 		return fmt.Errorf("failed to connect: %w", err)
 	}
 
+	// Parse fields parameter
+	fields := ui.ParseFieldsFlag(fieldsStr)
+
 	// Send search command
-	response, err := client.SendSearch(query)
+	response, err := client.SendSearch(query, fields)
 	if err != nil {
 		return fmt.Errorf("failed to send search: %w", err)
 	}
@@ -370,33 +373,54 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 	// Output results based on format
 	switch outputFormat {
 	case "fields":
-		// Tab-separated format with available fields
+		// Tab-separated format with requested fields
 		if len(response.Results) == 0 {
 			fmt.Println("No matches found")
 		} else {
 			for _, result := range response.Results {
 				var parts []string
-				parts = append(parts, result.Text)
-				if len(result.Path) > 0 {
-					// Extract text from node objects in path
-					var pathTexts []string
-					for _, p := range result.Path {
-						if node, ok := p.(map[string]interface{}); ok {
-							if text, ok := node["text"].(string); ok {
-								pathTexts = append(pathTexts, text)
+				// Output fields in the order they were requested
+				for _, fieldName := range fields {
+					value, exists := result[fieldName]
+					if !exists {
+						parts = append(parts, "")
+						continue
+					}
+
+					// Format the value based on type
+					switch v := value.(type) {
+					case string:
+						parts = append(parts, v)
+					case []interface{}:
+						// For path field
+						if fieldName == "path" {
+							var pathTexts []string
+							for _, p := range v {
+								if node, ok := p.(map[string]interface{}); ok {
+									if text, ok := node["text"].(string); ok {
+										pathTexts = append(pathTexts, text)
+									}
+								}
 							}
+							parts = append(parts, strings.Join(pathTexts, " > "))
+						} else {
+							// For tags or other arrays
+							var strItems []string
+							for _, item := range v {
+								strItems = append(strItems, fmt.Sprintf("%v", item))
+							}
+							parts = append(parts, strings.Join(strItems, ","))
 						}
+					case map[string]interface{}:
+						// For attributes map
+						var attrs []string
+						for k, val := range v {
+							attrs = append(attrs, fmt.Sprintf("@%s=%v", k, val))
+						}
+						parts = append(parts, strings.Join(attrs, " "))
+					default:
+						parts = append(parts, fmt.Sprintf("%v", v))
 					}
-					if len(pathTexts) > 0 {
-						parts = append(parts, strings.Join(pathTexts, " > "))
-					}
-				}
-				if len(result.Attributes) > 0 {
-					var attrs []string
-					for k, v := range result.Attributes {
-						attrs = append(attrs, fmt.Sprintf("@%s=%s", k, v))
-					}
-					parts = append(parts, strings.Join(attrs, " "))
 				}
 				fmt.Println(strings.Join(parts, "\t"))
 			}
@@ -424,39 +448,52 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 		}
 
 	default:
-		// text format (default)
+		// text format (default) - display text, path, and attributes if available
 		if len(response.Results) == 0 {
 			fmt.Println("No matches found")
 		} else {
 			fmt.Printf("Found %d match(es):\n\n", len(response.Results))
 			for i, result := range response.Results {
-				fmt.Printf("%d. %s\n", i+1, result.Text)
-				if len(result.Path) > 0 {
-					// Extract text from node objects in path
-					var pathTexts []string
-					for _, p := range result.Path {
-						if node, ok := p.(map[string]interface{}); ok {
-							if text, ok := node["text"].(string); ok {
-								pathTexts = append(pathTexts, text)
+				// Display text field
+				if text, ok := result["text"].(string); ok {
+					fmt.Printf("%d. %s\n", i+1, text)
+				} else {
+					fmt.Printf("%d. <no text>\n", i+1)
+				}
+
+				// Display path if available
+				if pathVal, ok := result["path"]; ok {
+					if pathArray, ok := pathVal.([]interface{}); ok && len(pathArray) > 0 {
+						var pathTexts []string
+						for _, p := range pathArray {
+							if node, ok := p.(map[string]interface{}); ok {
+								if text, ok := node["text"].(string); ok {
+									pathTexts = append(pathTexts, text)
+								}
 							}
 						}
-					}
-					if len(pathTexts) > 0 {
-						fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
-					}
-				}
-				if len(result.Attributes) > 0 {
-					fmt.Printf("   Attributes: ")
-					first := true
-					for k, v := range result.Attributes {
-						if !first {
-							fmt.Printf(", ")
+						if len(pathTexts) > 0 {
+							fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
 						}
-						fmt.Printf("%s=%s", k, v)
-						first = false
 					}
-					fmt.Println()
 				}
+
+				// Display attributes if available
+				if attrsVal, ok := result["attributes"]; ok {
+					if attrs, ok := attrsVal.(map[string]interface{}); ok && len(attrs) > 0 {
+						fmt.Printf("   Attributes: ")
+						first := true
+						for k, v := range attrs {
+							if !first {
+								fmt.Printf(", ")
+							}
+							fmt.Printf("%s=%v", k, v)
+							first = false
+						}
+						fmt.Println()
+					}
+				}
+
 				fmt.Println()
 			}
 		}
@@ -533,26 +570,16 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 		}
 
 	default:
-		// text format (default) - use SearchResult objects for backward compatibility
-		results := make([]socket.SearchResult, 0, len(matches))
-		for _, item := range matches {
-			result := socket.SearchResult{
-				Text: item.Text,
-				Path: buildItemPathForCLI(item),
-			}
-			if item.Metadata != nil && item.Metadata.Attributes != nil {
-				result.Attributes = item.Metadata.Attributes
-			}
-			results = append(results, result)
-		}
+		// text format (default) - display text, path, and attributes if available
+		fmt.Printf("Found %d match(es):\n\n", len(matches))
+		for i, item := range matches {
+			fmt.Printf("%d. %s\n", i+1, item.Text)
 
-		fmt.Printf("Found %d match(es):\n\n", len(results))
-		for i, result := range results {
-			fmt.Printf("%d. %s\n", i+1, result.Text)
-			if len(result.Path) > 0 {
-				// Extract text from node objects in path
+			// Display path
+			path := buildItemPathForCLI(item)
+			if len(path) > 0 {
 				var pathTexts []string
-				for _, p := range result.Path {
+				for _, p := range path {
 					if node, ok := p.(map[string]interface{}); ok {
 						if text, ok := node["text"].(string); ok {
 							pathTexts = append(pathTexts, text)
@@ -563,10 +590,12 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 					fmt.Printf("   Path: %s\n", strings.Join(pathTexts, " > "))
 				}
 			}
-			if len(result.Attributes) > 0 {
+
+			// Display attributes
+			if item.Metadata != nil && item.Metadata.Attributes != nil && len(item.Metadata.Attributes) > 0 {
 				fmt.Printf("   Attributes: ")
 				first := true
-				for k, v := range result.Attributes {
+				for k, v := range item.Metadata.Attributes {
 					if !first {
 						fmt.Printf(", ")
 					}

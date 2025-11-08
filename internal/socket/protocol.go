@@ -8,17 +8,15 @@ type Message struct {
 	Attributes map[string]string `json:"attributes,omitempty"` // Attributes to set on the new item
 	ExportPath string            `json:"export_path,omitempty"` // Path for export commands
 	Query      string            `json:"query,omitempty"`      // Search query
+	Fields     []string          `json:"fields,omitempty"`     // Fields to include in search results
 
 	// Internal field for synchronous responses (not sent over the wire)
 	ResponseChan chan *Response `json:"-"`
 }
 
-// SearchResult represents a single search result item
-type SearchResult struct {
-	Text       string                 `json:"text"`
-	Path       []interface{}          `json:"path"`  // Path to the item in the tree (array of node objects with id, text, attributes)
-	Attributes map[string]string      `json:"attributes,omitempty"`
-}
+// SearchResult represents a single search result item with flexible fields
+// The actual fields included depend on the Fields parameter in the search request
+type SearchResult map[string]interface{}
 
 // Response represents the response from the server
 type Response struct {
