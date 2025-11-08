@@ -100,8 +100,16 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		return false // Signal to exit edit mode and perform outdent
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if e.cursorPos > 0 {
-			e.text = e.text[:e.cursorPos-1] + e.text[e.cursorPos:]
-			e.cursorPos--
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			before := e.text[:e.cursorPos]
+			runes := []rune(before)
+			if len(runes) > 0 {
+				runes = runes[:len(runes)-1] // Remove last rune/character
+				newBefore := string(runes)
+				deletedBytes := len(before) - len(newBefore)
+				e.text = newBefore + e.text[e.cursorPos:]
+				e.cursorPos -= deletedBytes
+			}
 		} else if e.cursorPos == 0 && e.text == "" {
 			// Backspace pressed on empty item - signal to merge with previous item
 			e.backspaceOnEmpty = true
@@ -109,7 +117,14 @@ func (e *Editor) HandleKey(ev *tcell.EventKey) bool {
 		}
 	case tcell.KeyDelete:
 		if e.cursorPos < len(e.text) {
-			e.text = e.text[:e.cursorPos] + e.text[e.cursorPos+1:]
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			after := e.text[e.cursorPos:]
+			runes := []rune(after)
+			if len(runes) > 0 {
+				// Calculate bytes to delete (the first rune)
+				deletedBytes := len(string(runes[:1]))
+				e.text = e.text[:e.cursorPos] + e.text[e.cursorPos+deletedBytes:]
+			}
 		}
 	case tcell.KeyLeft:
 		if e.cursorPos > 0 {

@@ -116,8 +116,16 @@ func (c *CommandMode) HandleKey(ev *tcell.EventKey) (command string, done bool) 
 		}
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if c.cursorPos > 0 {
-			c.input = c.input[:c.cursorPos-1] + c.input[c.cursorPos:]
-			c.cursorPos--
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			before := c.input[:c.cursorPos]
+			runes := []rune(before)
+			if len(runes) > 0 {
+				runes = runes[:len(runes)-1] // Remove last rune/character
+				newBefore := string(runes)
+				deletedBytes := len(before) - len(newBefore)
+				c.input = newBefore + c.input[c.cursorPos:]
+				c.cursorPos -= deletedBytes
+			}
 		} else if c.input == "" {
 			// Exit command mode when backspace is pressed on empty command line
 			c.Stop()
@@ -125,7 +133,14 @@ func (c *CommandMode) HandleKey(ev *tcell.EventKey) (command string, done bool) 
 		}
 	case tcell.KeyDelete:
 		if c.cursorPos < len(c.input) {
-			c.input = c.input[:c.cursorPos] + c.input[c.cursorPos+1:]
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			after := c.input[c.cursorPos:]
+			runes := []rune(after)
+			if len(runes) > 0 {
+				// Calculate bytes to delete (the first rune)
+				deletedBytes := len(string(runes[:1]))
+				c.input = c.input[:c.cursorPos] + c.input[c.cursorPos+deletedBytes:]
+			}
 		}
 	case tcell.KeyLeft:
 		if c.cursorPos > 0 {

@@ -253,8 +253,16 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 	case tcell.KeyBackspace, tcell.KeyBackspace2:
 		if mle.cursorPos > 0 {
 			mle.saveUndoState()
-			mle.text = mle.text[:mle.cursorPos-1] + mle.text[mle.cursorPos:]
-			mle.cursorPos--
+			// Delete entire character (which may be multiple bytes for UTF-8)
+			before := mle.text[:mle.cursorPos]
+			runes := []rune(before)
+			if len(runes) > 0 {
+				runes = runes[:len(runes)-1] // Remove last rune/character
+				newBefore := string(runes)
+				deletedBytes := len(before) - len(newBefore)
+				mle.text = newBefore + mle.text[mle.cursorPos:]
+				mle.cursorPos -= deletedBytes
+			}
 			mle.calculateWrappedLines()
 		} else if mle.cursorPos == 0 && mle.text == "" {
 			mle.backspaceOnEmpty = true
@@ -269,7 +277,14 @@ func (mle *MultiLineEditor) HandleKey(ev *tcell.EventKey) bool {
 		} else {
 			if mle.cursorPos < len(mle.text) {
 				mle.saveUndoState()
-				mle.text = mle.text[:mle.cursorPos] + mle.text[mle.cursorPos+1:]
+				// Delete entire character (which may be multiple bytes for UTF-8)
+				after := mle.text[mle.cursorPos:]
+				runes := []rune(after)
+				if len(runes) > 0 {
+					// Calculate bytes to delete (the first rune)
+					deletedBytes := len(string(runes[:1]))
+					mle.text = mle.text[:mle.cursorPos] + mle.text[mle.cursorPos+deletedBytes:]
+				}
 				mle.calculateWrappedLines()
 			}
 		}
