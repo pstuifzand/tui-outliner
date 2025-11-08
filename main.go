@@ -264,19 +264,23 @@ func handleSearchCommand() {
 		fmt.Fprintf(os.Stderr, "  -r               Search in running tuo instance\n")
 		fmt.Fprintf(os.Stderr, "  -f file          Search in file\n")
 		fmt.Fprintf(os.Stderr, "  -ff format       Output format: text, fields, json, jsonl (default: text)\n")
-		fmt.Fprintf(os.Stderr, "  --fields list    Comma-separated fields for json/jsonl/fields output\n")
+		fmt.Fprintf(os.Stderr, "  --fields list    Comma-separated fields (file search only)\n")
 		fmt.Fprintf(os.Stderr, "  -json            Output results as JSON (deprecated, use -ff json)\n\n")
 		fmt.Fprintf(os.Stderr, "Output Formats:\n")
 		fmt.Fprintf(os.Stderr, "  text   - Human-readable text format (default)\n")
-		fmt.Fprintf(os.Stderr, "  fields - Tab-separated values for piping to Unix tools\n")
-		fmt.Fprintf(os.Stderr, "  json   - Pretty-printed JSON array\n")
-		fmt.Fprintf(os.Stderr, "  jsonl  - JSON Lines format (one object per line)\n\n")
-		fmt.Fprintf(os.Stderr, "Available Fields:\n")
+		fmt.Fprintf(os.Stderr, "  fields - Tab-separated values for piping to Unix tools (all sources)\n")
+		fmt.Fprintf(os.Stderr, "  json   - Pretty-printed JSON array (all sources)\n")
+		fmt.Fprintf(os.Stderr, "  jsonl  - JSON Lines format (all sources, one object per line)\n\n")
+		fmt.Fprintf(os.Stderr, "Available Fields (file search only):\n")
 		fmt.Fprintf(os.Stderr, "  id, text, attributes, created, modified, tags, depth, path, parent_id\n")
 		fmt.Fprintf(os.Stderr, "  Use attr:<name> for specific attributes (e.g., attr:status)\n\n")
+		fmt.Fprintf(os.Stderr, "Notes:\n")
+		fmt.Fprintf(os.Stderr, "  - Running instance search (-r) has limited field availability\n")
+		fmt.Fprintf(os.Stderr, "  - --fields option only works with file search (-f)\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -r \"@type=todo\" -ff json\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r \"@priority=high\" -ff fields\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -f work.json \"@status=done\" -ff fields\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -f work.json \"task\" -ff json --fields id,text,created\n")
 	}
@@ -358,17 +362,52 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 	}
 
 	// Output results based on format
-	// Note: socket response only has basic fields, so we support text and json formats
+	// Note: socket response has limited metadata compared to file search
+	// (no item IDs, only text-based paths)
 	switch outputFormat {
+	case "fields":
+		// Tab-separated format with available fields
+		if len(response.Results) == 0 {
+			fmt.Println("No matches found")
+		} else {
+			for _, result := range response.Results {
+				var parts []string
+				parts = append(parts, result.Text)
+				if len(result.Path) > 0 {
+					parts = append(parts, strings.Join(result.Path, " > "))
+				}
+				if len(result.Attrs) > 0 {
+					var attrs []string
+					for k, v := range result.Attrs {
+						attrs = append(attrs, fmt.Sprintf("@%s=%s", k, v))
+					}
+					parts = append(parts, strings.Join(attrs, " "))
+				}
+				fmt.Println(strings.Join(parts, "\t"))
+			}
+		}
+
 	case "json":
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(response.Results); err != nil {
 			return fmt.Errorf("failed to encode results: %w", err)
 		}
-	case "fields", "jsonl":
-		// These formats need full item metadata, only available when searching files
-		return fmt.Errorf("format '%s' is only supported when searching files (-f)", outputFormat)
+
+	case "jsonl":
+		// JSON Lines format - one result per line
+		if len(response.Results) == 0 {
+			fmt.Println("No matches found")
+		} else {
+			for _, result := range response.Results {
+				data, err := json.Marshal(result)
+				if err != nil {
+					return fmt.Errorf("failed to encode result: %w", err)
+				}
+				fmt.Println(string(data))
+			}
+		}
+
 	default:
 		// text format (default)
 		if len(response.Results) == 0 {
