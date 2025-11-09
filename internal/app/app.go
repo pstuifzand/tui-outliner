@@ -1350,13 +1350,21 @@ func (a *App) handleCommand(cmd string) {
 
 		switch format {
 		case "markdown":
+			// Full markdown format with headers as # ## ###
 			if err := export.ExportToMarkdown(a.outline, filename); err != nil {
 				a.SetStatus("Failed to export: " + err.Error())
 			} else {
-				a.SetStatus("Exported to " + filename)
+				a.SetStatus("Exported to " + filename + " (markdown with headers)")
+			}
+		case "list":
+			// List format with all items as bullets
+			if err := export.ExportToMarkdownList(a.outline, filename); err != nil {
+				a.SetStatus("Failed to export: " + err.Error())
+			} else {
+				a.SetStatus("Exported to " + filename + " (list format)")
 			}
 		default:
-			a.SetStatus("Unknown export format: " + format + " (use 'markdown' or 'text')")
+			a.SetStatus("Unknown export format: " + format + " (use 'markdown' or 'list')")
 		}
 	case "import":
 		if a.readOnly {
