@@ -323,6 +323,17 @@ func NewApp(filePath string) (*App, error) {
 			// Set the date attribute on current item
 			selected := app.tree.GetSelected()
 			if selected != nil {
+				// Initialize metadata if needed
+				if selected.Metadata == nil {
+					selected.Metadata = &model.Metadata{
+						Attributes: make(map[string]string),
+						Created:    time.Now(),
+						Modified:   time.Now(),
+					}
+				}
+				if selected.Metadata.Attributes == nil {
+					selected.Metadata.Attributes = make(map[string]string)
+				}
 				selected.Metadata.Attributes[app.calendarWidget.GetAttributeName()] = dateStr
 				app.dirty = true
 				app.SetStatus(fmt.Sprintf("Set %s to %s", app.calendarWidget.GetAttributeName(), dateStr))
@@ -954,6 +965,9 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 							Modified:   time.Now(),
 						}
 					}
+					if editedItem.Metadata.Attributes == nil {
+						editedItem.Metadata.Attributes = make(map[string]string)
+					}
 					// Set type and status attributes, strip prefix from text
 					editedItem.Metadata.Attributes["type"] = "todo"
 					editedItem.Metadata.Attributes["status"] = "todo"
@@ -972,6 +986,9 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 							Created:    time.Now(),
 							Modified:   time.Now(),
 						}
+					}
+					if editedItem.Metadata.Attributes == nil {
+						editedItem.Metadata.Attributes = make(map[string]string)
 					}
 					// Set type attribute, strip prefix from text
 					editedItem.Metadata.Attributes["type"] = "header"
