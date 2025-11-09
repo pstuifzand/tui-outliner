@@ -103,7 +103,7 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 		return
 	}
 
-	log.Printf("Searching with query: '%s', fields: %v", msg.Query, msg.Fields)
+	log.Printf("Searching with query: '%s', fields: %v, format: %s", msg.Query, msg.Fields, msg.Format)
 
 	// Parse the search query
 	filterExpr, err := search.ParseQuery(msg.Query)
@@ -129,10 +129,19 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 		fields = []string{"text", "path", "attributes"}
 	}
 
+	// For markdown/list format, always include children
+	includeChildren := msg.Format == "markdown" || msg.Format == "list"
+
 	// Build results with requested fields
 	results := make([]socket.SearchResult, 0, len(matches))
 	for _, item := range matches {
 		result := buildSearchResult(item, fields)
+
+		// Add children for export formats
+		if includeChildren {
+			result["children"] = buildChildrenArray(item)
+		}
+
 		results = append(results, result)
 	}
 
@@ -146,6 +155,35 @@ func (app *App) handleSocketSearchCommand(msg socket.Message) {
 	}
 
 	log.Printf("Search completed with %d results", len(results))
+}
+
+// buildChildrenArray recursively builds an array of children for an item
+func buildChildrenArray(item *model.Item) []interface{} {
+	if len(item.Children) == 0 {
+		return nil
+	}
+
+	children := make([]interface{}, 0, len(item.Children))
+	for _, child := range item.Children {
+		childData := map[string]interface{}{
+			"id":   child.ID,
+			"text": child.Text,
+		}
+
+		// Add attributes if present
+		if child.Metadata != nil && child.Metadata.Attributes != nil && len(child.Metadata.Attributes) > 0 {
+			childData["attributes"] = child.Metadata.Attributes
+		}
+
+		// Recursively add children
+		if grandchildren := buildChildrenArray(child); grandchildren != nil {
+			childData["children"] = grandchildren
+		}
+
+		children = append(children, childData)
+	}
+
+	return children
 }
 
 // buildItemPath constructs a path array for an item showing its hierarchy with full node objects

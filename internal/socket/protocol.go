@@ -9,6 +9,7 @@ type Message struct {
 	ExportPath string            `json:"export_path,omitempty"` // Path for export commands
 	Query      string            `json:"query,omitempty"`      // Search query
 	Fields     []string          `json:"fields,omitempty"`     // Fields to include in search results
+	Format     string            `json:"format,omitempty"`     // Output format for search results
 
 	// Internal field for synchronous responses (not sent over the wire)
 	ResponseChan chan *Response `json:"-"`
