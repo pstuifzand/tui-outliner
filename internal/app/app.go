@@ -959,6 +959,26 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					editedItem.Metadata.Attributes["status"] = "todo"
 					editedItem.Text = strings.TrimPrefix(editedItem.Text, "[] ")
 					editedItem.Metadata.Modified = time.Now()
+					// Rebuild view to show updated text without prefix
+					a.tree.RebuildView()
+				}
+
+				// Auto-detect header pattern "# "
+				if strings.HasPrefix(editedItem.Text, "# ") {
+					// Initialize metadata if needed
+					if editedItem.Metadata == nil {
+						editedItem.Metadata = &model.Metadata{
+							Attributes: make(map[string]string),
+							Created:    time.Now(),
+							Modified:   time.Now(),
+						}
+					}
+					// Set type attribute, strip prefix from text
+					editedItem.Metadata.Attributes["type"] = "header"
+					editedItem.Text = strings.TrimPrefix(editedItem.Text, "# ")
+					editedItem.Metadata.Modified = time.Now()
+					// Rebuild view to show updated text without prefix
+					a.tree.RebuildView()
 				}
 
 				// If Escape was pressed and item is empty (and has no children), delete it
