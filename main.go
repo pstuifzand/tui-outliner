@@ -255,7 +255,7 @@ func handleSearchCommand() {
 	runningFlag := searchCmd.Bool("r", false, "Search in running tuo instance")
 	fileFlag := searchCmd.String("f", "", "Search in file")
 	jsonFlag := searchCmd.Bool("json", false, "Output results as JSON (legacy, use -ff json)")
-	ffFlag := searchCmd.String("ff", "", "Output format: text, fields, json, jsonl")
+	ffFlag := searchCmd.String("ff", "", "Output format: text, fields, json, jsonl, markdown, list")
 	fieldsFlag := searchCmd.String("fields", "", "Comma-separated fields: id,text,created,etc")
 	searchCmd.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: tuo search -f|-r [options] <query>\n")
@@ -264,14 +264,16 @@ func handleSearchCommand() {
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fmt.Fprintf(os.Stderr, "  -r               Search in running tuo instance\n")
 		fmt.Fprintf(os.Stderr, "  -f file          Search in file\n")
-		fmt.Fprintf(os.Stderr, "  -ff format       Output format: text, fields, json, jsonl (default: text)\n")
+		fmt.Fprintf(os.Stderr, "  -ff format       Output format: text, fields, json, jsonl, markdown, list (default: text)\n")
 		fmt.Fprintf(os.Stderr, "  --fields list    Comma-separated fields to include in results\n")
 		fmt.Fprintf(os.Stderr, "  -json            Output results as JSON (deprecated, use -ff json)\n\n")
 		fmt.Fprintf(os.Stderr, "Output Formats:\n")
-		fmt.Fprintf(os.Stderr, "  text   - Human-readable text format (default)\n")
-		fmt.Fprintf(os.Stderr, "  fields - Tab-separated values for piping to Unix tools\n")
-		fmt.Fprintf(os.Stderr, "  json   - Pretty-printed JSON array\n")
-		fmt.Fprintf(os.Stderr, "  jsonl  - JSON Lines format (one object per line)\n\n")
+		fmt.Fprintf(os.Stderr, "  text     - Human-readable text format (default)\n")
+		fmt.Fprintf(os.Stderr, "  fields   - Tab-separated values for piping to Unix tools\n")
+		fmt.Fprintf(os.Stderr, "  json     - Pretty-printed JSON array\n")
+		fmt.Fprintf(os.Stderr, "  jsonl    - JSON Lines format (one object per line)\n")
+		fmt.Fprintf(os.Stderr, "  markdown - Export matched nodes and subtrees as markdown\n")
+		fmt.Fprintf(os.Stderr, "  list     - Export matched nodes and subtrees as markdown list (same as markdown)\n\n")
 		fmt.Fprintf(os.Stderr, "Available Fields:\n")
 		fmt.Fprintf(os.Stderr, "  id, text, attributes, created, modified, tags, depth, path, parent_id\n")
 		fmt.Fprintf(os.Stderr, "  Use attr:<name> for specific attributes (e.g., attr:status, attr:priority)\n\n")
@@ -289,6 +291,8 @@ func handleSearchCommand() {
 		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff fields --fields id,text,depth \"@status=done\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -r -ff jsonl --fields text,tags,attr:priority \"task\"\n")
 		fmt.Fprintf(os.Stderr, "  tuo search -f work.json -ff json --fields id,text,path,parent_id \"feature\"\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff markdown \"@type=project\" > project.md\n")
+		fmt.Fprintf(os.Stderr, "  tuo search -r -ff list \"important\" > important.md\n")
 	}
 
 	if err := searchCmd.Parse(os.Args[2:]); err != nil {
@@ -361,7 +365,7 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 	fields := ui.ParseFieldsFlag(fieldsStr)
 
 	// Send search command
-	response, err := client.SendSearch(query, fields)
+	response, err := client.SendSearch(query, fields, outputFormat)
 	if err != nil {
 		return fmt.Errorf("failed to send search: %w", err)
 	}
@@ -372,6 +376,33 @@ func searchRunningInstance(query string, outputFormat string, fieldsStr string) 
 
 	// Output results based on format
 	switch outputFormat {
+	case "markdown", "list":
+		// Export matched nodes and their subtrees as markdown
+		if len(response.Results) == 0 {
+			fmt.Println("No matches found")
+			return nil
+		}
+
+		// Reconstruct items from results
+		// For markdown export, we need to rebuild the item structure with children
+		var items []*model.Item
+		for _, result := range response.Results {
+			item := resultToItem(result)
+			if item != nil {
+				items = append(items, item)
+			}
+		}
+
+		// Create a temporary outline with matched items
+		tempOutline := &model.Outline{
+			Items: items,
+		}
+
+		// Export to markdown and write to stdout
+		if err := export.ExportToMarkdownWriter(tempOutline, os.Stdout); err != nil {
+			return fmt.Errorf("failed to export markdown: %w", err)
+		}
+
 	case "fields":
 		// Tab-separated format with requested fields
 		if len(response.Results) == 0 {
@@ -533,6 +564,23 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 
 	// Determine output format
 	switch outputFormat {
+	case "markdown", "list":
+		// Export matched nodes and their subtrees as markdown
+		if len(matches) == 0 {
+			fmt.Println("No matches found")
+			return nil
+		}
+
+		// Create a temporary outline with matched items
+		tempOutline := &model.Outline{
+			Items: matches,
+		}
+
+		// Export to markdown and write to stdout
+		if err := export.ExportToMarkdownWriter(tempOutline, os.Stdout); err != nil {
+			return fmt.Errorf("failed to export markdown: %w", err)
+		}
+
 	case "fields":
 		// Use SearchOutputFormatter for fields format
 		formatter := ui.NewSearchOutputFormatter()
@@ -614,6 +662,44 @@ func searchFile(query, filePath string, outputFormat string, fieldsStr string) e
 	return nil
 }
 
+// resultToItem converts a search result back to a model.Item for export
+func resultToItem(result socket.SearchResult) *model.Item {
+	text, ok := result["text"].(string)
+	if !ok {
+		return nil
+	}
+
+	item := model.NewItem(text)
+
+	// Set ID if available
+	if id, ok := result["id"].(string); ok {
+		item.ID = id
+	}
+
+	// Set attributes if available
+	if attrs, ok := result["attributes"].(map[string]interface{}); ok {
+		if item.Metadata.Attributes == nil {
+			item.Metadata.Attributes = make(map[string]string)
+		}
+		for k, v := range attrs {
+			item.Metadata.Attributes[k] = fmt.Sprintf("%v", v)
+		}
+	}
+
+	// Recursively build children if available
+	if children, ok := result["children"].([]interface{}); ok {
+		for _, childData := range children {
+			if childResult, ok := childData.(map[string]interface{}); ok {
+				if childItem := resultToItem(childResult); childItem != nil {
+					item.AddChild(childItem)
+				}
+			}
+		}
+	}
+
+	return item
+}
+
 // buildItemPathForCLI constructs a path array for an item showing its hierarchy with full node objects
 func buildItemPathForCLI(item *model.Item) []interface{} {
 	var path []interface{}
@@ -654,7 +740,8 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json \"todo\"           Search file for 'todo'\n")
 	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff fields \"@status=done\"  Tab-separated output\n")
 	fmt.Fprintf(os.Stderr, "  tuo search -r -ff json \"@type=todo\"       JSON output from running instance\n")
-	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff jsonl \"task\" Search with JSONL format (full node objects in path)\n\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff jsonl \"task\" Search with JSONL format (full node objects in path)\n")
+	fmt.Fprintf(os.Stderr, "  tuo search -f notes.json -ff markdown \"@type=project\" > export.md  Export matching nodes to markdown\n\n")
 	fmt.Fprintf(os.Stderr, "For more info on search, run: tuo search -h\n")
 }
 
