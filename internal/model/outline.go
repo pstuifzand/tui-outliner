@@ -235,6 +235,14 @@ func (i *Item) IsSearchNode() bool {
 	return i.Metadata.Attributes["type"] == "search"
 }
 
+// IsHeader returns true if this item is a header node (has type="header" attribute)
+func (i *Item) IsHeader() bool {
+	if i.Metadata == nil || i.Metadata.Attributes == nil {
+		return false
+	}
+	return i.Metadata.Attributes["type"] == "header"
+}
+
 // GetSearchQuery returns the search query from the @query attribute
 func (i *Item) GetSearchQuery() string {
 	if i.Metadata == nil || i.Metadata.Attributes == nil {
