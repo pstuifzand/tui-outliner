@@ -56,7 +56,8 @@ func GenerateMarkdownWithHeaders(outline *model.Outline) string {
 		writeItemAsMarkdownWithHeaders(&sb, item, 0, 1)
 	}
 
-	return sb.String()
+	// Trim leading newline if present (from first header)
+	return strings.TrimPrefix(sb.String(), "\n")
 }
 
 // GenerateMarkdownList generates markdown content from an outline as an unordered list.
@@ -100,6 +101,8 @@ func writeItemAsMarkdownWithHeaders(sb *strings.Builder, item *model.Item, depth
 	}
 
 	if item.IsHeader() {
+		// Add blank line before header for separation
+		sb.WriteString("\n")
 		// Write as markdown header
 		sb.WriteString(strings.Repeat("#", headerLevel))
 		sb.WriteString(" ")
