@@ -20,6 +20,9 @@ type NodeSearchWidget struct {
 	filterExpr  search.FilterExpr // Parsed filter expression
 	onSelect    func(*model.Item)
 	onHoist     func(*model.Item)
+	// Remember last search state
+	lastQuery       string
+	lastSelectedIdx int
 }
 
 func NewNodeSearchWidget() *NodeSearchWidget {
@@ -48,9 +51,16 @@ func (w *NodeSearchWidget) SetOnHoist(onHoist func(*model.Item)) {
 
 func (w *NodeSearchWidget) Show() {
 	w.visible = true
-	w.query = ""
-	w.cursorPos = 0
-	w.selectedIdx = 0
+	// Restore last search state if available
+	if w.lastQuery != "" {
+		w.query = w.lastQuery
+		w.cursorPos = len(w.query)
+		w.selectedIdx = w.lastSelectedIdx
+	} else {
+		w.query = ""
+		w.cursorPos = 0
+		w.selectedIdx = 0
+	}
 	w.updateMatches()
 }
 
@@ -64,6 +74,7 @@ func (w *NodeSearchWidget) IsVisible() bool {
 
 // updateMatches uses advanced search filter expressions to match items
 func (w *NodeSearchWidget) updateMatches() {
+	oldSelectedIdx := w.selectedIdx
 	w.matches = nil
 	w.selectedIdx = 0
 	w.parseError = ""
@@ -89,6 +100,10 @@ func (w *NodeSearchWidget) updateMatches() {
 				}
 			}
 		}
+		// Restore selected index if it's still valid after updating matches
+		if oldSelectedIdx > 0 && oldSelectedIdx < len(w.matches) {
+			w.selectedIdx = oldSelectedIdx
+		}
 		return
 	}
 
@@ -101,6 +116,11 @@ func (w *NodeSearchWidget) updateMatches() {
 				break
 			}
 		}
+	}
+
+	// Restore selected index if it's still valid after updating matches
+	if oldSelectedIdx > 0 && oldSelectedIdx < len(w.matches) {
+		w.selectedIdx = oldSelectedIdx
 	}
 }
 
@@ -145,6 +165,9 @@ func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 			// Alt+Enter: Hoist the current match
 			if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
 				selected := w.matches[w.selectedIdx]
+				// Remember last search state
+				w.lastQuery = w.query
+				w.lastSelectedIdx = w.selectedIdx
 				w.Hide()
 				if w.onHoist != nil {
 					w.onHoist(selected)
@@ -154,6 +177,9 @@ func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 			// Enter: Select the current match
 			if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
 				selected := w.matches[w.selectedIdx]
+				// Remember last search state
+				w.lastQuery = w.query
+				w.lastSelectedIdx = w.selectedIdx
 				w.Hide()
 				if w.onSelect != nil {
 					w.onSelect(selected)
