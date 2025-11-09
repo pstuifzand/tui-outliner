@@ -959,6 +959,8 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					editedItem.Metadata.Attributes["status"] = "todo"
 					editedItem.Text = strings.TrimPrefix(editedItem.Text, "[] ")
 					editedItem.Metadata.Modified = time.Now()
+					// Rebuild view to show updated text without prefix
+					a.tree.RebuildView()
 				}
 
 				// Auto-detect header pattern "# "
@@ -975,6 +977,8 @@ func (a *App) handleRawEvent(ev tcell.Event) {
 					editedItem.Metadata.Attributes["type"] = "header"
 					editedItem.Text = strings.TrimPrefix(editedItem.Text, "# ")
 					editedItem.Metadata.Modified = time.Now()
+					// Rebuild view to show updated text without prefix
+					a.tree.RebuildView()
 				}
 
 				// If Escape was pressed and item is empty (and has no children), delete it
