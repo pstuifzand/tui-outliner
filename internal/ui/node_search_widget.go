@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/model"
@@ -16,13 +17,10 @@ type NodeSearchWidget struct {
 	selectedIdx int
 	cursorPos   int
 	maxResults  int
-	parseError  string           // Error from parsing advanced search query
+	parseError  string            // Error from parsing advanced search query
 	filterExpr  search.FilterExpr // Parsed filter expression
 	onSelect    func(*model.Item)
 	onHoist     func(*model.Item)
-	// Remember last search state
-	lastQuery       string
-	lastSelectedIdx int
 }
 
 func NewNodeSearchWidget() *NodeSearchWidget {
@@ -57,16 +55,6 @@ func (w *NodeSearchWidget) SetQuery(query string) {
 
 func (w *NodeSearchWidget) Show() {
 	w.visible = true
-	// Restore last search state if available
-	if w.lastQuery != "" {
-		w.query = w.lastQuery
-		w.cursorPos = len(w.query)
-		w.selectedIdx = w.lastSelectedIdx
-	} else {
-		w.query = ""
-		w.cursorPos = 0
-		w.selectedIdx = 0
-	}
 	w.updateMatches()
 }
 
@@ -95,30 +83,16 @@ func (w *NodeSearchWidget) updateMatches() {
 	if err != nil {
 		// If parsing fails, treat as simple text search
 		w.parseError = err.Error()
-		w.filterExpr = nil
-		// Fall back to text-only matching
-		for _, item := range w.allItems {
-			textExpr := search.NewTextExpr(w.query)
-			if textExpr.Matches(item) {
-				w.matches = append(w.matches, item)
-				if len(w.matches) >= w.maxResults {
-					break
-				}
-			}
-		}
-		// Restore selected index if it's still valid after updating matches
-		if oldSelectedIdx > 0 && oldSelectedIdx < len(w.matches) {
-			w.selectedIdx = oldSelectedIdx
-		}
-		return
+		w.filterExpr = search.NewTextExpr(w.query)
+	} else {
+		w.filterExpr = expr
 	}
 
-	// Apply the filter expression to all items
-	w.filterExpr = expr
 	for _, item := range w.allItems {
-		if expr.Matches(item) {
+		if w.filterExpr.Matches(item) {
 			w.matches = append(w.matches, item)
 			if len(w.matches) >= w.maxResults {
+				// FIXME: optimization but inccomplete
 				break
 			}
 		}
@@ -163,31 +137,29 @@ func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 
 	switch ev.Key() {
 	case tcell.KeyEscape:
-		w.Hide()
-		return true
+		// Clear, and then close
+		if w.query != "" {
+			w.query = ""
+			w.cursorPos = 0
+			w.selectedIdx = 0
+			w.updateMatches()
+			return true
+		} else {
+			w.Hide()
+			return true
+		}
 
 	case tcell.KeyEnter:
-		if ev.Modifiers()&tcell.ModAlt != 0 {
-			// Alt+Enter: Hoist the current match
-			if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
-				selected := w.matches[w.selectedIdx]
-				// Remember last search state
-				w.lastQuery = w.query
-				w.lastSelectedIdx = w.selectedIdx
-				w.Hide()
-				if w.onHoist != nil {
+		// Alt+Enter: Hoist the current match, Enter: Select the current match
+		isAlt := ev.Modifiers()&tcell.ModAlt != 0
+		if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
+			selected := w.matches[w.selectedIdx]
+			// Remember last search state
+			w.Hide()
+			if w.onHoist != nil {
+				if isAlt {
 					w.onHoist(selected)
-				}
-			}
-		} else {
-			// Enter: Select the current match
-			if len(w.matches) > 0 && w.selectedIdx < len(w.matches) {
-				selected := w.matches[w.selectedIdx]
-				// Remember last search state
-				w.lastQuery = w.query
-				w.lastSelectedIdx = w.selectedIdx
-				w.Hide()
-				if w.onSelect != nil {
+				} else {
 					w.onSelect(selected)
 				}
 			}
@@ -341,13 +313,13 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 	}
 
 	// Draw title
-	titleY := boxStartY + 1
-	title := "Search Nodes"
+	titleY := boxStartY
+	title := " Search Nodes "
 	titleX := boxStartX + 2
 	screen.DrawStringLimited(titleX, titleY, title, boxWidth-4, borderStyle)
 
 	// Draw search input
-	inputY := boxStartY + 2
+	inputY := boxStartY + 1
 	inputX := boxStartX + 2
 	inputWidth := boxWidth - 4
 
@@ -380,29 +352,23 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 	}
 
 	// Draw results
-	resultsY := boxStartY + 3
-	maxDisplayResults := 9
-	canHoist := true
-	for i := 0; i < len(w.matches) && i < maxDisplayResults; i++ {
+	resultsY := boxStartY + 2
+	maxDisplayResults := 10
+	for i := 0; i < min(len(w.matches), maxDisplayResults); i++ {
 		resultY := resultsY + i
-		if resultY >= boxStartY+boxHeight-2 {
+		if resultY >= boxStartY+boxHeight-1 {
 			break
 		}
 
 		item := w.matches[i]
 		isSelected := i == w.selectedIdx
 
-		if isSelected && len(item.Children) == 0 {
-			canHoist = false
-		}
-
 		// Format the result line
-		var resultLine string
+		resultLine := "   "
 		if isSelected {
-			resultLine = " > " + item.Text
-		} else {
-			resultLine = "   " + item.Text
+			resultLine = " > "
 		}
+		resultLine += item.Text
 
 		// Truncate if too long
 		if len(resultLine) > inputWidth {
@@ -417,6 +383,12 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 		screen.DrawStringLimited(inputX, resultY, resultLine, inputWidth, resultStyle)
 	}
 
+	var canHoist bool
+	if w.selectedIdx >= 0 && w.selectedIdx < len(w.matches) {
+		selectedItem := w.matches[w.selectedIdx]
+		canHoist = len(selectedItem.Children) > 0
+	}
+
 	// Draw error message if parse error exists
 	if w.parseError != "" {
 		errorY := boxStartY + 3
@@ -429,14 +401,22 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 	}
 
 	// Draw footer with match count
-	footerY := boxStartY + boxHeight - 2
+	footerY := boxStartY + boxHeight - 1
 	matchCount := len(w.matches)
 	totalCount := len(w.allItems)
-	hoistAction := ""
-	if canHoist {
-		hoistAction = ", Alt+Enter: hoist"
+	b := &strings.Builder{}
+	fmt.Fprintf(b, " %d of %d matches | ", matchCount, totalCount)
+	if w.query == "" {
+		b.WriteString("<Esc> close")
+	} else {
+		b.WriteString("<Enter> select")
+		if canHoist {
+			b.WriteString(", <A-Enter> hoist")
+		}
+		b.WriteString(", <Esc>: clear")
 	}
-	footer := fmt.Sprintf(" %d of %d matches | Enter: select%s, Esc: close", matchCount, totalCount, hoistAction)
+	footer := b.String()
+
 	if len(footer) > inputWidth {
 		footer = footer[:inputWidth]
 	}
