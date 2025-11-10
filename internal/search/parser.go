@@ -615,7 +615,7 @@ func parseFilterValue(value string) (FilterExpr, error) {
 	case "sibling", "s":
 		// sibling -> sibling filter with quantifier (no closure support)
 		expr, err = parseSiblingFilter(criteria, quantifier)
-	case "ref", "r":
+	case "ref":
 		// ref:itemid -> find all items that link to this item (backlinks)
 		expr, err = parseRefFilter(criteria)
 	default:

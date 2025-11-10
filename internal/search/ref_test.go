@@ -79,11 +79,6 @@ func TestRefExprParsing(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name:      "Valid ref query with alias",
-			query:     "r:item_12345",
-			wantError: false,
-		},
-		{
 			name:      "Ref in combination with other filters",
 			query:     "ref:item_12345 | @tag=important",
 			wantError: false,

@@ -47,12 +47,6 @@ You can also manually use the `ref:` search filter to find backlinks.
 ref:<item_id>
 ```
 
-Or use the short alias:
-
-```
-r:<item_id>
-```
-
 ### Examples
 
 **Find all items linking to a specific item:**
