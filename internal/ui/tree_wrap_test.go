@@ -1,102 +1,130 @@
 package ui
 
 import (
-	"strings"
 	"testing"
 )
 
-func TestWrapTextAtWidth_PreservesLinkBoundaries(t *testing.T) {
+func TestWrapTextWithLinks_PreservesLinks(t *testing.T) {
 	tests := []struct {
 		name     string
-		text     string
+		rawText  string
 		maxWidth int
-		wantErr  bool
 	}{
 		{
 			name:     "Link at end of line that would be split",
-			text:     "This is a long line with [[item_123456789012345|a link]] here",
+			rawText:  "This is a long line with [[item_123456789012345|a link]] here",
 			maxWidth: 30,
-			wantErr:  false,
 		},
 		{
 			name:     "Link in middle that would be split",
-			text:     "Text before [[item_999999999999999|link text]] and after",
+			rawText:  "Text before [[item_999999999999999|link text]] and after",
 			maxWidth: 25,
-			wantErr:  false,
 		},
 		{
 			name:     "Multiple links",
-			text:     "First [[item_111111111111111|link]] and second [[item_222222222222222|link]]",
+			rawText:  "First [[item_111111111111111|link]] and second [[item_222222222222222|link]]",
 			maxWidth: 30,
-			wantErr:  false,
 		},
 		{
 			name:     "Very long link that exceeds maxWidth",
-			text:     "Before [[item_123456789012345678901234567890|very long display text]] after",
+			rawText:  "Before [[item_123456789012345678901234567890|very long display text]] after",
 			maxWidth: 20,
-			wantErr:  false,
+		},
+		{
+			name:     "Link with short display text but long ID",
+			rawText:  "Check [[item_20240115123456789012345|here]] for details",
+			maxWidth: 30,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := wrapTextAtWidth(tt.text, tt.maxWidth)
+			// Convert to display text and extract link ranges
+			displayText, linkRanges := convertLinksToDisplayText(tt.rawText)
 
-			// Verify links are not split
-			for _, line := range result {
-				// Count open and close brackets
-				openCount := strings.Count(line, "[[")
-				closeCount := strings.Count(line, "]]")
+			// Wrap with link awareness
+			wrappedLines := wrapTextWithLinks(displayText, linkRanges, tt.maxWidth)
 
-				// Each line should have equal opens and closes (or none)
-				// This ensures links are not split
-				if openCount != closeCount {
-					t.Errorf("wrapTextAtWidth() line %q has mismatched brackets: [[=%d, ]]=%d",
-						line, openCount, closeCount)
-				}
+			t.Logf("Raw text: %q (maxWidth=%d)", tt.rawText, tt.maxWidth)
+			t.Logf("Display text: %q", displayText)
+			t.Logf("Link ranges: %+v", linkRanges)
 
-				// If there's a [[, ensure it's followed by ]] in the same line
-				if strings.Contains(line, "[[") && !strings.Contains(line, "]]") {
-					t.Errorf("wrapTextAtWidth() line %q has incomplete link markup", line)
+			// Verify each wrapped line
+			for i, wrapped := range wrappedLines {
+				t.Logf("  Line %d (width=%d): %q", i+1, StringWidth(wrapped.Text), wrapped.Text)
+				t.Logf("    Link ranges: %+v", wrapped.LinkRanges)
+
+				// Verify link ranges are valid
+				for _, lr := range wrapped.LinkRanges {
+					if lr.Start < 0 || lr.End > len([]rune(wrapped.Text)) {
+						t.Errorf("Invalid link range: Start=%d, End=%d, text length=%d",
+							lr.Start, lr.End, len([]rune(wrapped.Text)))
+					}
+					if lr.Start >= lr.End {
+						t.Errorf("Invalid link range: Start=%d >= End=%d", lr.Start, lr.End)
+					}
 				}
 			}
 
-			// Print results for manual inspection
-			t.Logf("Input: %q (maxWidth=%d)", tt.text, tt.maxWidth)
-			for i, line := range result {
-				t.Logf("  Line %d (width=%d): %q", i+1, StringWidth(line), line)
+			// Verify links are not split - each link should appear complete in one line
+			totalLinkRanges := 0
+			for _, wrapped := range wrappedLines {
+				totalLinkRanges += len(wrapped.LinkRanges)
+			}
+			if totalLinkRanges != len(linkRanges) {
+				t.Errorf("Expected %d total link ranges across all lines, got %d",
+					len(linkRanges), totalLinkRanges)
 			}
 		})
 	}
 }
 
-func TestWrapTextAtWidth_EmptyAndShortText(t *testing.T) {
+func TestConvertLinksToDisplayText(t *testing.T) {
 	tests := []struct {
-		name     string
-		text     string
-		maxWidth int
-		want     []string
+		name        string
+		rawText     string
+		wantDisplay string
+		wantLinks   int
 	}{
 		{
-			name:     "Empty text",
-			text:     "",
-			maxWidth: 10,
-			want:     []string{""},
+			name:        "Link with custom display text",
+			rawText:     "Check [[item_123|here]] now",
+			wantDisplay: "Check here now",
+			wantLinks:   1,
 		},
 		{
-			name:     "Text shorter than maxWidth",
-			text:     "Short [[item_123|link]]",
-			maxWidth: 50,
-			want:     []string{"Short [[item_123|link]]"},
+			name:        "Link without display text (shows ID)",
+			rawText:     "See [[item_456]] please",
+			wantDisplay: "See item_456 please",
+			wantLinks:   1,
+		},
+		{
+			name:        "No links",
+			rawText:     "Plain text",
+			wantDisplay: "Plain text",
+			wantLinks:   0,
+		},
+		{
+			name:        "Multiple links",
+			rawText:     "[[item_1|First]] and [[item_2|second]]",
+			wantDisplay: "First and second",
+			wantLinks:   2,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := wrapTextAtWidth(tt.text, tt.maxWidth)
-			if len(got) != len(tt.want) {
-				t.Errorf("wrapTextAtWidth() returned %d lines, want %d", len(got), len(tt.want))
+			displayText, linkRanges := convertLinksToDisplayText(tt.rawText)
+
+			if displayText != tt.wantDisplay {
+				t.Errorf("Display text = %q, want %q", displayText, tt.wantDisplay)
 			}
+
+			if len(linkRanges) != tt.wantLinks {
+				t.Errorf("Got %d links, want %d", len(linkRanges), tt.wantLinks)
+			}
+
+			t.Logf("Raw: %q → Display: %q, Links: %+v", tt.rawText, displayText, linkRanges)
 		})
 	}
 }
