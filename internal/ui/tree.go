@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pstuifzand/tui-outliner/internal/config"
@@ -2663,17 +2664,21 @@ func (tv *TreeView) drawTextWithLinksAndSearch(screen *Screen, x int, y int, tex
 	for _, link := range itemLinks {
 		// Add text before this link
 		if link.StartPos > lastEnd {
-			displayParts = append(displayParts, text[lastEnd:link.StartPos])
-			displayPos += link.StartPos - lastEnd
+			textBefore := text[lastEnd:link.StartPos]
+			displayParts = append(displayParts, textBefore)
+			// Use rune count, not byte length
+			displayPos += utf8.RuneCountInString(textBefore)
 		}
 
 		// Add link display text (with link styling)
 		linkDisplay := link.GetDisplayText()
 		displayParts = append(displayParts, linkDisplay)
+		// Use rune count for link range, not byte length
+		linkRuneCount := utf8.RuneCountInString(linkDisplay)
 		displayLinkRanges = append(displayLinkRanges, struct {
 			start, end int
-		}{displayPos, displayPos + len(linkDisplay)})
-		displayPos += len(linkDisplay)
+		}{displayPos, displayPos + linkRuneCount})
+		displayPos += linkRuneCount
 
 		lastEnd = link.EndPos
 	}
@@ -2730,7 +2735,8 @@ func (tv *TreeView) drawTextWithLinksAndSearch(screen *Screen, x int, y int, tex
 		}
 
 		screen.SetCell(currentX, y, r, charStyle)
-		currentX++
+		// Use RuneWidth to properly account for wide characters (emoji, CJK = 2 columns)
+		currentX += RuneWidth(r)
 	}
 
 	// Return the display text width (accounting for wide characters like emoji and CJK)
