@@ -640,10 +640,10 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 							app.SetStatus("No item selected")
 							return
 						}
-						// Start search with ref:<itemid>
+						// Build query
 						query := "ref:" + selected.ID
-						app.search.Start()
-						// When hoisted, search only within the hoisted subtree
+
+						// Collect searchable items - respect hoisting
 						searchItems := app.outline.GetAllItems()
 						if app.tree.IsHoisted() {
 							hoistedItem := app.tree.GetHoistedItem()
@@ -652,10 +652,18 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 								searchItems = ui.GetAllItemsRecursive(hoistedItem)
 							}
 						}
-						app.search.SetAllItems(searchItems)
-						// Set the query manually and update results
-						// We need to access the search query field - let's use a helper method
-						app.handleBacklinksSearch(query)
+
+						// Set up the node search widget with pre-populated query
+						app.nodeSearchWidget.SetItems(searchItems)
+						app.nodeSearchWidget.SetQuery(query)
+						app.nodeSearchWidget.SetOnSelect(func(item *model.Item) {
+							if item != nil {
+								app.tree.SelectItemByID(item.ID)
+								app.SetStatus("Selected backlink item")
+							}
+						})
+						app.nodeSearchWidget.Show()
+						app.SetStatus("Searching for backlinks (items linking to this item)")
 					},
 				},
 			},
