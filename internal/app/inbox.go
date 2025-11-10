@@ -1,34 +1,26 @@
 package app
 
 import (
+	"maps"
 	"time"
 
 	"github.com/pstuifzand/tui-outliner/internal/model"
+	"github.com/pstuifzand/tui-outliner/internal/search"
 )
 
 // findInboxNode searches for a node marked with @type=inbox attribute
 // It searches recursively through all items in the outline
 func (app *App) findInboxNode() *model.Item {
-	return app.findInboxNodeRecursive(app.outline.Items)
+	return app.findInboxNodeRecursive(app.outline)
 }
 
 // findInboxNodeRecursive recursively searches for inbox node in item list
-func (app *App) findInboxNodeRecursive(items []*model.Item) *model.Item {
-	for _, item := range items {
-		// Check if this item has type=inbox attribute
-		if item.Metadata.Attributes != nil {
-			if typeVal, ok := item.Metadata.Attributes["type"]; ok && typeVal == "inbox" {
-				return item
-			}
-		}
-		// Recursively search children
-		if len(item.Children) > 0 {
-			if found := app.findInboxNodeRecursive(item.Children); found != nil {
-				return found
-			}
-		}
+func (app *App) findInboxNodeRecursive(outline *model.Outline) *model.Item {
+	item, err := search.GetFirstByQuery(outline, "@type=inbox")
+	if err != nil {
+		return nil
 	}
-	return nil
+	return item
 }
 
 // getOrCreateInboxNode finds an existing inbox node or creates a new one
@@ -38,6 +30,7 @@ func (app *App) getOrCreateInboxNode() (*model.Item, bool) {
 	if inbox := app.findInboxNode(); inbox != nil {
 		// Ensure inbox is expanded so new items are visible
 		inbox.Expanded = true
+		app.tree.ExpandParents(inbox)
 		return inbox, false
 	}
 
@@ -73,9 +66,7 @@ func (app *App) addToInbox(text string, attributes map[string]string) error {
 		if newItem.Metadata.Attributes == nil {
 			newItem.Metadata.Attributes = make(map[string]string)
 		}
-		for key, value := range attributes {
-			newItem.Metadata.Attributes[key] = value
-		}
+		maps.Copy(newItem.Metadata.Attributes, attributes)
 	}
 
 	inbox.AddChild(newItem)
