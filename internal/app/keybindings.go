@@ -631,6 +631,33 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						app.handleDiffCommand([]string{"diff"})
 					},
 				},
+				'b': {
+					Key:         'b',
+					Description: "Show backlinks (items linking to this item)",
+					Handler: func(app *App) {
+						selected := app.tree.GetSelected()
+						if selected == nil {
+							app.SetStatus("No item selected")
+							return
+						}
+						// Start search with ref:<itemid>
+						query := "ref:" + selected.ID
+						app.search.Start()
+						// When hoisted, search only within the hoisted subtree
+						searchItems := app.outline.GetAllItems()
+						if app.tree.IsHoisted() {
+							hoistedItem := app.tree.GetHoistedItem()
+							if hoistedItem != nil {
+								// Get all items within the hoisted subtree
+								searchItems = ui.GetAllItemsRecursive(hoistedItem)
+							}
+						}
+						app.search.SetAllItems(searchItems)
+						// Set the query manually and update results
+						// We need to access the search query field - let's use a helper method
+						app.handleBacklinksSearch(query)
+					},
+				},
 			},
 		},
 		{

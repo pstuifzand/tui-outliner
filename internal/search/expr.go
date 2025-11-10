@@ -694,6 +694,27 @@ func (e *SiblingFilter) String() string {
 	return fmt.Sprintf("sibling(%s,%s)", e.quantifier.String(), e.inner.String())
 }
 
+// RefExpr matches items whose text contains a link reference to the specified item ID
+// This is used for backlink searches (finding all items that link to a specific item)
+type RefExpr struct {
+	targetID string
+}
+
+func NewRefExpr(targetID string) *RefExpr {
+	return &RefExpr{targetID: targetID}
+}
+
+func (e *RefExpr) Matches(item *model.Item) bool {
+	// Check if item text contains [[targetID]] or [[targetID|...]]
+	// We need to import the links package to parse links properly
+	linkPattern := "[[" + e.targetID
+	return strings.Contains(item.Text, linkPattern)
+}
+
+func (e *RefExpr) String() string {
+	return fmt.Sprintf("ref(%s)", e.targetID)
+}
+
 // Helper functions
 
 // calculateDepth returns the depth of an item in the tree (root = 0)

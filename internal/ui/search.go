@@ -240,6 +240,13 @@ func (s *Search) SetAllItems(items []*model.Item) {
 	s.updateResults()
 }
 
+// SetQuery sets the search query programmatically and updates results
+func (s *Search) SetQuery(query string) {
+	s.query = query
+	s.cursorPos = len(query)
+	s.updateResults()
+}
+
 // NextMatch moves to the next search match
 func (s *Search) NextMatch() bool {
 	if len(s.matchIndices) == 0 {
