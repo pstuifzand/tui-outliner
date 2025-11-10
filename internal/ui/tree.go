@@ -231,7 +231,7 @@ func (tv *TreeView) SetItems(items []*model.Item) {
 
 // wrapTextAtWidth wraps a single text line to the specified display width
 // Returns a slice of wrapped text portions
-// Properly handles multi-byte Unicode characters
+// Properly handles multi-byte Unicode characters and preserves link markup boundaries
 func wrapTextAtWidth(text string, maxWidth int) []string {
 	if maxWidth <= 0 {
 		return []string{text}
@@ -241,8 +241,12 @@ func wrapTextAtWidth(text string, maxWidth int) []string {
 		return []string{text}
 	}
 
+	// Parse links to find boundaries that must not be broken
+	linkBoundaries := links.ParseLinks(text)
+
 	var result []string
 	remaining := text
+	processedBytes := 0 // Track how many bytes of original text we've processed
 
 	for StringWidth(remaining) > maxWidth {
 		// Use CalculateBreakPoint to find proper break location
@@ -256,17 +260,63 @@ func wrapTextAtWidth(text string, maxWidth int) []string {
 			if len(runes) > 0 {
 				result = append(result, string(runes[0]))
 				remaining = string(runes[1:])
+				processedBytes += len(string(runes[0]))
 			} else {
 				break
 			}
 		} else {
-			// Slice safely at byte boundary
-			line := remaining[:byteIdx]
-			result = append(result, strings.TrimRight(line, " "))
+			// Check if this break point would split a link
+			absoluteBreakPos := processedBytes + byteIdx
 
-			// Skip spaces at the beginning of next line
-			remaining = remaining[byteIdx:]
-			remaining = strings.TrimLeft(remaining, " ")
+			// Find if break point is inside any link
+			insideLink := false
+			var conflictingLink *links.Link
+			for i := range linkBoundaries {
+				link := &linkBoundaries[i]
+				// Break point is inside link if it's after start but before end
+				if absoluteBreakPos > link.StartPos && absoluteBreakPos < link.EndPos {
+					insideLink = true
+					conflictingLink = link
+					break
+				}
+			}
+
+			if insideLink {
+				// Move break point to before the link starts
+				// Calculate how many bytes to take from remaining to get to link start
+				bytesToTake := conflictingLink.StartPos - processedBytes
+
+				if bytesToTake <= 0 {
+					// Link starts at or before current position
+					// This means the link itself is too long for maxWidth
+					// Break after the link instead
+					bytesToTake = conflictingLink.EndPos - processedBytes
+					if bytesToTake > len(remaining) {
+						bytesToTake = len(remaining)
+					}
+				}
+
+				line := remaining[:bytesToTake]
+				result = append(result, strings.TrimRight(line, " "))
+				processedBytes += bytesToTake
+				remaining = remaining[bytesToTake:]
+
+				// Track trimmed spaces
+				beforeTrim := len(remaining)
+				remaining = strings.TrimLeft(remaining, " ")
+				processedBytes += beforeTrim - len(remaining)
+			} else {
+				// Safe to break here - not inside a link
+				line := remaining[:byteIdx]
+				result = append(result, strings.TrimRight(line, " "))
+				processedBytes += byteIdx
+				remaining = remaining[byteIdx:]
+
+				// Track trimmed spaces
+				beforeTrim := len(remaining)
+				remaining = strings.TrimLeft(remaining, " ")
+				processedBytes += beforeTrim - len(remaining)
+			}
 		}
 	}
 
