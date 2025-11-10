@@ -615,6 +615,9 @@ func parseFilterValue(value string) (FilterExpr, error) {
 	case "sibling", "s":
 		// sibling -> sibling filter with quantifier (no closure support)
 		expr, err = parseSiblingFilter(criteria, quantifier)
+	case "ref", "r":
+		// ref:itemid -> find all items that link to this item (backlinks)
+		expr, err = parseRefFilter(criteria)
 	default:
 		// Unknown filter type, treat as text
 		expr = NewTextExpr(value)
@@ -745,6 +748,15 @@ func parseSiblingFilter(criteria string, quantifier Quantifier) (FilterExpr, err
 		return nil, err
 	}
 	return NewSiblingFilter(innerExpr, quantifier), nil
+}
+
+func parseRefFilter(criteria string) (FilterExpr, error) {
+	// Ref filter takes an item ID as criteria
+	// ref:item_id finds all items that contain [[item_id]] links
+	if criteria == "" {
+		return nil, fmt.Errorf("ref filter requires an item ID")
+	}
+	return NewRefExpr(criteria), nil
 }
 
 // parseComparison extracts the comparison operator and value from criteria

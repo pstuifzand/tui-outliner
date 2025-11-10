@@ -2180,6 +2180,33 @@ func (a *App) handleLinksCommand(parts []string) {
 	}
 }
 
+// handleBacklinksSearch performs a backlinks search for the given query
+// This is used by the 'gb' keybinding to search for items that link to the current item
+func (a *App) handleBacklinksSearch(query string) {
+	// Set the query and update results
+	a.search.SetQuery(query)
+
+	// Auto-navigate to first match if there are results
+	if a.search.GetMatchCount() > 0 {
+		firstMatch := a.search.GetCurrentMatch()
+		if firstMatch != nil {
+			// Expand all parent nodes of the first match so it becomes visible
+			a.tree.ExpandParents(firstMatch)
+			// Find and select first match in the main tree
+			items := a.tree.GetDisplayItems()
+			for idx, dispItem := range items {
+				if dispItem.Item.ID == firstMatch.ID {
+					a.tree.SelectItem(idx)
+					break
+				}
+			}
+		}
+		a.SetStatus(fmt.Sprintf("Found %d backlink(s)", a.search.GetMatchCount()))
+	} else {
+		a.SetStatus("No backlinks found")
+	}
+}
+
 // handlePasteAsChildCommand pastes the clipboard item as a child of the selected item
 func (a *App) handlePasteAsChildCommand() {
 	if a.clipboard == nil {
