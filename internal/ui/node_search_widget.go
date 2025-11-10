@@ -49,6 +49,12 @@ func (w *NodeSearchWidget) SetOnHoist(onHoist func(*model.Item)) {
 	w.onHoist = onHoist
 }
 
+func (w *NodeSearchWidget) SetQuery(query string) {
+	w.query = query
+	w.cursorPos = len(query)
+	w.updateMatches()
+}
+
 func (w *NodeSearchWidget) Show() {
 	w.visible = true
 	// Restore last search state if available
