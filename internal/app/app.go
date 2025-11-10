@@ -47,17 +47,17 @@ type App struct {
 	command                *ui.CommandMode
 	attributeEditor        *ui.AttributeEditor // Attribute editing modal
 	nodeSearchWidget       *ui.NodeSearchWidget
-	linkAutocompleteWidget *ui.LinkAutocompleteWidget // Wiki-style link autocomplete
-	calendarWidget         *ui.CalendarWidget         // Calendar date picker widget
-	backupSelectorWidget   *ui.BackupSelectorWidget   // Backup selector with side-by-side diff preview
-	messageLogger          *ui.MessageLogger          // Message history for :messages command
-	historyManager         *history.Manager           // Manager for persisting command and search history
-	socketServer           *socket.Server             // Unix socket server for external commands
-	cfg                    *config.Config             // Application configuration
-	sessionID              string                     // 8-character session ID for backups
-	readOnly               bool                       // Whether the file is readonly (e.g., backup file)
-	originalFilePath       string                     // Original file path for backup filtering
-	currentBackupPath      string                     // Current backup file path if viewing a backup
+	linkAutocompleteWidget *ui.NodeSearchWidget     // Wiki-style link autocomplete
+	calendarWidget         *ui.CalendarWidget       // Calendar date picker widget
+	backupSelectorWidget   *ui.BackupSelectorWidget // Backup selector with side-by-side diff preview
+	messageLogger          *ui.MessageLogger        // Message history for :messages command
+	historyManager         *history.Manager         // Manager for persisting command and search history
+	socketServer           *socket.Server           // Unix socket server for external commands
+	cfg                    *config.Config           // Application configuration
+	sessionID              string                   // 8-character session ID for backups
+	readOnly               bool                     // Whether the file is readonly (e.g., backup file)
+	originalFilePath       string                   // Original file path for backup filtering
+	currentBackupPath      string                   // Current backup file path if viewing a backup
 	statusMsg              string
 	statusTime             time.Time
 	dirty                  bool
@@ -119,8 +119,8 @@ func NewApp(filePath string) (*App, error) {
 	help := ui.NewHelpScreen()
 	splash := ui.NewSplashScreen()
 	attributeEditor := ui.NewAttributeEditor()
-	nodeSearchWidget := ui.NewNodeSearchWidget()
-	linkAutocompleteWidget := ui.NewLinkAutocompleteWidget()
+	nodeSearchWidget := ui.NewNodeSearchWidget("Search nodes")
+	linkAutocompleteWidget := ui.NewNodeSearchWidget("Search links")
 	calendarWidget := ui.NewCalendarWidget()
 	backupSelectorWidget := ui.NewBackupSelectorWidget()
 	messageLogger := ui.NewMessageLogger(10) // Track last 10 messages

@@ -10,6 +10,7 @@ import (
 )
 
 type NodeSearchWidget struct {
+	title       string
 	visible     bool
 	query       string
 	allItems    []*model.Item
@@ -23,8 +24,9 @@ type NodeSearchWidget struct {
 	onHoist     func(*model.Item)
 }
 
-func NewNodeSearchWidget() *NodeSearchWidget {
+func NewNodeSearchWidget(title string) *NodeSearchWidget {
 	w := &NodeSearchWidget{
+		title:       title,
 		visible:     false,
 		query:       "",
 		selectedIdx: 0,
@@ -104,6 +106,13 @@ func (w *NodeSearchWidget) updateMatches() {
 	}
 }
 
+// UpdateQuery updates the search query (called while user types)
+func (w *NodeSearchWidget) UpdateQuery(newQuery string) {
+	w.query = newQuery
+	w.cursorPos = len(newQuery)
+	w.updateMatches()
+}
+
 // DeleteWordBackwards deletes the word before the cursor
 func (w *NodeSearchWidget) DeleteWordBackwards() {
 	if w.cursorPos == 0 {
@@ -156,12 +165,10 @@ func (w *NodeSearchWidget) HandleKeyEvent(ev *tcell.EventKey) bool {
 			selected := w.matches[w.selectedIdx]
 			// Remember last search state
 			w.Hide()
-			if w.onHoist != nil {
-				if isAlt {
-					w.onHoist(selected)
-				} else {
-					w.onSelect(selected)
-				}
+			if w.onHoist != nil && isAlt {
+				w.onHoist(selected)
+			} else if w.onSelect != nil && !isAlt {
+				w.onSelect(selected)
 			}
 		}
 		return true
@@ -314,7 +321,7 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 
 	// Draw title
 	titleY := boxStartY
-	title := " Search Nodes "
+	title := fmt.Sprintf(" %s ", w.title)
 	titleX := boxStartX + 2
 	screen.DrawStringLimited(titleX, titleY, title, boxWidth-4, borderStyle)
 
@@ -384,7 +391,7 @@ func (w *NodeSearchWidget) Render(screen *Screen) {
 	}
 
 	var canHoist bool
-	if w.selectedIdx >= 0 && w.selectedIdx < len(w.matches) {
+	if w.onHoist != nil && w.selectedIdx >= 0 && w.selectedIdx < len(w.matches) {
 		selectedItem := w.matches[w.selectedIdx]
 		canHoist = len(selectedItem.Children) > 0
 	}
