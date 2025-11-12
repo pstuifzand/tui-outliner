@@ -268,6 +268,65 @@ func (o *Outline) PopulateSearchNode(item *Item, matchingIDs []string) int {
 	return len(matchingIDs)
 }
 
+// AddTag adds a tag to the item's metadata (creates metadata if needed)
+func (i *Item) AddTag(tag string) {
+	if i.Metadata == nil {
+		i.Metadata = &Metadata{
+			Attributes: make(map[string]string),
+			Created:    time.Now(),
+			Modified:   time.Now(),
+		}
+	}
+	// Check if tag already exists
+	if !i.HasTag(tag) {
+		i.Metadata.Tags = append(i.Metadata.Tags, tag)
+		i.Metadata.Modified = time.Now()
+	}
+}
+
+// RemoveTag removes a tag from the item's metadata
+func (i *Item) RemoveTag(tag string) {
+	if i.Metadata == nil || len(i.Metadata.Tags) == 0 {
+		return
+	}
+	for idx, t := range i.Metadata.Tags {
+		if t == tag {
+			i.Metadata.Tags = append(i.Metadata.Tags[:idx], i.Metadata.Tags[idx+1:]...)
+			i.Metadata.Modified = time.Now()
+			break
+		}
+	}
+}
+
+// HasTag checks if the item has a specific tag
+func (i *Item) HasTag(tag string) bool {
+	if i.Metadata == nil || len(i.Metadata.Tags) == 0 {
+		return false
+	}
+	for _, t := range i.Metadata.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// GetTags returns all tags for the item
+func (i *Item) GetTags() []string {
+	if i.Metadata == nil {
+		return nil
+	}
+	return i.Metadata.Tags
+}
+
+// ClearTags removes all tags from the item
+func (i *Item) ClearTags() {
+	if i.Metadata != nil {
+		i.Metadata.Tags = nil
+		i.Metadata.Modified = time.Now()
+	}
+}
+
 func generateID() string {
 	return "item_" + time.Now().Format("20060102150405") + "_" + rand.Text()
 }

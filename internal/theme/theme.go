@@ -24,6 +24,7 @@ type Colors struct {
 	TreeVisualCursorBg   tcell.Color  // Background color for visual mode cursor
 	TreeAttributeIndicator tcell.Color // Color for attribute indicator symbol
 	TreeAttributeValue   tcell.Color  // Color for visible attribute values (gray/dim)
+	TreeTagValue         tcell.Color  // Color for visible tag values
 	TreeLinkText         tcell.Color  // Color for wiki-style links [[id|text]]
 
 	// Standard color palette for use throughout the app
@@ -107,6 +108,7 @@ func Default() *Theme {
 			TreeVisualCursorBg:  tcell.ColorBlue,
 			TreeAttributeIndicator: tcell.NewRGBColor(0, 208, 128), // Bright teal/green (#00D080)
 			TreeAttributeValue:  tcell.ColorGray, // Dim gray for attribute values
+			TreeTagValue:        tcell.NewRGBColor(100, 149, 237), // Cornflower blue for tags (#6495ED)
 			TreeLinkText:        tcell.NewRGBColor(0, 255, 255), // Cyan for wiki-style links (#00FFFF)
 			// Standard color palette
 			ColorYellow: tcell.ColorYellow,

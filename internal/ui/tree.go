@@ -2055,6 +2055,55 @@ func (tv *TreeView) RenderWithSearchQuery(screen *Screen, startY, endY int, visu
 				}
 			}
 
+			// Draw visible tags if configured (only on item start line)
+			if cfg != nil {
+				vistagsConfig := cfg.Get("vistags")
+				if vistagsConfig != "" {
+					// Parse comma-separated tag names (or "all" to show all tags)
+					var visibleTags []string
+
+					if displayLine.Item.Metadata != nil && len(displayLine.Item.Metadata.Tags) > 0 {
+						if vistagsConfig == "all" {
+							// Show all tags
+							visibleTags = displayLine.Item.Metadata.Tags
+						} else {
+							// Show only specified tags
+							requestedTags := strings.Split(vistagsConfig, ",")
+							for _, requestedTag := range requestedTags {
+								requestedTag = strings.TrimSpace(requestedTag)
+								for _, itemTag := range displayLine.Item.Metadata.Tags {
+									if itemTag == requestedTag {
+										visibleTags = append(visibleTags, itemTag)
+										break
+									}
+								}
+							}
+						}
+					}
+
+					// Draw tags in a distinct style if any are found
+					if len(visibleTags) > 0 {
+						var tagStrs []string
+						for _, tag := range visibleTags {
+							tagStrs = append(tagStrs, "#"+tag)
+						}
+						tagStr := "  " + strings.Join(tagStrs, " ")
+						tagStyle := screen.TreeTagStyle().Background(lineBackgroundColor)
+						if isLinePartOfSelected {
+							tagStyle = selectedStyle // Use selected style if item is selected
+						}
+
+						// Draw the tag string if it fits on screen
+						tagX := totalLen
+						tagWidth := StringWidth(tagStr)
+						if tagX+tagWidth <= screenWidth {
+							screen.DrawString(tagX, y, tagStr, tagStyle)
+							totalLen = tagX + tagWidth
+						}
+					}
+				}
+			}
+
 			// Draw progress bar if configured and if item has todo children (only on item start line)
 			if cfg != nil && cfg.Get("showprogress") != "false" {
 				statusesStr := cfg.Get("todostatuses")

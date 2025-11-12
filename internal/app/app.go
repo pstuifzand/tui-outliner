@@ -1517,6 +1517,8 @@ func (a *App) handleCommand(cmd string) {
 		}
 	case "attr":
 		a.handleAttrCommand(parts)
+	case "tag":
+		a.handleTagCommand(parts)
 	case "set":
 		a.handleSetCommand(parts)
 	case "search":
@@ -2003,6 +2005,98 @@ func (a *App) handleAttrCommand(parts []string) {
 	default:
 		a.SetStatus("Unknown attr command: " + parts[1])
 	}
+}
+
+// handleTagCommand handles tag management commands (:tag add, :tag remove, :tag list, :tag clear)
+func (a *App) handleTagCommand(parts []string) {
+	// Check if trying to modify tags on a readonly file
+	if len(parts) > 1 && parts[1] != "list" && parts[1] != "" {
+		if a.readOnly {
+			a.SetStatus("Cannot modify readonly file")
+			return
+		}
+	}
+
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected")
+		return
+	}
+
+	// Ensure metadata exists
+	if selected.Metadata == nil {
+		selected.Metadata = &model.Metadata{
+			Attributes: make(map[string]string),
+			Created:    time.Now(),
+			Modified:   time.Now(),
+		}
+	}
+
+	if len(parts) < 2 {
+		// Show all tags
+		a.showTags(selected)
+		return
+	}
+
+	switch parts[1] {
+	case "add":
+		if len(parts) < 3 {
+			a.SetStatus("Usage: :tag add <tag1> [tag2] ...")
+			return
+		}
+		tags := parts[2:]
+		for _, tag := range tags {
+			selected.AddTag(tag)
+		}
+		a.dirty = true
+		if len(tags) == 1 {
+			a.SetStatus(fmt.Sprintf("Tag '%s' added", tags[0]))
+		} else {
+			a.SetStatus(fmt.Sprintf("%d tags added", len(tags)))
+		}
+
+	case "del", "delete", "remove", "rm":
+		if len(parts) < 3 {
+			a.SetStatus("Usage: :tag remove <tag>")
+			return
+		}
+		tag := parts[2]
+		if !selected.HasTag(tag) {
+			a.SetStatus(fmt.Sprintf("Tag '%s' not found", tag))
+			return
+		}
+		selected.RemoveTag(tag)
+		a.dirty = true
+		a.SetStatus(fmt.Sprintf("Tag '%s' removed", tag))
+
+	case "list", "show", "view":
+		a.showTags(selected)
+
+	case "clear":
+		if len(selected.GetTags()) == 0 {
+			a.SetStatus("No tags to clear")
+			return
+		}
+		selected.ClearTags()
+		a.dirty = true
+		a.SetStatus("All tags cleared")
+
+	default:
+		a.SetStatus("Unknown tag command: " + parts[1])
+	}
+}
+
+// showTags displays all tags for an item
+func (a *App) showTags(item *model.Item) {
+	tags := item.GetTags()
+	if len(tags) == 0 {
+		a.SetStatus("No tags for this item")
+		return
+	}
+
+	// Build a formatted string of all tags
+	tagStr := strings.Join(tags, ", ")
+	a.SetStatus("Tags: " + tagStr)
 }
 
 // showAttributes displays all attributes for an item
