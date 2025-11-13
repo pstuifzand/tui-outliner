@@ -949,6 +949,20 @@ func (a *App) InitializePendingKeybindings() []PendingKeyBinding {
 						app.handleSendToLastNode()
 					},
 				},
+				'c': {
+					Key:         'c',
+					Description: "Copy item from search (search and copy to me)",
+					Handler: func(app *App) {
+						app.handleSearchAndCopy()
+					},
+				},
+				't': {
+					Key:         't',
+					Description: "Copy template from search (instantiate template)",
+					Handler: func(app *App) {
+						app.handleSearchTemplate()
+					},
+				},
 			},
 		},
 	}

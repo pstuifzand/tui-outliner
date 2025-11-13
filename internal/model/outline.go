@@ -57,12 +57,28 @@ func NewItem(text string) *Item {
 
 func NewItemFrom(item *Item) *Item {
 	yanked := NewItem(item.Text)
-	yanked.Metadata.Attributes = maps.Clone(yanked.Metadata.Attributes)
+	yanked.Metadata.Attributes = maps.Clone(item.Metadata.Attributes)
 	for _, c := range item.Children {
 		yc := NewItemFrom(c)
 		yanked.Children = append(yanked.Children, yc)
 		yc.Parent = yanked
 	}
+	return yanked
+}
+
+// NewItemFromWithout creates a copy of an item and recursively removes the specified attribute
+func NewItemFromWithout(item *Item, attrKey string) *Item {
+	yanked := NewItemFrom(item)
+	// Remove attribute from the item and all children recursively
+	delete(yanked.Metadata.Attributes, attrKey)
+	var removeAttrFromChildren func(*Item)
+	removeAttrFromChildren = func(i *Item) {
+		for _, child := range i.Children {
+			delete(child.Metadata.Attributes, attrKey)
+			removeAttrFromChildren(child)
+		}
+	}
+	removeAttrFromChildren(yanked)
 	return yanked
 }
 

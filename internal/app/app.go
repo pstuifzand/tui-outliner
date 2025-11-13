@@ -2265,6 +2265,178 @@ func (a *App) handleSendToLastNode() {
 	}
 }
 
+// handleSearchAndCopy opens the node search widget to find an item and copy it to the current location
+func (a *App) handleSearchAndCopy() {
+	if a.readOnly {
+		a.SetStatus("File is readonly")
+		return
+	}
+
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected (select destination first)")
+		return
+	}
+
+	// Set up the node search widget
+	a.nodeSearchWidget.SetItems(a.outline.GetAllItems())
+	a.nodeSearchWidget.SetOnSelect(func(sourceItem *model.Item) {
+		if sourceItem == nil {
+			a.SetStatus("No item selected")
+			return
+		}
+
+		// Create a deep copy of the source item (including all children)
+		copiedItem := model.NewItemFrom(sourceItem)
+
+		// Add as sibling after current item
+		a.tree.AddItemAfter(copiedItem)
+		a.dirty = true
+
+		// Truncate source text if too long
+		sourceText := sourceItem.Text
+		if len(sourceText) > 40 {
+			sourceText = sourceText[:37] + "..."
+		}
+		a.SetStatus(fmt.Sprintf("Copied: %s", sourceText))
+	})
+	a.nodeSearchWidget.Show()
+	a.SetStatus("Search for item to copy (Enter to select, Escape to cancel)")
+}
+
+// handleSearchTemplate opens the node search widget to find a template and instantiate it
+func (a *App) handleSearchTemplate() {
+	if a.readOnly {
+		a.SetStatus("File is readonly")
+		return
+	}
+
+	selected := a.tree.GetSelected()
+	if selected == nil {
+		a.SetStatus("No item selected (select destination first)")
+		return
+	}
+
+	// Set up the node search widget
+	a.nodeSearchWidget.SetItems(a.outline.GetAllItems())
+	a.nodeSearchWidget.SetOnSelect(func(sourceItem *model.Item) {
+		if sourceItem == nil {
+			a.SetStatus("No item selected")
+			return
+		}
+
+		// Create a deep copy of the source item and remove the @type=template attribute
+		copiedItem := model.NewItemFromWithout(sourceItem, "type")
+
+		// Add as sibling after current item
+		a.tree.AddItemAfter(copiedItem)
+
+		// Process template expressions in the copied item and all children
+		a.processTemplateItem(copiedItem)
+
+		a.dirty = true
+
+		// Truncate source text if too long
+		sourceText := sourceItem.Text
+		if len(sourceText) > 40 {
+			sourceText = sourceText[:37] + "..."
+		}
+		a.SetStatus(fmt.Sprintf("Instantiated: %s", sourceText))
+	})
+	a.nodeSearchWidget.Show()
+	a.SetStatus("Search for template to instantiate (Enter to select, Escape to cancel)")
+}
+
+// processTemplateItem processes template expressions in an item and all its children recursively
+func (a *App) processTemplateItem(item *model.Item) {
+	// Process the item's text
+	// Get clipboard command from config, default to wl-paste
+	clipboardCmd := a.cfg.Get("clipboard_command")
+	if clipboardCmd == "" {
+		clipboardCmd = "wl-paste"
+	}
+
+	ctx := tmpl.TemplateContext{
+		ClipboardCommand: clipboardCmd,
+		AppContext:       a,
+	}
+
+	processedText, interactions, err := tmpl.ProcessTemplate(item.Text, ctx)
+	if err != nil {
+		a.SetStatus(fmt.Sprintf("Template error: %v", err))
+		return
+	}
+
+	item.Text = processedText
+
+	// Handle any pending interactions sequentially
+	for _, interaction := range interactions {
+		a.handleTemplateInteraction(item, interaction)
+	}
+
+	// Recursively process children
+	for _, child := range item.Children {
+		a.processTemplateItem(child)
+	}
+}
+
+// handleTemplateInteraction handles a single template interaction (prompt, search, select)
+func (a *App) handleTemplateInteraction(targetItem *model.Item, interaction *tmpl.Interaction) {
+	switch interaction.Type {
+	case "prompt":
+		// Show input dialog for prompt
+		a.showInputPrompt(interaction.Question, func(response string) {
+			// Replace the interaction placeholder with the response
+			a.dirty = true
+		})
+
+	case "search":
+		// Show search widget with pre-filled query
+		a.showTemplateSearch(interaction.Query, func(selectedItem *model.Item) {
+			// Response callback will be called after user selects
+			if selectedItem != nil {
+				// The result will be used to replace the expression in the template
+				interaction.OnResult(selectedItem.Text)
+			}
+			a.dirty = true
+		})
+
+	case "select":
+		// Show selection modal with options
+		a.showTemplateSelect(interaction.Options, func(selected string) {
+			interaction.OnResult(selected)
+			a.dirty = true
+		})
+	}
+}
+
+// showInputPrompt displays an input prompt for template expressions
+// This is a simplified version - uses the editor for input
+func (a *App) showInputPrompt(question string, onResult func(string)) {
+	// TODO: Implement a dedicated input dialog for template prompts
+	// For now, this is a placeholder that would need UI implementation
+	a.SetStatus("Template prompt: " + question)
+}
+
+// showTemplateSearch displays a search widget with pre-filled query
+func (a *App) showTemplateSearch(query string, onResult func(*model.Item)) {
+	// Set up search widget with pre-filled query
+	a.nodeSearchWidget.SetItems(a.outline.GetAllItems())
+	a.nodeSearchWidget.SetOnSelect(func(selectedItem *model.Item) {
+		onResult(selectedItem)
+	})
+	a.nodeSearchWidget.SetQuery(query)
+	a.nodeSearchWidget.Show()
+	a.SetStatus(fmt.Sprintf("Select item for {{search:%s}} (Enter to select, Escape to cancel)", query))
+}
+
+// showTemplateSelect displays a selection modal with options
+func (a *App) showTemplateSelect(options []string, onResult func(string)) {
+	// TODO: Implement a selection modal for template {{select:...}}
+	// For now, this is a placeholder
+	a.SetStatus(fmt.Sprintf("Template select options: %v", options))
+}
+
 // handleExternalEdit opens the current item in an external editor
 func (a *App) handleExternalEdit() {
 	selected := a.tree.GetSelected()
