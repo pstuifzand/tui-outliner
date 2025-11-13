@@ -220,20 +220,29 @@ func (a *App) InitializeKeybindings() []KeyBinding {
 		},
 		{
 			Key:         'o',
-			Description: "Insert new item after",
+			Description: "Insert new item (as first child if parent has children, else as sibling)",
 			Handler: func(app *App) {
 				if app.readOnly {
 					app.SetStatus("File is readonly")
 					return
 				}
+				selected := app.tree.GetSelected()
 				item := model.NewItem("")
-				app.tree.AddItemAfter(item)
-				app.SetStatus("Created new item after")
+
+				// If selected item has children, add as first child
+				// Otherwise, add as sibling (after)
+				if selected != nil && len(selected.Children) > 0 {
+					app.tree.AddItemAsFirstChild(item)
+					app.SetStatus("Created new item as first child")
+				} else {
+					app.tree.AddItemAfter(item)
+					app.SetStatus("Created new item after")
+				}
 				app.dirty = true
 				// Enter insert mode for the new item
-				selected := app.tree.GetSelected()
-				if selected != nil {
-					app.editor = ui.NewMultiLineEditor(selected)
+				newSelected := app.tree.GetSelected()
+				if newSelected != nil {
+					app.editor = ui.NewMultiLineEditor(newSelected)
 					app.editor.Start()
 					app.mode = InsertMode
 				}

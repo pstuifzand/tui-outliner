@@ -1501,6 +1501,34 @@ func (tv *TreeView) AddItemAsChild(newItem *model.Item) {
 	tv.RebuildView()
 }
 
+// AddItemAsFirstChild adds a new item as the first child of the selected item
+func (tv *TreeView) AddItemAsFirstChild(newItem *model.Item) {
+	if len(tv.filteredView) > 0 && tv.selectedIdx < len(tv.filteredView) {
+		selected := tv.filteredView[tv.selectedIdx].Item
+		newItem.Parent = selected
+		// Insert at the beginning of children
+		newChildren := make([]*model.Item, 0, len(selected.Children)+1)
+		newChildren = append(newChildren, newItem)
+		newChildren = append(newChildren, selected.Children...)
+		selected.Children = newChildren
+		selected.Expanded = true
+		// When hoisted and we modify the hoisted node's children, update tv.items
+		if tv.hoistedItem != nil && selected == tv.hoistedItem {
+			tv.items = newChildren
+		}
+	} else {
+		tv.items = append(tv.items, newItem)
+	}
+	tv.RebuildView()
+	// Find and select the new item in the filtered view
+	for idx, dispItem := range tv.filteredView {
+		if dispItem.Item.ID == newItem.ID {
+			tv.selectedIdx = idx
+			return
+		}
+	}
+}
+
 // AddItemBefore adds a new item before the selected item
 func (tv *TreeView) AddItemBefore(text string) {
 	newItem := model.NewItem(text)
