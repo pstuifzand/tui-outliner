@@ -12,12 +12,12 @@ import (
 type Item struct {
 	ID               string    `json:"id"`
 	Text             string    `json:"text"`
+	Metadata         *Metadata `json:"metadata,omitempty"`
 	Children         []*Item   `json:"children,omitempty"`
 	VirtualChildRefs []string  `json:"virtual_children,omitempty"` // IDs of items to show as children (not duplicated)
-	Metadata         *Metadata `json:"metadata,omitempty"`
-	Parent           *Item     `json:"-"` // Not persisted
-	Expanded         bool      `json:"-"` // UI state, not persisted
-	virtualChildren  []*Item   `json:"-"` // Resolved virtual child pointers (runtime only)
+	Parent           *Item     `json:"-"`                          // Not persisted
+	Expanded         bool      `json:"-"`                          // UI state, not persisted
+	virtualChildren  []*Item   `json:"-"`                          // Resolved virtual child pointers (runtime only)
 	// CollapsedVirtualChildren tracks which virtual children are collapsed (for display-only)
 	// Maps virtual child item ID -> true if collapsed. Only used for search nodes to avoid
 	// collapsing the original items. This is session-only state.
@@ -34,10 +34,10 @@ type Metadata struct {
 
 // Outline represents the entire outline document
 type Outline struct {
-	Items                 []*Item            `json:"items"`
-	OriginalFilename      string             `json:"original_filename,omitempty"`
-	TypeDefinitions       map[string]string  `json:"type_definitions,omitempty"` // Global type definitions (key -> type spec)
-	itemIndex             map[string]*Item   `json:"-"` // Fast O(1) ID lookup cache
+	Items            []*Item           `json:"items"`
+	OriginalFilename string            `json:"original_filename,omitempty"`
+	TypeDefinitions  map[string]string `json:"type_definitions,omitempty"` // Global type definitions (key -> type spec)
+	itemIndex        map[string]*Item  `json:"-"`                          // Fast O(1) ID lookup cache
 }
 
 // NewItem creates a new outline item with a generated ID
