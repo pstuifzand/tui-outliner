@@ -347,6 +347,33 @@ func (e *AttributeDateFilter) String() string {
 	return fmt.Sprintf("attr(%s%s%s)", e.key, e.op, e.value)
 }
 
+// TagFilter matches items that have a specific tag
+type TagFilter struct {
+	tag string
+}
+
+func NewTagFilter(tag string) *TagFilter {
+	return &TagFilter{tag: tag}
+}
+
+func (e *TagFilter) Matches(item *model.Item) bool {
+	if item.Metadata == nil || len(item.Metadata.Tags) == 0 {
+		return false
+	}
+
+	// Check if the tag exists in the item's tags
+	for _, t := range item.Metadata.Tags {
+		if t == e.tag {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *TagFilter) String() string {
+	return fmt.Sprintf("tag(%s)", e.tag)
+}
+
 // DateFilter matches items based on creation or modification date
 type DateFilter struct {
 	filterType FilterType

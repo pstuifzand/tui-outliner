@@ -12,12 +12,12 @@ import (
 type Item struct {
 	ID               string    `json:"id"`
 	Text             string    `json:"text"`
+	Metadata         *Metadata `json:"metadata,omitempty"`
 	Children         []*Item   `json:"children,omitempty"`
 	VirtualChildRefs []string  `json:"virtual_children,omitempty"` // IDs of items to show as children (not duplicated)
-	Metadata         *Metadata `json:"metadata,omitempty"`
-	Parent           *Item     `json:"-"` // Not persisted
-	Expanded         bool      `json:"-"` // UI state, not persisted
-	virtualChildren  []*Item   `json:"-"` // Resolved virtual child pointers (runtime only)
+	Parent           *Item     `json:"-"`                          // Not persisted
+	Expanded         bool      `json:"-"`                          // UI state, not persisted
+	virtualChildren  []*Item   `json:"-"`                          // Resolved virtual child pointers (runtime only)
 	// CollapsedVirtualChildren tracks which virtual children are collapsed (for display-only)
 	// Maps virtual child item ID -> true if collapsed. Only used for search nodes to avoid
 	// collapsing the original items. This is session-only state.
@@ -34,10 +34,10 @@ type Metadata struct {
 
 // Outline represents the entire outline document
 type Outline struct {
-	Items                 []*Item            `json:"items"`
-	OriginalFilename      string             `json:"original_filename,omitempty"`
-	TypeDefinitions       map[string]string  `json:"type_definitions,omitempty"` // Global type definitions (key -> type spec)
-	itemIndex             map[string]*Item   `json:"-"` // Fast O(1) ID lookup cache
+	Items            []*Item           `json:"items"`
+	OriginalFilename string            `json:"original_filename,omitempty"`
+	TypeDefinitions  map[string]string `json:"type_definitions,omitempty"` // Global type definitions (key -> type spec)
+	itemIndex        map[string]*Item  `json:"-"`                          // Fast O(1) ID lookup cache
 }
 
 // NewItem creates a new outline item with a generated ID
@@ -282,6 +282,65 @@ func (o *Outline) PopulateSearchNode(item *Item, matchingIDs []string) int {
 	o.resolveVirtualChildrenRecursive(item, visitedPath)
 
 	return len(matchingIDs)
+}
+
+// AddTag adds a tag to the item's metadata (creates metadata if needed)
+func (i *Item) AddTag(tag string) {
+	if i.Metadata == nil {
+		i.Metadata = &Metadata{
+			Attributes: make(map[string]string),
+			Created:    time.Now(),
+			Modified:   time.Now(),
+		}
+	}
+	// Check if tag already exists
+	if !i.HasTag(tag) {
+		i.Metadata.Tags = append(i.Metadata.Tags, tag)
+		i.Metadata.Modified = time.Now()
+	}
+}
+
+// RemoveTag removes a tag from the item's metadata
+func (i *Item) RemoveTag(tag string) {
+	if i.Metadata == nil || len(i.Metadata.Tags) == 0 {
+		return
+	}
+	for idx, t := range i.Metadata.Tags {
+		if t == tag {
+			i.Metadata.Tags = append(i.Metadata.Tags[:idx], i.Metadata.Tags[idx+1:]...)
+			i.Metadata.Modified = time.Now()
+			break
+		}
+	}
+}
+
+// HasTag checks if the item has a specific tag
+func (i *Item) HasTag(tag string) bool {
+	if i.Metadata == nil || len(i.Metadata.Tags) == 0 {
+		return false
+	}
+	for _, t := range i.Metadata.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
+}
+
+// GetTags returns all tags for the item
+func (i *Item) GetTags() []string {
+	if i.Metadata == nil {
+		return nil
+	}
+	return i.Metadata.Tags
+}
+
+// ClearTags removes all tags from the item
+func (i *Item) ClearTags() {
+	if i.Metadata != nil {
+		i.Metadata.Tags = nil
+		i.Metadata.Modified = time.Now()
+	}
 }
 
 func generateID() string {

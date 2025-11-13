@@ -222,6 +222,11 @@ func (s *Screen) TreeAttributeStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeAttributeValue)
 }
 
+// TreeTagStyle returns the style for visible tag values
+func (s *Screen) TreeTagStyle() tcell.Style {
+	return theme.ColorToStyle(s.Theme.Colors.TreeTagValue)
+}
+
 // TreeLinkStyle returns the style for wiki-style links
 func (s *Screen) TreeLinkStyle() tcell.Style {
 	return theme.ColorToStyle(s.Theme.Colors.TreeLinkText)

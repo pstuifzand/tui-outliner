@@ -1,0 +1,247 @@
+{
+  "items": [
+    {
+      "id": "item_20251112120001_demo1",
+      "text": "Project Alpha - Web Application",
+      "metadata": {
+        "tags": [
+          "work",
+          "project",
+          "urgent"
+        ],
+        "attributes": {
+          "priority": "high",
+          "status": "in-progress"
+        },
+        "created": "2025-11-01T10:00:00Z",
+        "modified": "2025-11-12T12:00:00Z"
+      },
+      "children": [
+        {
+          "id": "item_20251112120002_demo2",
+          "text": "Frontend Development",
+          "metadata": {
+            "tags": [
+              "work",
+              "frontend",
+              "urgent"
+            ],
+            "attributes": {
+              "status": "doing"
+            },
+            "created": "2025-11-02T10:00:00Z",
+            "modified": "2025-11-10T15:00:00Z"
+          },
+          "children": [
+            {
+              "id": "item_20251112120003_demo3",
+              "text": "Implement user authentication",
+              "metadata": {
+                "tags": [
+                  "work",
+                  "frontend",
+                  "done"
+                ],
+                "attributes": {
+                  "status": "done"
+                },
+                "created": "2025-11-03T10:00:00Z",
+                "modified": "2025-11-08T16:00:00Z"
+              }
+            },
+            {
+              "id": "item_20251112120004_demo4",
+              "text": "Design landing page",
+              "metadata": {
+                "tags": [
+                  "work",
+                  "frontend",
+                  "urgent"
+                ],
+                "attributes": {
+                  "status": "todo"
+                },
+                "created": "2025-11-04T10:00:00Z",
+                "modified": "2025-11-09T14:00:00Z"
+              }
+            }
+          ]
+        },
+        {
+          "id": "item_20251112120005_demo5",
+          "text": "Backend Development",
+          "metadata": {
+            "tags": [
+              "work",
+              "backend"
+            ],
+            "attributes": {
+              "status": "todo"
+            },
+            "created": "2025-11-02T11:00:00Z",
+            "modified": "2025-11-05T12:00:00Z"
+          },
+          "children": [
+            {
+              "id": "item_20251112120006_demo6",
+              "text": "Set up database schema",
+              "metadata": {
+                "tags": [
+                  "work",
+                  "backend",
+                  "database",
+                  "done"
+                ],
+                "attributes": {
+                  "status": "done"
+                },
+                "created": "2025-11-03T11:00:00Z",
+                "modified": "2025-11-06T17:00:00Z"
+              }
+            },
+            {
+              "id": "item_20251112120007_demo7",
+              "text": "Implement REST API endpoints",
+              "metadata": {
+                "tags": [
+                  "work",
+                  "backend",
+                  "api"
+                ],
+                "attributes": {
+                  "status": "doing"
+                },
+                "created": "2025-11-04T11:00:00Z",
+                "modified": "2025-11-11T13:00:00Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "item_20251112120008_demo8",
+      "text": "Personal Projects",
+      "metadata": {
+        "tags": [
+          "personal",
+          "hobby"
+        ],
+        "created": "2025-11-01T15:00:00Z",
+        "modified": "2025-11-10T18:00:00Z"
+      },
+      "children": [
+        {
+          "id": "item_20251112120009_demo9",
+          "text": "Learn Rust programming",
+          "metadata": {
+            "tags": [
+              "personal",
+              "learning",
+              "rust"
+            ],
+            "attributes": {
+              "status": "doing"
+            },
+            "created": "2025-11-02T15:00:00Z",
+            "modified": "2025-11-12T10:00:00Z"
+          }
+        },
+        {
+          "id": "item_20251112120010_demo10",
+          "text": "Build a CLI tool",
+          "metadata": {
+            "tags": [
+              "personal",
+              "rust",
+              "cli"
+            ],
+            "attributes": {
+              "status": "todo"
+            },
+            "created": "2025-11-03T15:00:00Z",
+            "modified": "2025-11-09T19:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "item_20251112120011_demo11",
+      "text": "Shopping List",
+      "metadata": {
+        "tags": [
+          "personal",
+          "todo-list"
+        ],
+        "created": "2025-11-05T08:00:00Z",
+        "modified": "2025-11-12T08:00:00Z"
+      },
+      "children": [
+        {
+          "id": "item_20251112120012_demo12",
+          "text": "Buy groceries",
+          "metadata": {
+            "tags": [
+              "personal",
+              "shopping",
+              "urgent"
+            ],
+            "attributes": {
+              "status": "todo"
+            },
+            "created": "2025-11-10T08:00:00Z",
+            "modified": "2025-11-12T08:30:00Z"
+          }
+        },
+        {
+          "id": "item_20251112120013_demo13",
+          "text": "Pick up package from post office",
+          "metadata": {
+            "tags": [
+              "personal",
+              "errand",
+              "done"
+            ],
+            "attributes": {
+              "status": "done"
+            },
+            "created": "2025-11-08T09:00:00Z",
+            "modified": "2025-11-11T14:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "id": "item_20251112120014_demo14",
+      "text": "Meeting Notes - Q4 Planning",
+      "metadata": {
+        "tags": [
+          "work",
+          "meeting",
+          "archive"
+        ],
+        "attributes": {
+          "date": "2025-10-15"
+        },
+        "created": "2025-10-15T14:00:00Z",
+        "modified": "2025-10-15T16:00:00Z"
+      },
+      "children": [
+        {
+          "id": "item_20251112120015_demo15",
+          "text": "Discussed budget allocation",
+          "metadata": {
+            "tags": [
+              "work",
+              "meeting",
+              "budget"
+            ],
+            "created": "2025-10-15T14:15:00Z",
+            "modified": "2025-10-15T14:15:00Z"
+          }
+        }
+      ]
+    }
+  ],
+  "original_filename": "/home/peter/work/tui-outliner/examples/tags_demo.json"
+}

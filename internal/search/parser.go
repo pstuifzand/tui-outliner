@@ -124,6 +124,8 @@ func (t *Tokenizer) NextToken() Token {
 		return t.readQuotedText()
 	case '@':
 		return t.readAttrFilter()
+	case '#':
+		return t.readTagFilter()
 	case '~':
 		return t.readFuzzyFilter()
 	case '/':
@@ -266,6 +268,26 @@ func (t *Tokenizer) readAttrFilter() Token {
 
 	// Just @key with no criteria
 	value := "@" + key
+	return Token{Type: TokenFilter, Value: value}
+}
+
+func (t *Tokenizer) readTagFilter() Token {
+	t.pos++ // Skip #
+
+	// Read tag name (alphanumeric, underscore, dash)
+	tagStart := t.pos
+	for t.pos < len(t.input) && (isAlphaNumeric(t.input[t.pos]) || t.input[t.pos] == '_' || t.input[t.pos] == '-') {
+		t.pos++
+	}
+	tag := t.input[tagStart:t.pos]
+
+	if tag == "" {
+		// Empty tag, treat as just #
+		return Token{Type: TokenText, Value: "#"}
+	}
+
+	// Return as a filter token with "tag:" prefix
+	value := "tag:" + tag
 	return Token{Type: TokenFilter, Value: value}
 }
 
@@ -618,6 +640,9 @@ func parseFilterValue(value string) (FilterExpr, error) {
 	case "ref":
 		// ref:itemid -> find all items that link to this item (backlinks)
 		expr, err = parseRefFilter(criteria)
+	case "tag":
+		// tag:tagname -> filter by tag
+		expr = NewTagFilter(criteria)
 	default:
 		// Unknown filter type, treat as text
 		expr = NewTextExpr(value)
@@ -632,6 +657,11 @@ func parseFilterValue(value string) (FilterExpr, error) {
 		if !hasClosure && quantifier == QuantifierNone {
 			expr = NewNotExpr(expr)
 		}
+	}
+
+	// For tag filters, wrap with NOT if quantifier is None
+	if filterType == "tag" && quantifier == QuantifierNone {
+		expr = NewNotExpr(expr)
 	}
 
 	return expr, nil

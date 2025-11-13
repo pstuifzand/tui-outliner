@@ -27,6 +27,7 @@ type ThemeConfig struct {
 		TreeVisualCursorBg    string `toml:"tree_visual_cursor_bg"`
 		TreeAttributeIndicator string `toml:"tree_attribute_indicator"`
 		TreeAttributeValue    string `toml:"tree_attribute_value"`
+		TreeTagValue          string `toml:"tree_tag_value"`
 		EditorText        string `toml:"editor_text"`
 		EditorCursor      string `toml:"editor_cursor"`
 		EditorCursorBg    string `toml:"editor_cursor_bg"`
@@ -163,6 +164,9 @@ func configToTheme(config ThemeConfig) *Theme {
 	}
 	if config.Colors.TreeAttributeValue != "" {
 		baseTheme.Colors.TreeAttributeValue = ParseColorString(config.Colors.TreeAttributeValue)
+	}
+	if config.Colors.TreeTagValue != "" {
+		baseTheme.Colors.TreeTagValue = ParseColorString(config.Colors.TreeTagValue)
 	}
 	if config.Colors.EditorText != "" {
 		baseTheme.Colors.EditorText = ParseColorString(config.Colors.EditorText)
